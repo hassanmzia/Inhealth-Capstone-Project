@@ -1,0 +1,385 @@
+URGENT: Patient John Doe - New Cardiac Arrhythmia Detected
+  
+  Patient: John Doe (DOB: 1/15/1955, MRN: 123456)
+  Alert Time: 10/29/2025 14:30
+  Urgency: ORANGE (Same-day attention needed)
+  
+  SUMMARY:
+  - New atrial fibrillation detected by ECG Agent (Agent 5)
+  - Heart rate: 110-140 bpm (irregular)
+  - Patient reports palpitations, mild dyspnea
+  - No chest pain, stable blood pressure
+  
+  RELEVANT HISTORY:
+  - Type 2 Diabetes (HbA1c 7.2%)
+  - Hypertension (controlled)
+  - No prior arrhythmias
+  
+  AI RECOMMENDATIONS:
+  1. Order anticoagulation workup (CHA2DS2-VASc score: 4)
+  2. Consider beta-blocker for rate control
+  3. Schedule cardiology consult
+  
+  ACTIONS REQUIRED:
+  [ ] Review and approve recommendations
+  [ ] Schedule video visit today
+  [ ] Order to ED for evaluation
+  
+  View Full Dashboard: [Link]
+```
+- **Integration**: Receives triggers from Agent 18 (Triage); coordinates with Agent 21 (Appointment Scheduling)
+
+#### **Agent 20: Patient Notification Agent** ⭐ NEW
+- **Role**: Direct patient communication for engagement and education
+- **Data**: Patient-friendly summaries, action items, educational content
+- **Actions**:
+  - **Email Notifications** with health updates
+  - **SMS/Text Alerts** for urgent reminders (medication, appointments)
+  - **Push Notifications** via mobile app
+  - **Automated Phone Calls** for critical alerts (using voice synthesis)
+  - **Educational Content** delivery based on conditions
+- **Communication Types**:
+  - **Daily Health Summary**: "Your glucose levels were well-controlled today. Great job!"
+  - **Medication Reminders**: "Time to take your evening insulin (8 units)"
+  - **Appointment Reminders**: "You have a telehealth visit with Dr. Smith tomorrow at 2 PM"
+  - **Lifestyle Coaching**: "You've been sitting for 3 hours. Time for a 5-minute walk!"
+  - **Urgent Alerts**: "Your blood pressure is elevated. Please rest and recheck in 30 minutes."
+  - **Test Result Notifications**: "Your recent kidney function test shows improvement!"
+- **Algorithm**: **NLP for Patient-friendly Language Translation** + **Multi-channel Communication Manager** + **Personalization Engine**
+- **Accessibility Features**:
+  - Large text options for elderly
+  - Audio messages for low-literacy patients
+  - Language translation (Spanish, etc.) for rural immigrant populations
+  - Simple, jargon-free language
+- **Integration**: Receives from Agent 18 (Triage) and Agent 16 (Coaching); confirms receipt and tracks patient engagement
+
+#### **Agent 21: Appointment Scheduling Agent** ⭐ NEW
+- **Role**: Automated scheduling coordination with healthcare providers
+- **Data**: 
+  - Provider calendars (integrated via EHR/practice management systems)
+  - Patient availability (from patient profile/preferences)
+  - Urgency level from Agent 18
+  - Type of visit needed (video vs. in-person)
+- **Actions**:
+  - **Automatic Scheduling**: Books appointments based on urgency
+  - **Rescheduling**: Moves non-urgent appointments if urgent needs arise
+  - **Sends Calendar Invites**: To patient email/phone
+  - **Telehealth Setup**: Generates video visit links
+  - **Transportation Coordination**: For rural patients needing in-person visits (coordinates with Agent 23)
+- **Scheduling Logic**:
+  - CRITICAL: Within 2-4 hours (ED referral if no availability)
+  - URGENT: Same-day or next-day
+  - SOON: Within 3-7 days
+  - ROUTINE: Within 2-4 weeks
+- **Algorithm**: **Constraint Satisfaction Problem Solver** + **Calendar Integration APIs** + **Optimization for patient-provider matching**
+- **Example Workflow**:
+  1. Agent 18 flags URGENT pneumonia case
+  2. Agent 21 checks PCP availability → available in 6 hours
+  3. Books 4:00 PM telehealth appointment
+  4. Sends confirmation to patient (Agent 20) and doctor (Agent 19)
+  5. Sends video link 15 minutes before appointment
+- **Integration**: Triggered by Agent 18; coordinates with Agents 19-20 for notifications
+
+#### **Agent 22: Hospital Availability & Finder Agent** ⭐ NEW
+- **Role**: Real-time hospital resource tracking and recommendation
+- **Data**:
+  - Local hospital locations and distances (GPS)
+  - ED wait times (via hospital system integrations)
+  - Bed availability (ICU, general med/surg)
+  - Specialist availability (cardiologist on-call, etc.)
+  - Ambulance response times
+  - Insurance acceptance
+  - Hospital quality ratings for specific conditions
+- **Actions**:
+  - **Identifies nearest appropriate hospital** based on patient condition
+  - **Checks bed availability** before recommending admission
+  - **Compares hospital quality** for specific needs (e.g., cardiac cath lab for MI)
+  - **Provides turn-by-turn directions** to patient/family
+  - **Estimates wait times** to set expectations
+  - **Checks insurance coverage** to avoid surprise bills
+- **Algorithm**: **Geospatial Analysis** + **Real-time API Integration with Hospital Systems** + **Multi-criteria Ranking**
+- **Example Scenarios**:
+  - CRITICAL cardiac event → Recommends hospital with 24/7 cath lab, alerts Agent 23 to arrange transport
+  - Moderate pneumonia → Recommends local community hospital with available beds
+  - Suspected stroke → Recommends certified stroke center within "golden hour" window
+- **Rural Context**: Critical for areas with multiple small hospitals of varying capabilities
+- **Integration**: Triggered by Agent 18 for hospital-level care; coordinates with Agent 23 for admission
+
+#### **Agent 23: Hospital Contact & Admission Coordination Agent** ⭐ NEW
+- **Role**: End-to-end hospital admission logistics
+- **Data**: Patient medical summary, insurance info, transport needs
+- **Actions**:
+  - **Calls Hospital ED** directly to pre-register patient (automated or human-in-the-loop)
+  - **Transmits Medical Summary**: Sends comprehensive patient data to receiving hospital
+  - **Arranges Ambulance Transport**: Calls EMS if needed
+  - **Coordinates Direct Admission**: Bypasses ED when appropriate (e.g., direct admit to cardiology)
+  - **Notifies Family**: Alerts emergency contacts
+  - **Insurance Pre-authorization**: Initiates authorization process
+  - **Arranges Patient Transport**: For non-emergency admissions (medical transport van)
+- **Algorithm**: **Workflow Automation** + **Communication Protocols** + **Hospital Integration APIs**
+- **Example Critical Pathway**:
+  1. Agent 18 determines CRITICAL level → needs hospitalization
+  2. Agent 22 identifies Hospital A (15 miles, cardiac capabilities, beds available)
+  3. **Agent 23 executes**:
+     - Calls Hospital A ED: "Incoming patient with acute MI, ETA 25 minutes"
+     - Transmits ECG, vitals, medical history
+     - Calls 911 for ambulance dispatch
+     - Sends alert to patient family via Agent 20
+     - Notifies PCP via Agent 19
+     - Generates admission paperwork
+  4. Tracks patient through hospital system, maintains continuity
+- **Rural Context**: Especially critical where families may not have transport; coordinates volunteer drivers or medical vans
+- **Integration**: Final action agent in critical pathway; receives from Agent 18 & 22
+
+---
+
+## **TIER 7: Infrastructure & Support Agents** (2 Agents)
+
+#### **Agent 24: Offline Resilience Agent**
+- Maintains functionality during connectivity loss
+- Algorithm: Edge Computing protocols
+
+#### **Agent 25: Image Quality & Acquisition Agent**
+- Ensures diagnostic-quality medical images
+- Algorithm: Quality Assessment CNN
+
+---
+
+## **COMPLETE AGENT ROSTER: 25 AGENTS**
+
+| # | Agent Name | Type | Algorithm | Primary Function |
+|---|-----------|------|-----------|------------------|
+| 1 | Glucose Monitoring | Monitoring | Time-series | Glucose tracking |
+| 2 | Basic Cardiac | Monitoring | Pattern Recognition | HR, BP monitoring |
+| 3 | Activity & Lifestyle | Monitoring | Clustering | Behavior tracking |
+| **4** | **Body Temperature** | **Monitoring** | **Anomaly Detection** | **Fever/infection detection** |
+| 5 | ECG/EKG Analysis | Diagnostic | CNN | Arrhythmia detection |
+| 6 | Kidney Function | Diagnostic | Gradient Boosting | Renal health |
+| 7 | Pneumonia X-ray | Diagnostic | Deep CNN | Infection imaging |
+| 8 | COVID X-ray | Diagnostic | Custom CNN | Pandemic screening |
+| **9** | **Family History** | **Profile** | **Risk Scoring** | **Genetic risk analysis** |
+| **10** | **Obesity & Metabolic** | **Profile** | **Regression** | **Metabolic syndrome** |
+| **11** | **Current Medication** | **Profile** | **NLP + Pattern** | **Medication management** |
+| 12 | Drug Interaction | Safety | Knowledge Graphs | Drug safety |
+| **13** | **Disease Prediction** | **Predictive** | **Deep Neural Net** | **Future disease forecasting** |
+| 14 | Comorbidity Risk | Risk Assessment | XGBoost | Multi-condition risk |
+| 15 | Predictive Analytics | Risk Assessment | Multi-task LSTM | Event forecasting |
+| 16 | Coaching | Intervention | Reinforcement Learning | Patient education |
+| **17** | **Prescription** | **Intervention** | **Clinical Decision Support** | **Treatment recommendations** |
+| 18 | Priority & Triage | Decision | Multi-criteria Analysis | Urgency determination |
+| **19** | **Doctor Notification** | **Communication** | **NLP + Routing** | **Physician alerts** |
+| **20** | **Patient Notification** | **Communication** | **NLP + Multi-channel** | **Patient engagement** |
+| **21** | **Appointment Scheduling** | **Action** | **Constraint Solver** | **Calendar coordination** |
+| **22** | **Hospital Finder** | **Action** | **Geospatial + APIs** | **Hospital selection** |
+| **23** | **Hospital Coordination** | **Action** | **Workflow Automation** | **Admission logistics** |
+| 24 | Offline Resilience | Infrastructure | Edge Computing | Connectivity management |
+| 25 | Image Quality | Infrastructure | Quality Assessment | Image validation |
+
+---
+
+## **CRITICAL PATHWAY EXAMPLES**
+
+### **Scenario 1: Acute Cardiac Emergency**
+```
+Timeline: 10:45 AM - Patient has chest pain
+
+Agent 5 (ECG) → Detects ST-elevation MI pattern
+     ↓
+Agent 2 (Cardiac) → Confirms elevated HR, BP changes
+     ↓
+Agent 14 (Risk) → Calculates CRITICAL cardiac event risk score
+     ↓
+Agent 18 (Triage) → Classifies as RED/CRITICAL
+     ↓ (Parallel Actions)
+     ├→ Agent 19 (Doctor) → URGENT email + page to cardiologist
+     ├→ Agent 20 (Patient) → "Call 911 immediately. Possible heart attack."
+     ├→ Agent 22 (Hospital) → Identifies St. Mary's (12 miles, cath lab available)
+     └→ Agent 23 (Coordination):
+         - Calls 911: "AMI patient, needs cath lab"
+         - Calls St. Mary's ED: "STEMI incoming, ETA 20 min"
+         - Transmits ECG to hospital
+         - Notifies family
+         - Alerts PCP
+
+Result: Patient in cath lab within 45 minutes ("door-to-balloon time")
+```
+
+---
+
+### **Scenario 2: Gradual Disease Prediction & Prevention**
+```
+Timeline: Over 6 months
+
+Agent 9 (Family History) → Strong paternal history of early CVD
+     +
+Agent 10 (Obesity) → BMI trending upward (29→31)
+     +
+Agent 1 (Glucose) → Fasting glucose 105-115 mg/dL (pre-diabetes)
+     +
+Agent 2 (Cardiac) → Mild BP elevation (130-140/85-90)
+     +
+Agent 11 (Medication) → No current preventive medications
+     ↓
+Agent 13 (Disease Prediction) → Calculates:
+  - 10-year ASCVD risk: 18% (high)
+  - Diabetes progression risk: 65% within 3 years
+  - Metabolic syndrome: Present
+     ↓
+Agent 17 (Prescription) → Generates recommendations:
+  1. Start moderate-intensity statin (atorvastatin 20mg)
+  2. Consider metformin for diabetes prevention
+  3. Initiate ACE inhibitor for BP control
+     ↓
+Agent 18 (Triage) → Classifies as YELLOW (needs attention soon)
+     ↓
+Agent 19 (Doctor) → Sends comprehensive email:
+  "Patient at high CVD risk. AI recommends preventive therapy. 
+   Please review attached risk analysis and medication suggestions."
+     +
+Agent 21 (Scheduling) → Books appointment in 1 week
+     +
+Agent 20 (Patient) → Sends educational email:
+  "Your health data shows increased heart disease risk. 
+   We've scheduled an appointment to discuss prevention strategies."
+     +
+Agent 16 (Coaching) → Initiates weight loss program:
+  - Daily step goals
+  - Nutrition guidance
+  - Weekly check-ins
+
+Result: Preventive intervention BEFORE disease develops
+```
+
+---
+
+### **Scenario 3: Multi-Condition Cascade (Complex)**
+```
+Timeline: Patient develops pneumonia (diabetes + CVD background)
+
+Day 1 - Morning:
+Agent 4 (Temperature) → Detects fever 101.5°F
+     +
+Agent 7 (X-ray) → Identifies right lower lobe infiltrate (pneumonia)
+     ↓
+Agent 18 (Triage) → Classifies URGENT (same-day care)
+     ↓
+Agent 17 (Prescription) → Recommends antibiotic (azithromycin)
+     ↓
+BUT... Agent 5 (ECG) → Flags prolonged QT interval
+     AND Agent 6 (Kidney) → eGFR 32 (CKD Stage 3B)
+     ↓
+Agent 12 (Drug Safety) → ALERT: Azithromycin contraindicated!
+  (QT prolongation risk + renal dosing needed)
+     ↓
+Agent 17 (Prescription) → REVISED: Amoxicillin 500mg Q12H (renal-adjusted)
+     ↓
+Agent 19 (Doctor) → Email with recommendation + rationale
+Agent 21 (Scheduling) → Books same-day telehealth visit
+
+Day 1 - Afternoon:
+Doctor approves antibiotic → Agent 20 sends e-prescription to pharmacy
+
+Day 2:
+Agent 1 (Glucose) → Blood sugar rising (stress response: 180-220 mg/dL)
+     ↓
+Agent 14 (Risk) → Elevated infection + hyperglycemia risk
+     ↓
+Agent 17 (Prescription) → Suggests temporary insulin dose increase
+     ↓
+Agent 19 → Alerts doctor → Doctor approves
+     ↓
+Agent 20 (Patient) → "Your blood sugar is elevated due to infection. 
+  Increase insulin by 2 units temporarily. We're monitoring closely."
+
+Day 3:
+Agent 4 (Temperature) → Fever persisting (101.2°F)
+     +
+Agent 2 (Cardiac) → Heart rate elevated (105 bpm)
+     ↓
+Agent 18 (Triage) → Escalates to URGENT
+     ↓
+Agent 22 (Hospital) → Checks bed availability at County Hospital
+     ↓
+Agent 19 (Doctor) → "Patient not improving. Consider admission?"
+     ↓
+Doctor decides: Admit for IV antibiotics
+     ↓
+Agent 23 (Coordination):
+  - Calls County Hospital: Pre-registers patient
+  - Sends medical summary
+  - Arranges medical transport (patient has no car)
+  - Notifies family
+  - Ensures insulin/diabetic supplies packed
+
+Day 4:
+Patient admitted, receives IV antibiotics, continues monitoring
+
+Day 7:
+Agent 7 (X-ray) → Follow-up shows improvement
+Agent 4 (Temperature) → Normal for 48 hours
+Agent 1 (Glucose) → Back to baseline
+     ↓
+Agent 18 (Triage) → GREEN/stable
+     ↓
+Agent 23 → Coordinates discharge planning with hospital
+Agent 21 → Schedules follow-up appointment in 1 week
+Agent 20 → Sends discharge instructions to patient
+
+Result: Coordinated care through complex multi-system crisis
+```
+
+---
+
+## **DATA FLOW ARCHITECTURE**
+```
+┌─────────────────────────────────────────────────────────┐
+│         PATIENT (Rural Home Setting)                     │
+├─────────────────────────────────────────────────────────┤
+│  Wearables: Glucose monitor, smartwatch, smart scale,   │
+│             temperature sensor, BP cuff                  │
+│  Devices: Smartphone app, tablet, portable ECG          │
+│  Periodic: X-rays (mobile unit visits), Lab results     │
+└────────────────────┬────────────────────────────────────┘
+                     │ (Edge Processing via Agent 24)
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│         TIER 1-2: MONITORING & DIAGNOSTIC AGENTS        │
+│    (Agents 1-8: Collect, analyze physiological data)    │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│         TIER 3: PROFILE & ANALYSIS AGENTS               │
+│  (Agents 9-15: Risk assessment, medication analysis,    │
+│   disease prediction, family history)                   │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│         TIER 4: INTERVENTION AGENTS                     │
+│  (Agents 16-17: Coaching, treatment recommendations)    │
+└────────────────────┬────────────────────────────────────┘
+                     ↓
+┌─────────────────────────────────────────────────────────┐
+│         AGENT 18: TRIAGE (Central Decision Hub)         │
+│    Determines urgency → Routes to action agents         │
+└─────────┬───────────────────────────────────────┬───────┘
+          │                                       │
+          ↓                                       ↓
+┌──────────────────────┐              ┌──────────────────────┐
+│   PHYSICIAN PATHWAY  │              │   PATIENT PATHWAY    │
+├──────────────────────┤              ├──────────────────────┤
+│ Agent 19: Notify Dr  │              │ Agent 20: Notify Pt  │
+│ Agent 21: Schedule   │              │ Agent 16: Coach      │
+└──────────────────────┘              └──────────────────────┘
+          │                                       │
+          └───────────────┬───────────────────────┘
+                          ↓
+            ┌─────────────────────────────┐
+            │   CRITICAL PATHWAY          │
+            ├─────────────────────────────┤
+            │ Agent 22: Find Hospital     │
+            │ Agent 23: Coordinate Care   │
+            └─────────────────────────────┘
+                          ↓
+            ┌─────────────────────────────┐
+            │   HOSPITAL/ED               │
+            └─────────────────────────────┘

@@ -1,0 +1,151 @@
+# apps/fhir/models.py
+
+from django.db import models
+from django.contrib.postgres.fields import ArrayField, JSONField
+import uuid
+
+class FHIRPatient(models.Model):
+    """Django ORM wrapper for FHIR Patient resource"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    identifier = models.CharField(max_length=255, unique=True, db_index=True)  # MRN
+    name_family = models.CharField(max_length=255)
+    name_given = models.CharField(max_length=255)
+    birth_date = models.DateField()
+    gender = models.CharField(max_length=50)
+    address_line = models.TextField(null=True, blank=True)
+    address_city = models.CharField(max_length=100, null=True)
+    address_state = models.CharField(max_length=50, null=True)
+    address_postal_code = models.CharField(max_length=20, null=True)
+    telecom_phone = models.CharField(max_length=50, null=True)
+    telecom_email = models.EmailField(null=True)
+    active = models.BooleanField(default=True)
+    raw_fhir = models.JSONField(null=True)  # Full FHIR JSON
+    meta_last_updated = models.DateTimeField(auto_now=True)
+    
+    class Meta:
+        db_table = 'fhir_patient'
+        ordering = ['-meta_last_updated']
+    
+    def __str__(self):
+        return f"{self.name_given} {self.name_family} ({self.identifier})"
+    
+    def to_fhir_json(self):
+        """Convert to FHIR JSON format"""
+        return {
+            "resourceType": "Patient",
+            "id": str(self.id),
+            "identifier": [{"value": self.identifier, "system": "MRN"}],
+            "name": [{
+                "family": self.name_family,
+                "given": [self.name_given]
+            }],
+            "gender": self.gender,
+            "birthDate": self.birth_date.isoformat(),
+            "telecom": [
+                {"system": "phone", "value": self.telecom_phone},
+                {"system": "email", "value": self.telecom_email}
+            ],
+            "address": [{
+                "line": [self.address_line],
+                "city": self.address_city,
+                "state": self.address_state,
+                "postalCode": self.address_postal_code
+            }],
+            "active": self.active
+        }
+
+class FHIRObservation(models.Model):
+    """Vital signs, labs, wearable data"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    patient = models.ForeignKey(FHIRPatient, on_delete=models.CASCADE, related_name='observations')
+    status = models.CharField(max_length=50, default='final')
+    category = models.CharField(max_length=100, db_index=True)  # vital-signs, laboratory, imaging
+    code_system = models.CharField(max_length=255)  # LOINC, SNOMED
+    code_code = models.CharField(max_length=100, db_index=True)
+    code_display = models.CharField(max_length=255)
+    value_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    value_unit = models.CharField(max_length=50, null=True)
+    value_string = models.TextField(null=True)
+    effective_datetime = models.DateTimeField(db_index=True)
+    issued = models.DateTimeField(auto_now_add=True)
+    performer_id = models.UUIDField(null=True)
+    device_id = models.UUIDField(null=True)
+    interpretation = models.CharField(max_length=50, null=True)  # normal, high, low, critical
+    raw_fhir = models.JSONField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'fhir_observation'
+        ordering = ['-effective_datetime']
+        indexes = [
+            models.Index(fields=['patient', 'code_code', '-effective_datetime']),
+        ]
+    
+    def __str__(self):
+        return f"{self.code_display}: {self.value_quantity} {self.value_unit}"
+
+class FHIRCondition(models.Model):
+    """Diagnoses/Problems"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    patient = models.ForeignKey(FHIRPatient, on_delete=models.CASCADE, related_name='conditions')
+    clinical_status = models.CharField(max_length=50, db_index=True)
+    verification_status = models.CharField(max_length=50)
+    category = models.CharField(max_length=100)
+    severity = models.CharField(max_length=50, null=True)
+    code_system = models.CharField(max_length=255)
+    code_code = models.CharField(max_length=100, db_index=True)
+    code_display = models.CharField(max_length=255)
+    onset_datetime = models.DateTimeField(null=True)
+    recorded_date = models.DateTimeField(auto_now_add=True)
+    recorder_id = models.UUIDField(null=True)
+    raw_fhir = models.JSONField(null=True)
+    
+    class Meta:
+        db_table = 'fhir_condition'
+        ordering = ['-recorded_date']
+
+class FHIRMedicationRequest(models.Model):
+    """Prescriptions"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    patient = models.ForeignKey(FHIRPatient, on_delete=models.CASCADE, related_name='medications')
+    status = models.CharField(max_length=50, db_index=True)
+    intent = models.CharField(max_length=50)
+    priority = models.CharField(max_length=50, null=True)
+    medication_code_system = models.CharField(max_length=255)
+    medication_code = models.CharField(max_length=100, db_index=True)
+    medication_display = models.CharField(max_length=255)
+    dosage_text = models.TextField(null=True)
+    dosage_timing_repeat = models.JSONField(null=True)
+    dosage_route = models.CharField(max_length=100, null=True)
+    dosage_quantity = models.DecimalField(max_digits=10, decimal_places=2, null=True)
+    dosage_unit = models.CharField(max_length=50, null=True)
+    requester_id = models.UUIDField(null=True)
+    authored_on = models.DateTimeField(auto_now_add=True)
+    dispense_request = models.JSONField(null=True)
+    raw_fhir = models.JSONField(null=True)
+    
+    class Meta:
+        db_table = 'fhir_medication_request'
+        ordering = ['-authored_on']
+
+class AgentActionLog(models.Model):
+    """Track all agent actions"""
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4)
+    agent_name = models.CharField(max_length=100, db_index=True)
+    agent_id = models.IntegerField()
+    patient = models.ForeignKey(FHIRPatient, on_delete=models.CASCADE, related_name='agent_actions')
+    action_type = models.CharField(max_length=100)
+    action_data = models.JSONField()
+    priority = models.CharField(max_length=50)
+    status = models.CharField(max_length=50, default='pending')
+    executed_at = models.DateTimeField(null=True)
+    result = models.JSONField(null=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    
+    class Meta:
+        db_table = 'agent_action_log'
+        ordering = ['-created_at']
+        indexes = [
+            models.Index(fields=['patient', 'agent_name', '-created_at']),
+            models.Index(fields=['status', 'priority']),
+        ]

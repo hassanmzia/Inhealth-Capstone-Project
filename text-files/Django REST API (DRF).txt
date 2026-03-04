@@ -1,0 +1,77 @@
+# apps/patients/views.py
+
+from rest_framework import viewsets, status
+from rest_framework.decorators import action
+from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated
+from django.db.models import Q
+from .models import FHIRPatient, FHIRObservation, FHIRCondition
+from .serializers import PatientSerializer, ObservationSerializer
+from apps.agents.orchestrator import AgentOrchestrator
+
+class PatientViewSet(viewsets.ModelViewSet):
+    """Patient API endpoints"""
+    queryset = FHIRPatient.objects.all()
+    serializer_class = PatientSerializer
+    permission_classes = [IsAuthenticated]
+    
+    def get_queryset(self):
+        """Filter patients based on user role"""
+        user = self.request.user
+        if user.role == 'doctor':
+            return FHIRPatient.objects.filter(assigned_doctor=user)
+        elif user.role == 'patient':
+            return FHIRPatient.objects.filter(user=user)
+        return FHIRPatient.objects.all()
+    
+    @action(detail=True, methods=['get'])
+    def dashboard(self, request, pk=None):
+        """Get comprehensive patient dashboard data"""
+        patient = self.get_object()
+        
+        # Get recent vitals
+        recent_vitals = FHIRObservation.objects.filter(
+            patient=patient,
+            category='vital-signs'
+        ).order_by('-effective_datetime')[:20]
+        
+        # Get active conditions
+        conditions = FHIRCondition.objects.filter(
+            patient=patient,
+            clinical_status='active'
+        )
+        
+        # Get agent insights
+        orchestrator = AgentOrchestrator()
+        agent_insights = orchestrator.get_patient_insights(patient.id)
+        
+        return Response({
+            'patient': PatientSerializer(patient).data,
+            'recent_vitals': ObservationSerializer(recent_vitals, many=True).data,
+            'conditions': [c.code_display for c in conditions],
+            'agent_insights': agent_insights,
+            'risk_scores': agent_insights.get('risk_assessment', {}),
+            'recommendations': agent_insights.get('recommendations', [])
+        })
+    
+    @action(detail=True, methods=['post'])
+    def trigger_agent_analysis(self, request, pk=None):
+        """Manually trigger agent analysis"""
+        patient = self.get_object()
+        agent_name = request.data.get('agent_name')
+        
+        orchestrator = AgentOrchestrator()
+        result = orchestrator.run_specific_agent(agent_name, patient.id)
+        
+        return Response(result)
+    
+    @action(detail=True, methods=['get'])
+    def health_timeline(self, request, pk=None):
+        """Get patient health timeline"""
+        patient = self.get_object()
+        start_date = request.query_params.get('start_date')
+        end_date = request.query_params.get('end_date')
+        
+        timeline_data = self._build_timeline(patient, start_date, end_date)
+        
+        return Response(timeline_data)

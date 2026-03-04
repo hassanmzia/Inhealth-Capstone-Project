@@ -1,0 +1,342 @@
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                    ENHANCED MULTI-AGENT SYSTEM ARCHITECTURE                    │
+│              with MCP (Model Context Protocol) & A2A Integration               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PRESENTATION LAYER                                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐ │
+│  │   Patient    │  │   Doctor     │  │   Hospital   │  │    Analytics    │ │
+│  │   Portal     │  │  Dashboard   │  │    Admin     │  │     Console     │ │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └────────┬────────┘ │
+│         │                 │                  │                    │          │
+│         └─────────────────┴──────────────────┴────────────────────┘          │
+│                                     │                                        │
+│                              HTTPS/WSS                                       │
+└─────────────────────────────────────┼──────────────────────────────────────┘
+                                      │
+┌─────────────────────────────────────┼──────────────────────────────────────┐
+│                    API GATEWAY LAYER (Django + MCP)                          │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                    Django REST Framework                            │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐ │    │
+│  │  │ FHIR REST API│  │  MCP Server  │  │  WebSocket (Channels)    │ │    │
+│  │  │ (R4)         │  │  Endpoint    │  │  (Real-time A2A)         │ │    │
+│  │  │              │  │              │  │                          │ │    │
+│  │  │ GET /Patient │  │ POST /mcp/   │  │  ws://agent-comm/       │ │    │
+│  │  │ GET /Obs     │  │   context    │  │                          │ │    │
+│  │  │ POST /Med    │  │ POST /mcp/   │  │                          │ │    │
+│  │  │              │  │   tools      │  │                          │ │    │
+│  │  └──────────────┘  └──────────────┘  └──────────────────────────┘ │    │
+│  └─────────┬──────────────────┬────────────────────┬──────────────────┘    │
+│            │                  │                    │                        │
+│  ┌─────────▼──────────────────▼────────────────────▼──────────────────┐    │
+│  │              Authentication & Authorization Layer                   │    │
+│  │  (JWT, OAuth 2.0, Role-Based Access Control)                        │    │
+│  └─────────┬────────────────────────────────────────────────────────┬─┘    │
+└────────────┼────────────────────────────────────────────────────────┼───────┘
+             │                                                        │
+┌────────────▼────────────────────────────────────────────────────────▼───────┐
+│                    AGENT COMMUNICATION LAYER                                 │
+│                   (A2A Protocol Implementation)                              │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     A2A Message Bus (Redis Pub/Sub)                  │   │
+│  │  ┌───────────────────────────────────────────────────────────────┐  │   │
+│  │  │  Message Format (A2A Protocol):                                │  │   │
+│  │  │  {                                                              │  │   │
+│  │  │    "protocol": "A2A/1.0",                                      │  │   │
+│  │  │    "message_id": "uuid",                                       │  │   │
+│  │  │    "timestamp": "ISO-8601",                                    │  │   │
+│  │  │    "sender": {                                                 │  │   │
+│  │  │      "agent_id": 5,                                           │  │   │
+│  │  │      "agent_name": "ECG Analysis Agent",                      │  │   │
+│  │  │      "agent_type": "diagnostic"                               │  │   │
+│  │  │    },                                                          │  │   │
+│  │  │    "recipient": {                                              │  │   │
+│  │  │      "agent_id": 18,                                          │  │   │
+│  │  │      "agent_name": "Triage Agent",                           │  │   │
+│  │  │      "broadcast": false                                       │  │   │
+│  │  │    },                                                          │  │   │
+│  │  │    "message_type": "ALERT",                                   │  │   │
+│  │  │    "priority": "CRITICAL",                                    │  │   │
+│  │  │    "payload": {                                               │  │   │
+│  │  │      "patient_id": "uuid",                                    │  │   │
+│  │  │      "finding": "ST-Elevation Inferior MI",                  │  │   │
+│  │  │      "confidence": 0.96,                                      │  │   │
+│  │  │      "data": { ... },                                         │  │   │
+│  │  │      "context": { ... }                                       │  │   │
+│  │  │    },                                                          │  │   │
+│  │  │    "requires_response": true,                                 │  │   │
+│  │  │    "response_timeout": 30                                     │  │   │
+│  │  │  }                                                             │  │   │
+│  │  └───────────────────────────────────────────────────────────────┘  │   │
+│  │                                                                      │   │
+│  │  Channels (Redis Pub/Sub):                                          │   │
+│  │  • agent.monitoring      → Tier 1 agents                           │   │
+│  │  • agent.diagnostic      → Tier 2 agents                           │   │
+│  │  • agent.risk            → Tier 3 agents                           │   │
+│  │  • agent.intervention    → Tier 4 agents                           │   │
+│  │  • agent.action          → Tier 5 agents                           │   │
+│  │  • agent.broadcast       → All agents                              │   │
+│  │  • agent.response.{id}   → Direct responses                        │   │
+│  └─────────────────────────────────────────────────────────────────────┘   │
+└────────────────────────────┬────────────────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────────────────┐
+│                     INTELLIGENT AGENT LAYER (25 Agents)                      │
+│                        with MCP & A2A Integration                            │
+│  ┌─────────────────────────────────────────────────────────────────────┐   │
+│  │                     Agent Orchestrator                               │   │
+│  │              (Manages A2A routing & MCP context)                     │   │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │   │
+│  │  │  MCP Context Manager                                            │ │   │
+│  │  │  • Maintains shared context across agents                       │ │   │
+│  │  │  • Provides MCP-compliant context to LLM                        │ │   │
+│  │  │  • Tracks conversation history                                  │ │   │
+│  │  │  • Manages tool registry                                        │ │   │
+│  │  └────────────────────────────────────────────────────────────────┘ │   │
+│  └────────────────────────┬────────────────────────────────────────────┘   │
+│                           │                                                 │
+│  ┌────────────────────────▼─────────────────────────────────────────────┐  │
+│  │                    AGENT BASE CLASS (MCP-Enabled)                     │  │
+│  │  ┌─────────────────────────────────────────────────────────────────┐ │  │
+│  │  │  class MCPAgent(BaseAgent):                                      │ │  │
+│  │  │                                                                   │ │  │
+│  │  │    # MCP Protocol Implementation                                 │ │  │
+│  │  │    def get_mcp_context(self, patient_id):                        │ │  │
+│  │  │      """Retrieve MCP-formatted context"""                        │ │  │
+│  │  │      return {                                                    │ │  │
+│  │  │        "protocol": "MCP/1.0",                                   │ │  │
+│  │  │        "context": {                                             │ │  │
+│  │  │          "patient": self.get_patient_data(patient_id),         │ │  │
+│  │  │          "history": self.get_conversation_history(),           │ │  │
+│  │  │          "tools": self.get_available_tools(),                  │ │  │
+│  │  │          "constraints": self.get_clinical_constraints()        │ │  │
+│  │  │        }                                                         │ │  │
+│  │  │      }                                                           │ │  │
+│  │  │                                                                   │ │  │
+│  │  │    # A2A Protocol Implementation                                 │ │  │
+│  │  │    def send_a2a_message(self, recipient_id, message_type,       │ │  │
+│  │  │                         payload, priority="NORMAL"):             │ │  │
+│  │  │      """Send A2A protocol message to another agent"""           │ │  │
+│  │  │      message = {                                                │ │  │
+│  │  │        "protocol": "A2A/1.0",                                   │ │  │
+│  │  │        "sender": {"agent_id": self.agent_id},                  │ │  │
+│  │  │        "recipient": {"agent_id": recipient_id},                │ │  │
+│  │  │        "message_type": message_type,                           │ │  │
+│  │  │        "priority": priority,                                    │ │  │
+│  │  │        "payload": payload                                       │ │  │
+│  │  │      }                                                           │ │  │
+│  │  │      self.message_bus.publish(                                  │ │  │
+│  │  │        f"agent.{recipient_id}", message                        │ │  │
+│  │  │      )                                                           │ │  │
+│  │  │                                                                   │ │  │
+│  │  │    def receive_a2a_message(self, message):                       │ │  │
+│  │  │      """Handle incoming A2A message"""                           │ │  │
+│  │  │      if message["message_type"] == "ALERT":                     │ │  │
+│  │  │        self.handle_alert(message["payload"])                    │ │  │
+│  │  │      elif message["message_type"] == "REQUEST":                 │ │  │
+│  │  │        self.handle_request(message["payload"])                  │ │  │
+│  │  │      elif message["message_type"] == "RESPONSE":                │ │  │
+│  │  │        self.handle_response(message["payload"])                 │ │  │
+│  │  └─────────────────────────────────────────────────────────────────┘ │  │
+│  └───────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  TIER 1: MONITORING AGENTS (1-4)                                     │  │
+│  │  • Subscribe to: device data streams                                 │  │
+│  │  • Publish to: agent.diagnostic, agent.risk                          │  │
+│  │  • MCP Context: Real-time vitals, trends                             │  │
+│  │  • A2A Messages: ALERT, DATA_UPDATE                                  │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  TIER 2: DIAGNOSTIC AGENTS (5-8)                                     │  │
+│  │  • Subscribe to: agent.monitoring, agent.diagnostic                  │  │
+│  │  • Publish to: agent.risk, agent.triage                              │  │
+│  │  • MCP Context: Diagnostic results, interpretations                  │  │
+│  │  • A2A Messages: DIAGNOSTIC_RESULT, CRITICAL_FINDING                 │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  TIER 3: RISK ASSESSMENT AGENTS (9-15)                               │  │
+│  │  • Subscribe to: agent.monitoring, agent.diagnostic                  │  │
+│  │  • Publish to: agent.intervention, agent.triage                      │  │
+│  │  • MCP Context: Risk scores, predictions, evidence                   │  │
+│  │  • A2A Messages: RISK_ASSESSMENT, PREDICTION, RECOMMENDATION         │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  TIER 4: INTERVENTION AGENTS (16-18)                                 │  │
+│  │  • Subscribe to: agent.risk, agent.triage                            │  │
+│  │  • Publish to: agent.action, agent.response                          │  │
+│  │  • MCP Context: Treatment options, guidelines, constraints           │  │
+│  │  • A2A Messages: TREATMENT_PLAN, TRIAGE_DECISION, ESCALATION         │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+│                                                                              │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │  TIER 5: ACTION AGENTS (19-23)                                       │  │
+│  │  • Subscribe to: agent.action                                        │  │
+│  │  • Publish to: agent.response (execution confirmation)               │  │
+│  │  • MCP Context: Communication templates, contact info                │  │
+│  │  • A2A Messages: ACTION_COMPLETE, ACTION_FAILED, STATUS_UPDATE       │  │
+│  └──────────────────────────────────────────────────────────────────────┘  │
+└──────────────────────────────────────────────────────────────────────────────┘
+
+┌──────────────────────────────────────────────────────────────────────────────┐
+│                    MCP (MODEL CONTEXT PROTOCOL) LAYER                         │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                     MCP Server Implementation                        │    │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │    │
+│  │  │  MCP Endpoints:                                                 │ │    │
+│  │  │                                                                  │ │    │
+│  │  │  POST /mcp/context                                             │ │    │
+│  │  │  • Request: { "patient_id": "uuid", "agent_id": 17 }          │ │    │
+│  │  │  • Response: {                                                  │ │    │
+│  │  │      "protocol": "MCP/1.0",                                    │ │    │
+│  │  │      "context": {                                              │ │    │
+│  │  │        "patient": {                                            │ │    │
+│  │  │          "demographics": { ... },                             │ │    │
+│  │  │          "conditions": [ ... ],                               │ │    │
+│  │  │          "medications": [ ... ],                              │ │    │
+│  │  │          "recent_vitals": [ ... ]                            │ │    │
+│  │  │        },                                                       │ │    │
+│  │  │        "conversation_history": [ ... ],                       │ │    │
+│  │  │        "available_tools": [                                    │ │    │
+│  │  │          {                                                     │ │    │
+│  │  │            "name": "query_fhir_database",                     │ │    │
+│  │  │            "description": "Query patient records",            │ │    │
+│  │  │            "parameters": { ... }                              │ │    │
+│  │  │          },                                                     │ │    │
+│  │  │          {                                                     │ │    │
+│  │  │            "name": "check_drug_interactions",                 │ │    │
+│  │  │            "description": "Check for drug interactions",      │ │    │
+│  │  │            "parameters": { ... }                              │ │    │
+│  │  │          }                                                      │ │    │
+│  │  │        ],                                                       │ │    │
+│  │  │        "constraints": {                                        │ │    │
+│  │  │          "safety_rules": [ ... ],                            │ │    │
+│  │  │          "clinical_guidelines": [ ... ]                       │ │    │
+│  │  │        }                                                        │ │    │
+│  │  │      }                                                          │ │    │
+│  │  │    }                                                            │ │    │
+│  │  │                                                                  │ │    │
+│  │  │  POST /mcp/tools/execute                                       │ │    │
+│  │  │  • Request: {                                                  │ │    │
+│  │  │      "tool_name": "check_drug_interactions",                  │ │    │
+│  │  │      "parameters": { "drugs": ["metformin", "empagliflozin"] }│ │    │
+│  │  │    }                                                            │ │    │
+│  │  │  • Response: {                                                 │ │    │
+│  │  │      "result": { "interactions": [ ... ] },                   │ │    │
+│  │  │      "execution_time": "45ms"                                  │ │    │
+│  │  │    }                                                            │ │    │
+│  │  └────────────────────────────────────────────────────────────────┘ │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │                     MCP Tool Registry                                │    │
+│  │  Registered Tools Available to All Agents:                          │    │
+│  │                                                                       │    │
+│  │  1. query_fhir_database(resource_type, filters)                     │    │
+│  │     → PostgreSQL FHIR queries                                        │    │
+│  │                                                                       │    │
+│  │  2. query_graph_database(cypher_query, params)                      │    │
+│  │     → Neo4j graph traversals                                         │    │
+│  │                                                                       │    │
+│  │  3. vector_search(query, collection, top_k)                          │    │
+│  │     → Qdrant semantic search                                         │    │
+│  │                                                                       │    │
+│  │  4. check_drug_interactions(drug_list)                               │    │
+│  │     → Neo4j drug interaction checking                                │    │
+│  │                                                                       │    │
+│  │  5. calculate_risk_score(patient_id, condition)                      │    │
+│  │     → ML model inference                                             │    │
+│  │                                                                       │    │
+│  │  6. send_notification(recipient, message, channel)                   │    │
+│  │     → Email/SMS/push notifications                                   │    │
+│  │                                                                       │    │
+│  │  7. schedule_appointment(patient_id, provider_id, urgency)           │    │
+│  │     → Calendar integration                                           │    │
+│  │                                                                       │    │
+│  │  8. find_hospital(location, requirements)                            │    │
+│  │     → Hospital database query                                        │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                    LLM LAYER (Llama 3.2 with MCP)                             │
+│  ┌─────────────────────────────────────────────────────────────────────┐     │
+│  │                   Llama 3.2 Inference Engine                         │     │
+│  │                                                                       │     │
+│  │  Accepts MCP-formatted prompts:                                      │     │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │     │
+│  │  │ {                                                               │ │     │
+│  │  │   "model": "llama-3.2-3b-instruct",                            │ │     │
+│  │  │   "messages": [                                                 │ │     │
+│  │  │     {                                                           │ │     │
+│  │  │       "role": "system",                                        │ │     │
+│  │  │       "content": "You are Agent 17: Prescription Agent",       │ │     │
+│  │  │       "context": {  ← MCP Context                              │ │     │
+│  │  │         "patient": { ... },                                    │ │     │
+│  │  │         "available_tools": [ ... ],                           │ │     │
+│  │  │         "constraints": { ... }                                 │ │     │
+│  │  │       }                                                         │ │     │
+│  │  │     },                                                          │ │     │
+│  │  │     {                                                           │ │     │
+│  │  │       "role": "user",                                          │ │     │
+│  │  │       "content": "Recommend medication for this patient"       │ │     │
+│  │  │     }                                                           │ │     │
+│  │  │   ],                                                            │ │     │
+│  │  │   "tools": [  ← MCP Tool Definitions                           │ │     │
+│  │  │     {                                                           │ │     │
+│  │  │       "type": "function",                                      │ │     │
+│  │  │       "function": {                                            │ │     │
+│  │  │         "name": "check_drug_interactions",                     │ │     │
+│  │  │         "description": "...",                                  │ │     │
+│  │  │         "parameters": { ... }                                  │ │     │
+│  │  │       }                                                         │ │     │
+│  │  │     }                                                           │ │     │
+│  │  │   ]                                                             │ │     │
+│  │  │ }                                                               │ │     │
+│  │  └────────────────────────────────────────────────────────────────┘ │     │
+│  │                                                                       │     │
+│  │  LLM can invoke tools via MCP:                                       │     │
+│  │  ┌────────────────────────────────────────────────────────────────┐ │     │
+│  │  │ LLM Response:                                                   │ │     │
+│  │  │ {                                                               │ │     │
+│  │  │   "tool_calls": [                                              │ │     │
+│  │  │     {                                                           │ │     │
+│  │  │       "id": "call_1",                                          │ │     │
+│  │  │       "type": "function",                                      │ │     │
+│  │  │       "function": {                                            │ │     │
+│  │  │         "name": "check_drug_interactions",                     │ │     │
+│  │  │         "arguments": {                                         │ │     │
+│  │  │           "drugs": ["metformin", "empagliflozin"]             │ │     │
+│  │  │         }                                                       │ │     │
+│  │  │       }                                                         │ │     │
+│  │  │     }                                                           │ │     │
+│  │  │   ]                                                             │ │     │
+│  │  │ }                                                               │ │     │
+│  │  │                                                                 │ │     │
+│  │  │ → MCP Server executes tool → returns result to LLM             │ │     │
+│  │  │ → LLM generates final response with tool results               │ │     │
+│  │  └────────────────────────────────────────────────────────────────┘ │     │
+│  └─────────────────────────────────────────────────────────────────────┘     │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                    DATABASE LAYER (with MCP/A2A Integration)                  │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────────────┐ │
+│  │   PostgreSQL     │  │     Neo4j        │  │   Qdrant Vector DB         │ │
+│  │   (FHIR/HL7)     │  │  (Graph DB)      │  │                            │ │
+│  │                  │  │                  │  │                            │ │
+│  │  MCP Tools:      │  │  MCP Tools:      │  │  MCP Tools:                │ │
+│  │  • query_fhir    │  │  • query_graph   │  │  • vector_search           │ │
+│  │  • insert_obs    │  │  • traverse      │  │  • embed_document          │ │
+│  │  • update_med    │  │  • check_path    │  │  • similarity_search       │ │
+│  │                  │  │                  │  │                            │ │
+│  │  A2A Events:     │  │  A2A Events:     │  │  A2A Events:               │ │
+│  │  • DATA_CHANGED  │  │  • INTERACTION   │  │  • CONTEXT_RETRIEVED       │ │
+│  │  • ALERT_STORED  │  │    _FOUND        │  │  • GUIDELINE_FOUND         │ │
+│  └──────────────────┘  └──────────────────┘  └────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────────────────────┘

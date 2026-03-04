@@ -1,0 +1,339 @@
+<mxfile host="app.diagrams.net" modified="2025-10-29T00:00:00.000Z" agent="Claude" version="21.0.0">
+  <diagram name="Agent Interaction Flow" id="agent-flow">
+    <mxGraphModel dx="1434" dy="790" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1169" pageHeight="1600" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Multi-Agent Interaction Flow: Exacerbation Detection &amp; Response" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="184" y="20" width="800" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Start Event -->
+        <mxCell id="start" value="Wearable Device&#xa;Detects Anomaly" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCDD2;strokeColor=#C62828;fontStyle=1;fontSize=12;" vertex="1" parent="1">
+          <mxGeometry x="484" y="80" width="200" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Step 1: Vital Monitoring Agent -->
+        <mxCell id="step1_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="180" width="320" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="step1_title" value="STEP 1: Vital Monitoring Agent" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#1565C0;" vertex="1" parent="1">
+          <mxGeometry x="90" y="185" width="250" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step1_1" value="Receive Data:&#xa;SpO2 = 89% (Low)&#xa;HR = 115 bpm (High)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="220" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step1_2" value="Validate Data&#xa;&amp; Compare to&#xa;Baseline" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="290" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step1_3" value="Generate Alert:&#xa;THRESHOLD_BREACH" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#90CAF9;strokeColor=#0D47A1;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="250" y="240" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows within step 1 -->
+        <mxCell id="arrow_s1_1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#1976D2;" edge="1" parent="1" source="step1_1" target="step1_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_s1_2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=2;strokeColor=#1976D2;" edge="1" parent="1" source="step1_2" target="step1_3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from start to step 1 -->
+        <mxCell id="arrow_start_s1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=0.5;entryY=0;strokeWidth=3;strokeColor=#C62828;" edge="1" parent="1" source="start" target="step1_1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="170" y="110" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Step 2: Diagnostic Agent -->
+        <mxCell id="step2_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="180" width="320" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="step2_title" value="STEP 2: Diagnostic Agent" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="450" y="185" width="250" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step2_1" value="Retrieve 14-day&#xa;Historical Data" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;" vertex="1" parent="1">
+          <mxGeometry x="460" y="220" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="step2_2" value="Run LSTM Model:&#xa;Predict Exacerbation&#xa;Probability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;" vertex="1" parent="1">
+          <mxGeometry x="460" y="280" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step2_3" value="Run Random Forest:&#xa;Risk Classification" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;" vertex="1" parent="1">
+          <mxGeometry x="610" y="220" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="step2_4" value="Calculate Confidence:&#xa;92% probability&#xa;HIGH RISK" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#1B5E20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="530" y="360" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows within step 2 -->
+        <mxCell id="arrow_s2_1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="step2_1" target="step2_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_s2_2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="step2_2" target="step2_4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_s2_3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="step2_3" target="step2_4">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from step 1 to step 2 -->
+        <mxCell id="arrow_s1_s2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=3;strokeColor=#1976D2;" edge="1" parent="1" source="step1_3" target="step2_1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="420" y="270" />
+              <mxPoint x="420" y="245" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_s1_s2_label" value="ALERT MESSAGE" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1;fillColor=#FFFFFF;" vertex="1" connectable="0" parent="arrow_s1_s2">
+          <mxGeometry x="-0.1" y="-2" relative="1" as="geometry">
+            <mxPoint as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Step 3: Treatment Recommendation Agent -->
+        <mxCell id="step3_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="800" y="180" width="320" height="260" as="geometry" />
+        </mxCell>
+        <mxCell id="step3_title" value="STEP 3: Treatment Agent" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="810" y="185" width="250" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step3_1" value="Retrieve Patient&#xa;Med History &amp;&#xa;Contraindications" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#EF6C00;" vertex="1" parent="1">
+          <mxGeometry x="820" y="220" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step3_2" value="Apply Clinical&#xa;Decision Rules" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#EF6C00;" vertex="1" parent="1">
+          <mxGeometry x="820" y="290" width="140" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="step3_3" value="Generate&#xa;Recommendations:&#xa;• Increase O2 therapy&#xa;• Start prednisone&#xa;• Schedule urgent visit" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFCC80;strokeColor=#E65100;fontStyle=1;align=left" vertex="1" parent="1">
+          <mxGeometry x="970" y="220" width="140" height="120" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows within step 3 -->
+        <mxCell id="arrow_s3_1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#EF6C00;" edge="1" parent="1" source="step3_1" target="step3_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_s3_2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=2;strokeColor=#EF6C00;" edge="1" parent="1" source="step3_2" target="step3_3">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from step 2 to step 3 -->
+        <mxCell id="arrow_s2_s3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=3;strokeColor=#388E3C;" edge="1" parent="1" source="step2_4" target="step3_1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="390" />
+              <mxPoint x="780" y="250" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_s2_s3_label" value="DIAGNOSIS" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1;fillColor=#FFFFFF;" vertex="1" connectable="0" parent="arrow_s2_s3">
+          <mxGeometry x="-0.1" y="-2" relative="1" as="geometry">
+            <mxPoint x="3" y="-8" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Step 4: Patient Communication Agent -->
+        <mxCell id="step4_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#01579B;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="480" width="320" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="step4_title" value="STEP 4: Patient Communication Agent" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#01579B;" vertex="1" parent="1">
+          <mxGeometry x="90" y="485" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step4_1" value="Compose Patient&#xa;Message in Plain&#xa;Language" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#B3E5FC;strokeColor=#0277BD;" vertex="1" parent="1">
+          <mxGeometry x="100" y="520" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step4_2" value="Send Alert:&#xa;&quot;Your oxygen levels&#xa;are concerning.&#xa;Please follow&#xa;these steps...&quot;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81D4FA;strokeColor=#01579B;fontStyle=1;align=left" vertex="1" parent="1">
+          <mxGeometry x="250" y="520" width="140" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows within step 4 -->
+        <mxCell id="arrow_s4_1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=2;strokeColor=#0277BD;" edge="1" parent="1" source="step4_1" target="step4_2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from step 3 to step 4 -->
+        <mxCell id="arrow_s3_s4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=1;entryX=0.5;entryY=0;strokeWidth=3;strokeColor=#EF6C00;" edge="1" parent="1" source="step3_3" target="step4_1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="970" y="460" />
+              <mxPoint x="170" y="460" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_s3_s4_label" value="RECOMMENDATIONS" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=10;fontStyle=1;fillColor=#FFFFFF;" vertex="1" connectable="0" parent="arrow_s3_s4">
+          <mxGeometry x="-0.1" y="-2" relative="1" as="geometry">
+            <mxPoint x="192" y="2" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Step 5: Care Coordination Agent -->
+        <mxCell id="step5_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#4A148C;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="440" y="480" width="680" height="200" as="geometry" />
+        </mxCell>
+        <mxCell id="step5_title" value="STEP 5: Care Coordination Agent" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="450" y="485" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="step5_1" value="Alert Pulmonologist:&#xa;HIGH RISK PATIENT&#xa;Dr. Johnson" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;" vertex="1" parent="1">
+          <mxGeometry x="460" y="530" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step5_2" value="Schedule Urgent&#xa;Appointment:&#xa;Within 24 hours" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;" vertex="1" parent="1">
+          <mxGeometry x="610" y="530" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step5_3" value="Notify Respiratory&#xa;Therapist for Home&#xa;Assessment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;" vertex="1" parent="1">
+          <mxGeometry x="760" y="530" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step5_4" value="Update EHR with&#xa;Risk Assessment &amp;&#xa;Action Plan" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#4A148C;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="910" y="530" width="140" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="step5_5" value="Set Follow-up&#xa;Monitoring:&#xa;Every 2 hours" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;" vertex="1" parent="1">
+          <mxGeometry x="685" y="610" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow from step 3 to step 5 -->
+        <mxCell id="arrow_s3_s5" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0;entryY=0.5;strokeWidth=3;strokeColor=#EF6C00;" edge="1" parent="1" source="step3_3" target="step5_1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1040" y="460" />
+              <mxPoint x="420" y="460" />
+              <mxPoint x="420" y="560" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Parallel arrows within step 5 -->
+        <mxCell id="arrow_s5_1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="step5_1" target="step5_5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="530" y="605" />
+              <mxPoint x="755" y="605" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_s5_2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="step5_2" target="step5_5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="680" y="605" />
+              <mxPoint x="755" y="605" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_s5_3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="step5_3" target="step5_5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="830" y="605" />
+              <mxPoint x="755" y="605" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_s5_4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="step5_4" target="step5_5">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="980" y="605" />
+              <mxPoint x="755" y="605" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Outcome boxes -->
+        <mxCell id="outcome_patient" value="✓ Patient receives&#xa;clear instructions&#xa;and support" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="120" y="720" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="outcome_provider" value="✓ Providers alerted&#xa;and coordinated&#xa;response initiated" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="504" y="720" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="outcome_system" value="✓ System maintains&#xa;enhanced monitoring&#xa;until resolved" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#2E7D32;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="888" y="720" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows to outcomes -->
+        <mxCell id="arrow_out1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#01579B;" edge="1" parent="1" source="step4_2" target="outcome_patient">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="320" y="690" />
+              <mxPoint x="200" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_out2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="step5_5" target="outcome_provider">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="755" y="690" />
+              <mxPoint x="584" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_out3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="step5_5" target="outcome_system">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="755" y="690" />
+              <mxPoint x="968" y="690" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Success indicator -->
+        <mxCell id="success" value="🎯 EXPECTED OUTCOME:&#xa;Exacerbation prevented or minimized&#xa;through early intervention and&#xa;coordinated multi-agent response" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#AED581;strokeColor=#33691E;fontStyle=1;fontSize=14;align=center" vertex="1" parent="1">
+          <mxGeometry x="384" y="820" width="400" height="80" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrow to success -->
+        <mxCell id="arrow_success" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=3;strokeColor=#2E7D32;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="outcome_provider" target="success">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Legend -->
+        <mxCell id="legend_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFFFF;strokeColor=#000000;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="940" width="1040" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="legend_title" value="LEGEND - Agent Communication Patterns" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=14;fontStyle=1;" vertex="1" parent="1">
+          <mxGeometry x="90" y="945" width="350" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend1" value="Solid Arrow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;" vertex="1" parent="1">
+          <mxGeometry x="100" y="980" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="legend1_text" value="Direct agent-to-agent message" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="230" y="985" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend2" value="Dashed Arrow" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;dashed=1;dashPattern=8 8;" vertex="1" parent="1">
+          <mxGeometry x="450" y="980" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="legend2_text" value="Data retrieval from database" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="580" y="985" width="200" height="30" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="legend3" value="Parallel Actions" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#4A148C;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="800" y="980" width="120" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="legend3_text" value="Multiple simultaneous operations" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=11;" vertex="1" parent="1">
+          <mxGeometry x="930" y="985" width="180" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Time metrics -->
+        <mxCell id="time_metrics" value="⏱️ PERFORMANCE METRICS:&#xa;• Total response time: &lt;5 seconds&#xa;• Agent-to-agent latency: &lt;100ms&#xa;• Patient notification: Within 10 seconds&#xa;• Provider alert: Within 30 seconds" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F57F17;align=left;verticalAlign=top;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="80" y="1090" width="300" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Data metrics -->
+        <mxCell id="data_metrics" value="📊 DATA FLOW:&#xa;• Messages exchanged: 15-20&#xa;• Database queries: 8-12&#xa;• ML model inferences: 2&#xa;• External API calls: 3-5 (EHR, scheduling)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#01579B;align=left;verticalAlign=top;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="420" y="1090" width="320" height="100" as="geometry" />
+        </mxCell>
+        
+        <!-- Clinical outcomes -->
+        <mxCell id="clinical_outcomes" value="🏥 CLINICAL IMPACT:&#xa;• Early detection window: 48-72 hours&#xa;• Intervention timing: Proactive vs. reactive&#xa;• Hospitalization avoided: 30-40% of cases&#xa;• Patient satisfaction: Improved sense of security" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;align=left;verticalAlign=top;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="780" y="1090" width="340" height="100" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

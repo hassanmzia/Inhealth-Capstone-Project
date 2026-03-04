@@ -1,0 +1,182 @@
+// ============================================
+// NODE TYPES
+// ============================================
+
+// Patient Node
+CREATE CONSTRAINT patient_id IF NOT EXISTS 
+FOR (p:Patient) REQUIRE p.id IS UNIQUE;
+
+CREATE (p:Patient {
+    id: "patient-uuid",
+    mrn: "MRN12345",
+    name: "John Doe",
+    birthDate: date("1955-01-15"),
+    gender: "male"
+})
+
+// Medication Node
+CREATE CONSTRAINT medication_rxnorm IF NOT EXISTS 
+FOR (m:Medication) REQUIRE m.rxnorm IS UNIQUE;
+
+CREATE (m:Medication {
+    rxnorm: "197361",
+    name: "Metformin",
+    genericName: "Metformin",
+    brandName: "Glucophage",
+    class: "Biguanide",
+    route: "Oral"
+})
+
+// Disease/Condition Node
+CREATE CONSTRAINT disease_icd10 IF NOT EXISTS 
+FOR (d:Disease) REQUIRE d.icd10 IS UNIQUE;
+
+CREATE (d:Disease {
+    icd10: "E11",
+    snomedCT: "44054006",
+    name: "Type 2 Diabetes Mellitus",
+    category: "Endocrine",
+    severity: "chronic"
+})
+
+// Symptom Node
+CREATE (s:Symptom {
+    id: "symptom-001",
+    name: "Chest Pain",
+    snomedCT: "29857009"
+})
+
+// Lab Test Node
+CREATE (l:LabTest {
+    loinc: "4548-4",
+    name: "Hemoglobin A1c",
+    unit: "%"
+})
+
+// Gene/Family History Node
+CREATE (g:Gene {
+    hgncId: "HGNC:1234",
+    name: "BRCA1",
+    chromosome: "17"
+})
+
+CREATE (fh:FamilyMember {
+    id: "fm-001",
+    relationship: "father",
+    livingStatus: "deceased"
+})
+
+// Clinical Guideline Node
+CREATE (cg:ClinicalGuideline {
+    id: "guideline-ada-2024",
+    title: "ADA Diabetes Management Guidelines 2024",
+    organization: "American Diabetes Association",
+    year: 2024
+})
+
+// Hospital/Facility Node
+CREATE (h:Hospital {
+    id: "hosp-001",
+    name: "Rural County Hospital",
+    address: "123 Main St",
+    city: "Smalltown",
+    state: "VA",
+    hasER: true,
+    hasCathLab: false,
+    bedCount: 50
+})
+
+// ============================================
+// RELATIONSHIP TYPES
+// ============================================
+
+// Patient has Condition
+MATCH (p:Patient {id: "patient-uuid"}), (d:Disease {icd10: "E11"})
+CREATE (p)-[:HAS_CONDITION {
+    onsetDate: date("2020-01-15"),
+    status: "active",
+    severity: "moderate"
+}]->(d)
+
+// Patient takes Medication
+MATCH (p:Patient {id: "patient-uuid"}), (m:Medication {rxnorm: "197361"})
+CREATE (p)-[:TAKES_MEDICATION {
+    startDate: date("2020-01-15"),
+    dosage: "1000mg",
+    frequency: "twice daily",
+    adherence: 0.85,
+    prescribedBy: "dr-smith"
+}]->(m)
+
+// Drug Interaction (Critical for Agent 12)
+MATCH (m1:Medication {rxnorm: "197361"}), (m2:Medication {rxnorm: "8787"})
+CREATE (m1)-[:INTERACTS_WITH {
+    severity: "moderate",
+    effect: "Increased hypoglycemia risk",
+    mechanism: "Additive glucose-lowering effect",
+    clinicalRelevance: "Monitor glucose closely",
+    source: "DrugBank"
+}]->(m2)
+
+// Drug Contraindication with Disease
+MATCH (m:Medication {name: "Metformin"}), (d:Disease {name: "Chronic Kidney Disease Stage 4"})
+CREATE (m)-[:CONTRAINDICATED_IN {
+    severity: "absolute",
+    reason: "Risk of lactic acidosis",
+    eGFRThreshold: 30,
+    guidelineReference: "FDA Black Box Warning"
+}]->(d)
+
+// Disease causes Symptom
+MATCH (d:Disease {name: "Heart Failure"}), (s:Symptom {name: "Shortness of Breath"})
+CREATE (d)-[:CAUSES_SYMPTOM {
+    frequency: "common",
+    severity: "moderate-severe"
+}]->(s)
+
+// Disease increases risk of Disease (for Agent 13)
+MATCH (d1:Disease {name: "Type 2 Diabetes Mellitus"}), 
+      (d2:Disease {name: "Coronary Artery Disease"})
+CREATE (d1)-[:INCREASES_RISK_OF {
+    relativeRisk: 2.5,
+    mechanism: "Endothelial dysfunction and inflammation",
+    timeframe: "10-20 years",
+    preventable: true
+}]->(d2)
+
+// Family History relationship
+MATCH (p:Patient {id: "patient-uuid"}), (fm:FamilyMember {id: "fm-001"}), 
+      (d:Disease {name: "Myocardial Infarction"})
+CREATE (p)-[:HAS_FAMILY_MEMBER]->(fm),
+       (fm)-[:HAD_CONDITION {
+    ageAtOnset: 52,
+    fatal: true
+}]->(d)
+
+// Medication treats Disease
+MATCH (m:Medication {name: "Metformin"}), (d:Disease {name: "Type 2 Diabetes Mellitus"})
+CREATE (m)-[:TREATS {
+    efficacy: "high",
+    firstLine: true,
+    mechanism: "Decreases hepatic glucose production",
+    guidelineRecommendation: "ADA 2024"
+}]->(d)
+
+// Lab Test monitors Disease
+MATCH (l:LabTest {name: "Hemoglobin A1c"}), (d:Disease {name: "Type 2 Diabetes Mellitus"})
+CREATE (l)-[:MONITORS {
+    frequency: "quarterly",
+    target: "< 7.0%",
+    critical: "> 9.0%"
+}]->(d)
+
+// Clinical Guideline recommends Medication for Disease
+MATCH (cg:ClinicalGuideline {id: "guideline-ada-2024"}),
+      (m:Medication {name: "Metformin"}),
+      (d:Disease {name: "Type 2 Diabetes Mellitus"})
+CREATE (cg)-[:RECOMMENDS {
+    strength: "strong",
+    evidence: "A",
+    firstLine: true
+}]->(m),
+       (m)-[:FOR_CONDITION]->(d)

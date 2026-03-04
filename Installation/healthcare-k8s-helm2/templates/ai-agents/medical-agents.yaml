@@ -1,0 +1,113 @@
+{{- range $agentName, $agentConfig := .Values.aiAgents.medicalAgents }}
+{{- if $agentConfig.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "healthcare.fullname" $ }}-{{ $agentName | kebabcase }}
+  namespace: {{ $.Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+    agent-type: medical
+spec:
+  replicas: {{ $agentConfig.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $agentName | kebabcase }}
+  template:
+    metadata:
+      annotations:
+        {{- include "healthcare.podAnnotations" $ | nindent 8 }}
+      labels:
+        {{- include "healthcare.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $agentName | kebabcase }}
+        agent-type: medical
+    spec:
+      {{- include "healthcare.imagePullSecrets" $ | nindent 6 }}
+      serviceAccountName: {{ include "healthcare.serviceAccountName" $ }}
+      {{- if and (hasKey $agentConfig.resources.requests "nvidia.com/gpu") (ne (index $agentConfig.resources.requests "nvidia.com/gpu") 0) }}
+      nodeSelector:
+        nvidia.com/gpu: "true"
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      {{- end }}
+      containers:
+      - name: {{ $agentName | kebabcase }}
+        image: "{{ $.Values.global.imageRegistry }}/healthcare/{{ $agentName | kebabcase }}:1.0.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: AGENT_NAME
+          value: "{{ $agentName }}"
+        - name: LLM_SERVICE_URL
+          value: "http://{{ include "healthcare.fullname" $ }}-llm-service:8080"
+        - name: RAG_SERVICE_URL
+          value: "http://{{ include "healthcare.fullname" $ }}-rag-service:8080"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "healthcare.fullname" $ }}-django-secrets
+              key: database-url
+        - name: REDIS_URL
+          value: "redis://{{ include "healthcare.fullname" $ }}-redis-master:6379/2"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 20
+          timeoutSeconds: 5
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+          timeoutSeconds: 3
+        resources:
+          requests:
+            cpu: {{ $agentConfig.resources.requests.cpu }}
+            memory: {{ $agentConfig.resources.requests.memory }}
+            {{- if hasKey $agentConfig.resources.requests "nvidia.com/gpu" }}
+            nvidia.com/gpu: {{ index $agentConfig.resources.requests "nvidia.com/gpu" }}
+            {{- end }}
+          limits:
+            cpu: {{ $agentConfig.resources.limits.cpu }}
+            memory: {{ $agentConfig.resources.limits.memory }}
+            {{- if hasKey $agentConfig.resources.limits "nvidia.com/gpu" }}
+            nvidia.com/gpu: {{ index $agentConfig.resources.limits "nvidia.com/gpu" }}
+            {{- end }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "healthcare.fullname" $ }}-{{ $agentName | kebabcase }}
+  namespace: {{ $.Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "healthcare.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+{{- end }}
+{{- end }}

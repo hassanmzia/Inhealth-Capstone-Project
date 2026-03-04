@@ -1,0 +1,625 @@
+# ============================================================================
+# A2A Protocol Implementation
+# ============================================================================
+
+import redis
+import json
+from datetime import datetime
+import uuid
+
+class A2AMessageBus:
+    """
+    Agent-to-Agent communication bus using Redis Pub/Sub
+    Implements A2A protocol for inter-agent messaging
+    """
+    
+    def __init__(self):
+        self.redis_client = redis.Redis(
+            host='redis',
+            port=6379,
+            decode_responses=True
+        )
+        self.pubsub = self.redis_client.pubsub()
+        
+        # A2A message channels
+        self.channels = {
+            'monitoring': 'agent.monitoring',
+            'diagnostic': 'agent.diagnostic',
+            'risk': 'agent.risk',
+            'intervention': 'agent.intervention',
+            'action': 'agent.action',
+            'broadcast': 'agent.broadcast',
+            'direct': 'agent.direct.{agent_id}'
+        }
+    
+    def publish_message(self, sender_id, recipient_id, message_type, 
+                       payload, priority="NORMAL", requires_response=False):
+        """
+        Publish A2A protocol message
+        
+        Args:
+            sender_id: ID of sending agent
+            recipient_id: ID of recipient agent (or "broadcast")
+            message_type: Type of message (ALERT, REQUEST, RESPONSE, etc.)
+            payload: Message payload
+            priority: Message priority (LOW, NORMAL, HIGH, CRITICAL)
+            requires_response: Whether this message requires a response
+        """
+        
+        message = {
+            "protocol": "A2A/1.0",
+            "message_id": str(uuid.uuid4()),
+            "timestamp": datetime.now().isoformat(),
+            
+            "sender": {
+                "agent_id": sender_id,
+                "agent_name": self._get_agent_name(sender_id),
+                "agent_type": self._get_agent_type(sender_id)
+            },
+            
+            "recipient": {
+                "agent_id": recipient_id if recipient_id != "broadcast" else None,
+                "broadcast": recipient_id == "broadcast"
+            },
+            
+            "message_type": message_type,
+            "priority": priority,
+            "payload": payload,
+            
+            "requires_response": requires_response,
+            "response_timeout": 30 if requires_response else None,
+            
+            "routing": {
+                "channel": self._determine_channel(sender_id, recipient_id),
+                "ttl": 300  # 5 minutes
+            }
+        }
+        
+        # Publish to appropriate channel
+        channel = message["routing"]["channel"]
+        self.redis_client.publish(channel, json.dumps(message))
+        
+        # Store message in history
+        self._store_message_history(message)
+        
+        # If requires response, set up response handler
+        if requires_response:
+            self._setup_response_handler(message["message_id"], sender_id)
+        
+        return message["message_id"]
+    
+    def subscribe_agent(self, agent_id, message_handler):
+        """
+        Subscribe an agent to receive A2A messages
+        
+        Args:
+            agent_id: ID of subscribing agent
+            message_handler: Callback function to handle received messages
+        """
+        
+        # Determine which channels this agent should subscribe to
+        channels = self._get_agent_channels(agent_id)
+        
+        # Subscribe to channels
+        for channel in channels:
+            self.pubsub.subscribe(**{channel: message_handler})
+        
+        # Start listening thread
+        self.pubsub.run_in_thread(sleep_time=0.001)
+    
+    def send_response(self, original_message_id, sender_id, response_payload):
+        """Send a response to an A2A message"""
+        
+        # Get original message
+        original = self._get_message_from_history(original_message_id)
+        
+        if not original:
+            raise ValueError(f"Original message {original_message_id} not found")
+        
+        # Create response message
+        response = {
+            "protocol": "A2A/1.0",
+            "message_id": str(uuid.uuid4()),
+            "in_response_to": original_message_id,
+            "timestamp": datetime.now().isoformat(),
+            
+            "sender": {
+                "agent_id": sender_id,
+                "agent_name": self._get_agent_name(sender_id),
+                "agent_type": self._get_agent_type(sender_id)
+            },
+            
+            "recipient": {
+                "agent_id": original["sender"]["agent_id"]
+            },
+            
+            "message_type": "RESPONSE",
+            "payload": response_payload
+        }
+        
+        # Send directly to original sender
+        channel = f"agent.direct.{original['sender']['agent_id']}"
+        self.redis_client.publish(channel, json.dumps(response))
+        
+        return response["message_id"]
+    
+    def _determine_channel(self, sender_id, recipient_id):
+        """Determine which channel to use based on sender/recipient"""
+        
+        if recipient_id == "broadcast":
+            return self.channels['broadcast']
+        
+        # Direct message
+        if recipient_id:
+            return f"agent.direct.{recipient_id}"
+        
+        # Tier-based routing
+        sender_tier = self._get_agent_tier(sender_id)
+        
+        tier_channels = {
+            1: 'monitoring',  # Monitoring agents → monitoring channel
+            2: 'diagnostic',  # Diagnostic agents → diagnostic channel
+            3: 'risk',        # Risk agents → risk channel
+            4: 'intervention',# Intervention agents → intervention channel
+            5: 'action'       # Action agents → action channel
+        }
+        
+        return self.channels.get(tier_channels.get(sender_tier), 'broadcast')
+    
+    def _get_agent_channels(self, agent_id):
+        """Get list of channels an agent should subscribe to"""
+        
+        agent_tier = self._get_agent_tier(agent_id)
+        
+        # All agents subscribe to broadcast and direct
+        channels = ['agent.broadcast', f'agent.direct.{agent_id}']
+        
+        # Subscribe to tier-appropriate channels
+        tier_subscriptions = {
+            1: ['agent.broadcast'],  # Monitoring agents only listen to broadcast
+            2: ['agent.monitoring', 'agent.diagnostic'],  # Diagnostic listen to monitoring
+            3: ['agent.monitoring', 'agent.diagnostic', 'agent.risk'],  # Risk agents
+            4: ['agent.risk', 'agent.intervention'],  # Intervention agents
+            5: ['agent.intervention', 'agent.action']  # Action agents
+        }
+        
+        channels.extend(tier_subscriptions.get(agent_tier, []))
+        
+        return list(set(channels))  # Remove duplicates
+
+
+# ============================================================================
+# A2A Message Types
+# ============================================================================
+
+class A2AMessageTypes:
+    """Standard A2A message types"""
+    
+    # Monitoring and Data
+    ALERT = "ALERT"                    # Critical alert from monitoring/diagnostic agent
+    DATA_UPDATE = "DATA_UPDATE"        # New data available
+    VITAL_SIGN = "VITAL_SIGN"          # Vital sign measurement
+    
+    # Diagnostic
+    DIAGNOSTIC_RESULT = "DIAGNOSTIC_RESULT"  # Diagnostic test result
+    CRITICAL_FINDING = "CRITICAL_FINDING"    # Critical diagnostic finding
+    IMAGE_ANALYZED = "IMAGE_ANALYZED"        # Image analysis complete
+    
+    # Risk Assessment
+    RISK_ASSESSMENT = "RISK_ASSESSMENT"      # Risk score calculated
+    PREDICTION = "PREDICTION"                # Predictive model output
+    RISK_ESCALATION = "RISK_ESCALATION"      # Risk threshold exceeded
+    
+    # Treatment and Intervention
+    RECOMMENDATION = "RECOMMENDATION"        # Treatment recommendation
+    TREATMENT_PLAN = "TREATMENT_PLAN"        # Complete treatment plan
+    MEDICATION_ALERT = "MEDICATION_ALERT"    # Medication-related alert
+    
+    # Triage and Coordination
+    TRIAGE_DECISION = "TRIAGE_DECISION"      # Triage priority decision
+    ESCALATION = "ESCALATION"                # Escalate to human clinician
+    COORDINATION_REQUEST = "COORDINATION_REQUEST"  # Request for coordination
+    
+    # Actions
+    ACTION_REQUEST = "ACTION_REQUEST"        # Request to perform action
+    ACTION_COMPLETE = "ACTION_COMPLETE"      # Action completed successfully
+    ACTION_FAILED = "ACTION_FAILED"          # Action failed
+    
+    # Communication
+    NOTIFICATION_SENT = "NOTIFICATION_SENT"  # Notification delivered
+    APPOINTMENT_SCHEDULED = "APPOINTMENT_SCHEDULED"  # Appointment booked
+    
+    # System
+    REQUEST = "REQUEST"                      # Generic request
+    RESPONSE = "RESPONSE"                    # Response to request
+    STATUS_UPDATE = "STATUS_UPDATE"          # Status update
+    ERROR = "ERROR"                          # Error occurred
+
+
+# ============================================================================
+# Example: Agent Using MCP & A2A
+# ============================================================================
+
+class PrescriptionAgentWithMCPA2A(MCPAgent):
+    """
+    Agent 17: Prescription Agent
+    Demonstrates MCP and A2A integration
+    """
+    
+    def __init__(self):
+        super().__init__(agent_id=17, agent_name="Prescription Agent")
+        
+        # Initialize A2A message bus
+        self.a2a_bus = A2AMessageBus()
+        
+        # Subscribe to relevant channels
+        self.a2a_bus.subscribe_agent(
+            agent_id=self.agent_id,
+            message_handler=self.handle_a2a_message
+        )
+        
+        # Initialize MCP client
+        self.mcp_client = MCPClient(server_url="http://django:8000/mcp")
+    
+    def execute(self, patient_id):
+        """Main execution logic with MCP and A2A"""
+        
+        # Step 1: Get MCP context
+        context = self.mcp_client.get_context(
+            patient_id=patient_id,
+            agent_id=self.agent_id
+        )
+        
+        # Step 2: Use MCP tools to gather additional data
+        drug_interactions = self.mcp_client.execute_tool(
+            tool_name="check_drug_interactions",
+            parameters={
+                "drug_list": context["context"]["patient"]["medications"]
+            }
+        )
+        
+        # Step 3: Perform vector search via MCP
+        guidelines = self.mcp_client.execute_tool(
+            tool_name="vector_search",
+            parameters={
+                "query": f"Treatment for {context['context']['patient']['conditions']}",
+                "collection": "clinical_guidelines",
+                "top_k": 5
+            }
+        )
+        
+        # Step 4: Build prompt with MCP context
+        prompt = self._build_prompt_with_mcp_context(context, guidelines)
+        
+        # Step 5: Get LLM recommendation
+        recommendation = self.llm.generate(prompt)
+        
+        # Step 6: Send A2A message to Triage Agent
+        message_id = self.a2a_bus.publish_message(
+            sender_id=self.agent_id,
+            recipient_id=18,  # Triage Agent
+            message_type=A2AMessageTypes.RECOMMENDATION,
+            payload={
+                "patient_id": patient_id,
+                "recommendation": recommendation,
+                "confidence": 0.92,
+                "supporting_evidence": guidelines
+            },
+            priority="HIGH",
+            requires_response=True
+        )
+        
+        # Step 7: Wait for triage decision
+        triage_response = self._wait_for_response(message_id, timeout=30)
+        
+        # Step 8: If approved, send notification via A2A
+        if triage_response["payload"]["approved"]:
+            self.a2a_bus.publish_message(
+                sender_id=self.agent_id,
+                recipient_id=19,  # Doctor Notification Agent
+                message_type=A2AMessageTypes.ACTION_REQUEST,
+                payload={
+                    "action_type": "send_email",
+                    "recommendation": recommendation,
+                    "requires_approval": True
+                },
+                priority="HIGH"
+            )
+        
+        return recommendation
+    
+    def handle_a2a_message(self, message):
+        """Handle incoming A2A messages"""
+        
+        msg = json.loads(message['data'])
+        
+        if msg["message_type"] == A2AMessageTypes.REQUEST:
+            # Another agent is requesting prescription review
+            self._handle_prescription_request(msg)
+            
+        elif msg["message_type"] == A2AMessageTypes.MEDICATION_ALERT:
+            # Drug safety agent found an issue
+            self._handle_medication_alert(msg)
+            
+        elif msg["message_type"] == A2AMessageTypes.RESPONSE:
+            # Response to our previous message
+            self._handle_response(msg)
+```
+
+---
+
+## **INTEGRATION DIAGRAM: MCP + A2A Flow**
+```
+┌─────────────────────────────────────────────────────────────────────┐
+│           COMPLETE MCP + A2A WORKFLOW EXAMPLE                        │
+│              (Patient with New Diagnosis)                            │
+└─────────────────────────────────────────────────────────────────────┘
+
+TIME: 10:00 AM - New Lab Results Arrive (HbA1c 8.5%)
+
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Data Ingestion (HL7/FHIR)                                   │
+│  Lab system → HL7 ORU message → Django FHIR API                     │
+│  → Stored in PostgreSQL as fhir_observation                          │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 2: A2A Broadcast from Data Layer                               │
+│  PostgreSQL trigger → A2A Message                                    │
+│  {                                                                   │
+│    "protocol": "A2A/1.0",                                           │
+│    "sender": {"system": "PostgreSQL"},                              │
+│    "recipient": {"broadcast": true},                                │
+│    "message_type": "DATA_UPDATE",                                   │
+│    "payload": {                                                      │
+│      "patient_id": "uuid",                                          │
+│      "resource_type": "Observation",                                │
+│      "code": "4548-4",  // HbA1c                                   │
+│      "value": 8.5                                                    │
+│    }                                                                 │
+│  }                                                                   │
+│  → Published to: agent.broadcast                                    │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 3: Agent 1 (Glucose Monitor) Receives A2A Message             │
+│  Agent subscribes to: agent.broadcast, agent.monitoring             │
+│  Receives DATA_UPDATE → Processes HbA1c value                       │
+│  Determines: HbA1c 8.5% is above target (>7.0%)                    │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 4: Agent 1 Sends A2A Alert to Risk Agent                      │
+│  {                                                                   │
+│    "protocol": "A2A/1.0",                                           │
+│    "sender": {"agent_id": 1, "agent_name": "Glucose Monitor"},     │
+│    "recipient": {"agent_id": 14},  // Risk Assessment Agent        │
+│    "message_type": "ALERT",                                         │
+│    "priority": "HIGH",                                              │
+│    "payload": {                                                      │
+│      "patient_id": "uuid",                                          │
+│      "alert_type": "elevated_hba1c",                               │
+│      "value": 8.5,                                                   │
+│      "trend": "increasing",  // vs last HbA1c 6 months ago         │
+│      "requires_action": true                                        │
+│    }                                                                 │
+│  }                                                                   │
+│  → Published to: agent.risk                                         │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 5: Agent 14 (Risk Assessment) Gets MCP Context                │
+│  Request to MCP Server: POST /mcp/context                           │
+│  {                                                                   │
+│    "patient_id": "uuid",                                            │
+│    "agent_id": 14                                                    │
+│  }                                                                   │
+│                                                                      │
+│  MCP Server Response:                                               │
+│  {                                                                   │
+│    "protocol": "MCP/1.0",                                           │
+│    "context": {                                                      │
+│      "patient": {                                                   │
+│        "conditions": ["Type 2 Diabetes", "Hypertension", "CKD"],  │
+│        "medications": ["Metformin 1000mg BID"],                    │
+│        "recent_vitals": [...],                                     │
+│        "family_history": [...],                                    │
+│        "risk_factors": ["obesity", "sedentary"]                    │
+│      },                                                              │
+│      "available_tools": [                                           │
+│        {                                                             │
+│          "name": "calculate_risk_score",                           │
+│          "parameters": {...}                                        │
+│        },                                                            │
+│        {                                                             │
+│          "name": "query_graph_database",                           │
+│          "parameters": {...}                                        │
+│        }                                                             │
+│      ]                                                               │
+│    }                                                                 │
+│  }                                                                   │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 6: Agent 14 Uses MCP Tools                                     │
+│  Tool Call 1: calculate_risk_score                                  │
+│  POST /mcp/tools/execute                                            │
+│  {                                                                   │
+│    "tool_name": "calculate_risk_score",                            │
+│    "agent_id": 14,                                                   │
+│    "parameters": {                                                   │
+│      "patient_id": "uuid",                                          │
+│      "risk_type": "diabetes_complications",                         │
+│      "timeframe_days": 365                                          │
+│    }                                                                 │
+│  }                                                                   │
+│  → Result: 72% risk of complications in next year                  │
+│                                                                      │
+│  Tool Call 2: query_graph_database                                  │
+│  {                                                                   │
+│    "tool_name": "query_graph_database",                            │
+│    "agent_id": 14,                                                   │
+│    "parameters": {                                                   │
+│      "cypher_query": "MATCH (p:Patient)-[:HAS_FAMILY_MEMBER]->     │
+│                       (fm)-[:HAD_CONDITION]->(d:Disease)            │
+│                       WHERE d.name = 'Type 2 Diabetes'              │
+│                       RETURN fm.relationship, fm.ageAtOnset"        │
+│    }                                                                 │
+│  }                                                                   │
+│  → Result: Father diagnosed at age 52, Mother at 58                │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 7: Agent 14 Sends A2A to Prescription Agent                   │
+│  {                                                                   │
+│    "protocol": "A2A/1.0",                                           │
+│    "sender": {"agent_id": 14},                                      │
+│    "recipient": {"agent_id": 17},  // Prescription Agent           │
+│    "message_type": "RISK_ASSESSMENT",                               │
+│    "priority": "HIGH",                                              │
+│    "payload": {                                                      │
+│      "patient_id": "uuid",                                          │
+│      "risk_score": 72,                                              │
+│      "risk_factors": ["poor_control", "family_history", "CKD"],   │
+│      "recommendation": "Consider medication intensification",       │
+│      "urgency": "within_2_weeks"                                    │
+│    },                                                                │
+│    "requires_response": true                                        │
+│  }                                                                   │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 8: Agent 17 (Prescription) Gets MCP Context + Uses RAG        │
+│  Gets MCP context (patient, meds, contraindications)               │
+│                                                                      │
+│  Uses MCP Tool: vector_search                                       │
+│  {                                                                   │
+│    "tool_name": "vector_search",                                    │
+│    "parameters": {                                                   │
+│      "query": "Diabetes medication intensification HbA1c 8.5 CKD", │
+│      "collection": "clinical_guidelines",                           │
+│      "top_k": 5                                                      │
+│    }                                                                 │
+│  }                                                                   │
+│  → Retrieves ADA guidelines, KDIGO guidelines                      │
+│                                                                      │
+│  Uses MCP Tool: check_drug_interactions                             │
+│  {                                                                   │
+│    "tool_name": "check_drug_interactions",                         │
+│    "parameters": {                                                   │
+│      "drug_list": ["Metformin", "Empagliflozin"]  // proposed add │
+│    }                                                                 │
+│  }                                                                   │
+│  → Result: No significant interactions                              │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 9: Agent 17 Sends LLM Request with MCP Context                │
+│  POST to Llama 3.2 with MCP-formatted prompt:                      │
+│  {                                                                   │
+│    "model": "llama-3.2-3b-instruct",                               │
+│    "messages": [                                                     │
+│      {                                                               │
+│        "role": "system",                                            │
+│        "content": "You are a clinical pharmacologist",             │
+│        "context": {  ← MCP Context                                 │
+│          "patient": {...},                                          │
+│          "retrieved_guidelines": [...],                            │
+│          "drug_interactions": {...}                                │
+│        }                                                             │
+│      },                                                              │
+│      {                                                               │
+│        "role": "user",                                              │
+│        "content": "Recommend medication intensification"           │
+│      }                                                               │
+│    ],                                                                │
+│    "tools": [...]  ← MCP Tools                                     │
+│  }                                                                   │
+│                                                                      │
+│  LLM Response:                                                      │
+│  "Based on ADA 2024 guidelines and patient's CKD, recommend        │
+│   adding Empagliflozin 10mg daily. SGLT2 inhibitors provide        │
+│   cardiovascular and renal protection..."                           │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 10: Agent 17 Sends A2A to Triage Agent                        │
+│  {                                                                   │
+│    "protocol": "A2A/1.0",                                           │
+│    "sender": {"agent_id": 17},                                      │
+│    "recipient": {"agent_id": 18},  // Triage Agent                 │
+│    "message_type": "TREATMENT_PLAN",                                │
+│    "priority": "HIGH",                                              │
+│    "payload": {                                                      │
+│      "patient_id": "uuid",                                          │
+│      "recommendation": "Add Empagliflozin 10mg daily",             │
+│      "evidence_level": "A",                                         │
+│      "sources": ["ADA 2024", "KDIGO 2024"],                        │
+│      "requires_physician_approval": true                            │
+│    },                                                                │
+│    "requires_response": true                                        │
+│  }                                                                   │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 11: Agent 18 (Triage) Evaluates and Routes                    │
+│  Determines: HIGH priority, requires same-week action               │
+│                                                                      │
+│  Sends A2A Response to Agent 17:                                    │
+│  {                                                                   │
+│    "protocol": "A2A/1.0",                                           │
+│    "message_type": "RESPONSE",                                      │
+│    "in_response_to": "message_id_from_step_10",                    │
+│    "payload": {                                                      │
+│      "approved_for_escalation": true,                              │
+│      "priority": "HIGH",                                            │
+│      "action": "notify_doctor"                                      │
+│    }                                                                 │
+│  }                                                                   │
+│                                                                      │
+│  Sends A2A to Doctor Notification Agent:                            │
+│  {                                                                   │
+│    "recipient": {"agent_id": 19},                                   │
+│    "message_type": "ACTION_REQUEST",                                │
+│    "priority": "HIGH",                                              │
+│    "payload": {                                                      │
+│      "action_type": "send_doctor_notification",                    │
+│      "patient_id": "uuid",                                          │
+│      "recommendation": {...},                                       │
+│      "requires_approval": true                                      │
+│    }                                                                 │
+│  }                                                                   │
+└──────────────────────────┬──────────────────────────────────────────┘
+                           │
+                           ▼
+┌─────────────────────────────────────────────────────────────────────┐
+│ STEP 12: Agent 19 (Doctor Notification) Sends Email                │
+│  Uses MCP Tool: send_notification                                  │
+│  → Email sent to Dr. Johnson with recommendation                   │
+│                                                                      │
+│  Sends A2A confirmation:                                            │
+│  {                                                                   │
+│    "message_type": "ACTION_COMPLETE",                               │
+│    "payload": {                                                      │
+│      "action": "email_sent",                                        │
+│      "timestamp": "2025-10-29T10:05:00Z",                          │
+│      "recipient": "dr.johnson@hospital.com"                         │
+│    }                                                                 │
+│  }                                                                   │
+└─────────────────────────────────────────────────────────────────────┘
+
+TIME: 10:05 AM - Complete workflow from lab result to doctor notification
+TOTAL TIME: 5 minutes
+AGENTS INVOLVED: 5 (Glucose Monitor, Risk, Prescription, Triage, Notification)
+A2A MESSAGES: 6
+MCP TOOL CALLS: 5

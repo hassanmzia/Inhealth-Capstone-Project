@@ -1,0 +1,35 @@
+// Agent 12: Check Drug Interactions
+MATCH (p:Patient {id: $patientId})-[:TAKES_MEDICATION]->(m1:Medication)
+MATCH (m1)-[i:INTERACTS_WITH]->(m2:Medication)
+WHERE i.severity IN ['major', 'severe']
+RETURN m1.name, m2.name, i.effect, i.severity
+
+// Agent 9: Family History Risk Analysis
+MATCH (p:Patient {id: $patientId})-[:HAS_FAMILY_MEMBER]->(fm)-[hc:HAD_CONDITION]->(d:Disease)
+WHERE hc.ageAtOnset < 60
+RETURN d.name, fm.relationship, hc.ageAtOnset, hc.fatal
+
+// Agent 13: Disease Prediction
+MATCH (p:Patient)-[:HAS_CONDITION]->(d1:Disease)-[r:INCREASES_RISK_OF]->(d2:Disease)
+WHERE p.id = $patientId AND NOT EXISTS((p)-[:HAS_CONDITION]->(d2))
+RETURN d2.name, r.relativeRisk, r.timeframe, r.preventable
+ORDER BY r.relativeRisk DESC
+
+// Agent 17: Treatment Recommendations
+MATCH (p:Patient {id: $patientId})-[:HAS_CONDITION]->(d:Disease)
+MATCH (cg:ClinicalGuideline)-[rec:RECOMMENDS]->(m:Medication)-[:FOR_CONDITION]->(d)
+WHERE NOT EXISTS((p)-[:TAKES_MEDICATION]->(m))
+  AND NOT EXISTS((m)-[:CONTRAINDICATED_IN]->(p_disease:Disease)<-[:HAS_CONDITION]-(p))
+RETURN m.name, rec.strength, rec.evidence, cg.title
+ORDER BY rec.strength DESC
+
+// Agent 22: Hospital Capabilities
+MATCH (h:Hospital)
+WHERE h.state = $state 
+  AND point.distance(point({latitude: h.latitude, longitude: h.longitude}), 
+                     point({latitude: $patLat, longitude: $patLon})) < 50000
+  AND h.hasER = true
+RETURN h.name, h.city, 
+       point.distance(point({latitude: h.latitude, longitude: h.longitude}), 
+                      point({latitude: $patLat, longitude: $patLon})) AS distance
+ORDER BY distance

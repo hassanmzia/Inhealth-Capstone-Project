@@ -1,0 +1,817 @@
+# Global Configuration
+global:
+  domain: healthcare.example.com
+  environment: production
+  storageClass: standard
+  imageRegistry: docker.io
+  imagePullSecrets: []
+  timezone: UTC
+
+# Namespace configuration
+namespace:
+  create: true
+  name: healthcare-system
+
+# Ingress Configuration
+ingress:
+  enabled: true
+  className: nginx
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+  tls:
+    enabled: true
+    secretName: healthcare-tls
+  
+  nginx:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: nginx/nginx-ingress
+      tag: "3.3.0"
+    resources:
+      requests:
+        cpu: 200m
+        memory: 256Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+  
+  certManager:
+    enabled: true
+    image:
+      repository: quay.io/jetstack/cert-manager-controller
+      tag: "v1.13.0"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+  
+  waf:
+    enabled: true
+    image:
+      repository: owasp/modsecurity-crs
+      tag: "3.3-nginx"
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 300m
+        memory: 512Mi
+      limits:
+        cpu: 1000m
+        memory: 1Gi
+  
+  externalDns:
+    enabled: true
+    image:
+      repository: k8s.gcr.io/external-dns/external-dns
+      tag: "v0.13.5"
+    provider: aws  # Change to your DNS provider
+    resources:
+      requests:
+        cpu: 50m
+        memory: 64Mi
+      limits:
+        cpu: 100m
+        memory: 128Mi
+  
+  kong:
+    enabled: true
+    image:
+      repository: kong
+      tag: "3.4"
+    replicaCount: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 2Gi
+
+# Application Layer
+application:
+  django:
+    enabled: true
+    replicaCount: 5
+    image:
+      repository: healthcare/django-app
+      tag: "1.0.0"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      minReplicas: 5
+      maxReplicas: 20
+      targetCPUUtilizationPercentage: 70
+      targetMemoryUtilizationPercentage: 80
+    env:
+      - name: DJANGO_SETTINGS_MODULE
+        value: "healthcare.settings.production"
+      - name: DEBUG
+        value: "False"
+    secrets:
+      secretKey: ""  # Set via --set or secrets
+      databaseUrl: ""
+  
+  celery:
+    enabled: true
+    workers:
+      replicaCount: 8
+      image:
+        repository: healthcare/celery-worker
+        tag: "1.0.0"
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 4000m
+          memory: 8Gi
+      autoscaling:
+        enabled: true
+        minReplicas: 8
+        maxReplicas: 30
+    beat:
+      enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    flower:
+      enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 200m
+          memory: 512Mi
+  
+  websocket:
+    enabled: true
+    replicaCount: 4
+    image:
+      repository: healthcare/websocket-server
+      tag: "1.0.0"
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    autoscaling:
+      enabled: true
+      minReplicas: 4
+      maxReplicas: 15
+  
+  staticFiles:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: nginx
+      tag: "1.25-alpine"
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 500m
+        memory: 512Mi
+    storage:
+      size: 50Gi
+
+# AI Agents Layer
+aiAgents:
+  # LLM Service
+  llm:
+    enabled: true
+    replicaCount: 3
+    image:
+      repository: healthcare/llm-service
+      tag: "1.0.0"
+    resources:
+      requests:
+        cpu: 4000m
+        memory: 16Gi
+        nvidia.com/gpu: 1
+      limits:
+        cpu: 8000m
+        memory: 32Gi
+        nvidia.com/gpu: 1
+    gpu:
+      enabled: true
+      type: nvidia-tesla-a100
+  
+  # RAG Service
+  rag:
+    enabled: true
+    replicaCount: 2
+    image:
+      repository: healthcare/rag-service
+      tag: "1.0.0"
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+    vectorDb:
+      enabled: true
+      storage: 200Gi
+  
+  # Medical Agents
+  medicalAgents:
+    diagnosticAgent:
+      enabled: true
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+    
+    treatmentAgent:
+      enabled: true
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+    
+    imagingAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4Gi
+          nvidia.com/gpu: 1
+        limits:
+          cpu: 4000m
+          memory: 8Gi
+          nvidia.com/gpu: 1
+    
+    labResultsAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    medicationAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    symptomsAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    allergyAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+    
+    chronicDiseaseAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+  
+  # Administrative Agents
+  administrativeAgents:
+    schedulingAgent:
+      enabled: true
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    billingAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    insuranceAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    ehrIntegrationAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    complianceAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+    
+    auditAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+  
+  # Communication Agents
+  communicationAgents:
+    notificationAgent:
+      enabled: true
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+    
+    emailAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    
+    smsAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 200m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+    
+    chatAgent:
+      enabled: true
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    translationAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+  
+  # Analytics Agents
+  analyticsAgents:
+    predictiveAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4Gi
+        limits:
+          cpu: 4000m
+          memory: 8Gi
+    
+    reportingAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+    
+    populationHealthAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+    
+    qualityMetricsAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    clinicalResearchAgent:
+      enabled: true
+      replicaCount: 1
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 2Gi
+        limits:
+          cpu: 2000m
+          memory: 4Gi
+  
+  # Security Agents
+  securityAgents:
+    authenticationAgent:
+      enabled: true
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    authorizationAgent:
+      enabled: true
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 500m
+          memory: 1Gi
+        limits:
+          cpu: 1000m
+          memory: 2Gi
+    
+    encryptionAgent:
+      enabled: true
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 300m
+          memory: 512Mi
+        limits:
+          cpu: 500m
+          memory: 1Gi
+
+# Data Persistence Layer
+data:
+  postgresql:
+    enabled: true
+    architecture: replication
+    auth:
+      username: healthcare
+      password: ""  # Set via --set or secrets
+      database: healthcare_db
+    primary:
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 8Gi
+        limits:
+          cpu: 4000m
+          memory: 16Gi
+      persistence:
+        enabled: true
+        size: 500Gi
+        storageClass: fast-ssd
+    readReplicas:
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 8Gi
+        limits:
+          cpu: 4000m
+          memory: 16Gi
+      persistence:
+        enabled: true
+        size: 500Gi
+  
+  neo4j:
+    enabled: true
+    image:
+      repository: neo4j
+      tag: "5.12-enterprise"
+    replicaCount: 3
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+    persistence:
+      enabled: true
+      size: 300Gi
+      storageClass: fast-ssd
+    auth:
+      password: ""  # Set via --set or secrets
+  
+  redis:
+    enabled: true
+    architecture: replication
+    master:
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+        limits:
+          cpu: 2000m
+          memory: 8Gi
+      persistence:
+        enabled: true
+        size: 50Gi
+    replica:
+      replicaCount: 2
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+        limits:
+          cpu: 2000m
+          memory: 8Gi
+      persistence:
+        enabled: true
+        size: 50Gi
+  
+  rabbitmq:
+    enabled: true
+    replicaCount: 3
+    auth:
+      username: healthcare
+      password: ""  # Set via --set or secrets
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    persistence:
+      enabled: true
+      size: 100Gi
+    clustering:
+      enabled: true
+  
+  minio:
+    enabled: true
+    mode: distributed
+    replicaCount: 4
+    image:
+      repository: minio/minio
+      tag: "RELEASE.2023-09-30T07-02-29Z"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 4Gi
+      limits:
+        cpu: 2000m
+        memory: 8Gi
+    persistence:
+      enabled: true
+      size: 1Ti
+      storageClass: standard
+    auth:
+      rootUser: admin
+      rootPassword: ""  # Set via --set or secrets
+    buckets:
+      - name: medical-images
+        policy: none
+      - name: documents
+        policy: none
+      - name: backups
+        policy: none
+
+# Monitoring Stack
+monitoring:
+  prometheus:
+    enabled: true
+    server:
+      resources:
+        requests:
+          cpu: 1000m
+          memory: 4Gi
+        limits:
+          cpu: 2000m
+          memory: 8Gi
+      persistentVolume:
+        enabled: true
+        size: 200Gi
+      retention: 30d
+    
+    alertmanager:
+      enabled: true
+      resources:
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: 500m
+          memory: 512Mi
+      persistentVolume:
+        enabled: true
+        size: 10Gi
+    
+    nodeExporter:
+      enabled: true
+    
+    kubeStateMetrics:
+      enabled: true
+  
+  grafana:
+    enabled: true
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+    persistence:
+      enabled: true
+      size: 20Gi
+    adminPassword: ""  # Set via --set or secrets
+    dashboards:
+      enabled: true
+      defaultDashboardsEnabled: true
+
+# Logging Stack
+logging:
+  elasticsearch:
+    enabled: true
+    replicas: 3
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+    volumeClaimTemplate:
+      resources:
+        requests:
+          storage: 500Gi
+      storageClassName: fast-ssd
+    clusterHealthCheckParams: "wait_for_status=yellow&timeout=10s"
+  
+  logstash:
+    enabled: true
+    replicas: 2
+    image:
+      repository: docker.elastic.co/logstash/logstash
+      tag: "8.10.0"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    persistence:
+      enabled: true
+      size: 50Gi
+  
+  kibana:
+    enabled: true
+    replicas: 2
+    resources:
+      requests:
+        cpu: 500m
+        memory: 1Gi
+      limits:
+        cpu: 1000m
+        memory: 2Gi
+  
+  filebeat:
+    enabled: true
+    resources:
+      requests:
+        cpu: 100m
+        memory: 128Mi
+      limits:
+        cpu: 200m
+        memory: 256Mi
+
+# Network Policies
+networkPolicies:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+
+# Pod Security Policies
+podSecurityPolicy:
+  enabled: true
+
+# Service Mesh (Optional)
+serviceMesh:
+  enabled: false
+  provider: istio  # or linkerd
+
+# Backup Configuration
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: 30
+  storageClass: standard
+  
+# RBAC
+rbac:
+  create: true
+
+# Service Account
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""

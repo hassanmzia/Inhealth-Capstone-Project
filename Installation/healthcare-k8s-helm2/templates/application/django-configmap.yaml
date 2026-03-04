@@ -1,0 +1,39 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "healthcare.fullname" . }}-django-config
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+data:
+  ALLOWED_HOSTS: "{{ .Values.global.domain }},*.{{ .Values.global.domain }}"
+  CORS_ALLOWED_ORIGINS: "https://{{ .Values.global.domain }}"
+  STATIC_ROOT: "/app/staticfiles"
+  MEDIA_ROOT: "/app/media"
+  TIME_ZONE: "{{ .Values.global.timezone }}"
+  LANGUAGE_CODE: "en-us"
+  USE_TZ: "True"
+  LOG_LEVEL: "INFO"
+  
+  # Database settings
+  DB_ENGINE: "django.db.backends.postgresql"
+  DB_HOST: "{{ include "healthcare.fullname" . }}-postgresql"
+  DB_PORT: "5432"
+  DB_NAME: "{{ .Values.data.postgresql.auth.database }}"
+  
+  # Redis settings
+  REDIS_HOST: "{{ include "healthcare.fullname" . }}-redis-master"
+  REDIS_PORT: "6379"
+  
+  # RabbitMQ settings
+  RABBITMQ_HOST: "{{ include "healthcare.fullname" . }}-rabbitmq"
+  RABBITMQ_PORT: "5672"
+  
+  # MinIO settings
+  MINIO_ENDPOINT: "{{ include "healthcare.fullname" . }}-minio:9000"
+  MINIO_USE_SSL: "false"
+  
+  # Neo4j settings
+  NEO4J_HOST: "{{ include "healthcare.fullname" . }}-neo4j"
+  NEO4J_BOLT_PORT: "7687"
+  NEO4J_HTTP_PORT: "7474"

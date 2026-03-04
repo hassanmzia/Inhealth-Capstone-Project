@@ -1,0 +1,124 @@
+{
+  "medication": "Empagliflozin (Jardiance)",
+  "dose": "10mg once daily",
+  "rationale": "Patient has Type 2 diabetes with HbA1c 8.2%, recent MI, and CKD Stage 3A (eGFR 52). Per ADA Standards of Care 2024 and KDIGO 2024 guidelines, SGLT2 inhibitors are strongly recommended (Evidence Level A) for patients with diabetes, atherosclerotic CVD, and CKD. Empagliflozin specifically demonstrated 38% reduction in CV death and 35% reduction in HF hospitalization in EMPA-REG OUTCOME trial. Renal protection shown in EMPA-KIDNEY trial with slowed CKD progression.",
+  "evidence_level": "A",
+  "sources": [
+    "ADA Standards of Medical Care in Diabetes 2024",
+    "KDIGO 2024 Clinical Practice Guideline for CKD",
+    "EMPA-REG OUTCOME Trial (NEJM 2015)"
+  ],
+  "safety_checks": {
+    "drug_interactions": "None with current medications (metformin, lisinopril, atorvastatin)",
+    "contraindications": "None - eGFR 52 is above threshold",
+    "renal_dosing": "No adjustment needed for eGFR >45"
+  },
+  "monitoring": [
+    "eGFR and potassium at 2-4 weeks",
+    "Genital mycotic infection surveillance",
+    "HbA1c in 3 months (expect 0.5-0.8% reduction)",
+    "Blood pressure (may see modest reduction)"
+  ],
+  "patient_education": "This medication helps protect your heart and kidneys while also helping control blood sugar. Take once daily in the morning. Stay well-hydrated. Report any unusual fatigue, nausea, or difficulty breathing. Cost: ~$500/month (check insurance coverage, patient assistance programs available)."
+}
+```
+
+---
+
+### **Agent 18: Priority & Triage Agent**
+**Primary Algorithm: Multi-Criteria Decision Analysis (MCDA) with Fuzzy Logic**
+
+**Algorithm Description:**
+Decision framework evaluating multiple criteria:
+1. **Criteria**: Clinical severity, time sensitivity, resource availability, patient preference
+2. **Fuzzy Logic**: Handles uncertainty in clinical judgments (e.g., "moderately severe" pneumonia)
+3. **Weighted Scoring**: Combines criteria into overall priority score
+4. **Routing Rules**: Maps priority scores to action pathways
+
+**Justification:**
+1. **Multi-Dimensional Decisions**: Triage requires balancing competing factors (severity vs. available resources vs. patient preference). MCDA explicitly models these trade-offs.
+
+2. **Uncertainty Handling**: Clinical presentations have inherent uncertainty. Fuzzy logic represents "borderline severe" better than binary classification.
+
+3. **Interpretability**: Weighted scores show clinician exactly why decision was made: "Priority: HIGH due to severe finding (weight 0.4 × severity 0.9) + high clinical risk (weight 0.3 × risk 0.8)."
+
+4. **Flexible Thresholds**: Weights and thresholds can be adjusted based on system capacity (e.g., lower threshold for hospitalization when beds available).
+
+5. **Consistency**: Algorithmic triage ensures consistent prioritization, reducing human cognitive biases.
+
+**Technical Specifications:**
+- Decision Criteria (7):
+  1. **Clinical Severity** (weight 0.30):
+     - Life-threatening (1.0): STEMI, stroke, severe hypoglycemia
+     - Severe (0.75): Pneumonia with hypoxia, uncontrolled AFib
+     - Moderate (0.50): Elevated BP, poor glucose control
+     - Mild (0.25): Routine follow-up needs
+  
+  2. **Time Sensitivity** (weight 0.25):
+     - Immediate (<1 hour): Cardiac arrest, severe hypoglycemia
+     - Urgent (<4 hours): STEMI, stroke, severe sepsis
+     - Soon (<24 hours): Pneumonia, new AFib
+     - Routine (<7 days): Medication adjustment
+  
+  3. **Risk Score from Agent 14** (weight 0.20):
+     - Critical (76-100): 1.0
+     - High (51-75): 0.75
+     - Moderate (26-50): 0.50
+     - Low (0-25): 0.25
+  
+  4. **Trajectory** (weight 0.10):
+     - Rapidly worsening: 1.0
+     - Slowly worsening: 0.75
+     - Stable: 0.50
+     - Improving: 0.25
+  
+  5. **Comorbidity Burden** (weight 0.08):
+     - Based on number of active conditions, medication count
+  
+  6. **Social Factors** (weight 0.05):
+     - Lives alone, limited support: Higher priority
+     - Strong support system: Can manage at home
+  
+  7. **Patient Preference** (weight 0.02):
+     - Respects advance directives, treatment preferences
+
+- Fuzzy Logic Membership Functions:
+  - Example: "Severe" pneumonia
+    - Oxygen saturation 85%: Membership = 1.0 (definitely severe)
+    - Oxygen saturation 90%: Membership = 0.6 (moderately severe)
+    - Oxygen saturation 94%: Membership = 0.2 (borderline severe)
+    - Oxygen saturation 97%: Membership = 0.0 (not severe)
+
+- Priority Score Calculation:
+```
+  Priority_Score = Σ (weight_i × fuzzy_value_i)
+  
+  Example:
+  - Severity (0.30 × 0.9) = 0.27
+  - Time Sensitivity (0.25 × 0.8) = 0.20
+  - Risk Score (0.20 × 0.85) = 0.17
+  - Trajectory (0.10 × 0.7) = 0.07
+  - Comorbidity (0.08 × 0.6) = 0.05
+  - Social (0.05 × 0.5) = 0.03
+  - Preference (0.02 × 0.5) = 0.01
+  
+  Total Priority Score = 0.80 (HIGH)
+```
+
+- Routing Decision Tree:
+```
+  IF Priority_Score ≥ 0.85 → RED (CRITICAL)
+    Action: Emergency intervention (call 911, hospital admission)
+    Notify: Agent 22 (Hospital Finder) + Agent 23 (Coordination)
+  
+  ELSE IF Priority_Score ≥ 0.65 → ORANGE (URGENT)
+    Action: Same-day intervention
+    Notify: Agent 19 (Doctor) for immediate review + Agent 21 (Scheduling)
+  
+  ELSE IF Priority_Score ≥ 0.40 → YELLOW (SOON)
+    Action: Within 48-72 hours
+    Notify: Agent 19 (Doctor) + Agent 21 (Schedule routine)
+  
+  ELSE → GREEN (ROUTINE)
+    Action: Standard monitoring
+    Notify: Continue current care plan

@@ -1,0 +1,408 @@
+MATCH (p:Patient)-[:HAS_CONDITION]->(d:Disease)
+  MATCH (m:Medication)-[c:CONTRAINDICATED_IN]->(d)
+  WHERE c.severity = 'absolute'
+  RETURN m.name, d.name, c.reason
+```
+
+- Rule Engine:
+  - Renal Dosing Rules: 200+ medication dose adjustments by eGFR
+  - QT Prolongation Rules: 150+ QT-prolonging drugs, checks cumulative risk
+  - Hepatic Dosing Rules: 80+ medications requiring dose adjustment in liver disease
+  - Pregnancy Rules: FDA pregnancy categories, breastfeeding safety
+
+**Interaction Severity Levels:**
+1. **Minor**: Monitor patient, no intervention needed
+2. **Moderate**: Consider alternative or timing separation, monitor closely
+3. **Major**: Avoid combination unless benefit outweighs risk, requires close monitoring
+4. **Severe (Contraindicated)**: Do not use combination
+
+**Alternative Considered:**
+- **Relational Database**: Complex joins for multi-hop interactions, slower queries
+- **Machine Learning Prediction**: Can predict novel interactions but lacks mechanistic explanations needed for clinical trust
+- **Simple Drug-Pair Lookup**: Misses multi-drug interactions and context-dependent interactions
+
+**Integration with MCP/A2A:**
+- MCP tool `check_drug_interactions` wraps Neo4j queries
+- Agent 17 (Prescription) calls this tool before recommending medications
+- Agent 6 (Kidney Function) publishes eGFR changes → Agent 12 re-checks renal dosing
+- Publishes A2A MEDICATION_ALERT for newly detected interactions
+- MCP context includes interaction summary for all prescribing decisions
+
+**Safety Features:**
+- All interactions logged to audit trail
+- Critical interactions require physician override with justification
+- Alerts ranked by severity to avoid alert fatigue
+- Interaction checking happens at multiple points: prescription, administration, pharmacy
+
+---
+
+### **Agent 13: Disease Prediction Agent**
+**Primary Algorithm: Multi-Task Deep Neural Network (DNN) + XGBoost Ensemble**
+
+**Algorithm Description:**
+Ensemble combining two complementary approaches:
+1. **Multi-Task Deep Neural Network** with shared layers learning common disease risk patterns, disease-specific heads for individual predictions
+2. **XGBoost models** for each disease outcome, capturing non-linear interactions
+3. **Ensemble averaging** combines predictions with learned weights
+
+**Justification:**
+1. **Multi-Task Learning Efficiency**: Patients with diabetes + CVD share many risk factors (age, BMI, smoking, labs). Multi-task DNN learns shared representations, improving data efficiency and generalization.
+
+2. **Long-term Prediction**: Predicting disease onset 3-10 years in advance requires learning complex temporal patterns that deep networks excel at.
+
+3. **XGBoost for Robustness**: Tree-based models handle missing data better and provide feature importance. Ensembling with DNN combines strengths of both paradigms.
+
+4. **Outcome Diversity**: System predicts multiple outcomes:
+   - Cardiovascular: MI, stroke, heart failure, AFib
+   - Diabetes complications: Retinopathy, neuropathy, nephropathy
+   - Mortality: 5-year and 10-year risk
+   - New disease onset: CKD, cancer screening priorities
+
+5. **Actionable Timeline**: 3-10 year predictions enable preventive interventions (unlike 30-day predictions which are too short for lifestyle changes).
+
+**Technical Specifications:**
+- Multi-Task DNN Architecture:
+  - Input Layer: 150 features (demographics, vitals, labs, medications, behaviors, family history)
+  - Shared Layers: Dense(256) → Dropout(0.3) → Dense(128) → Dropout(0.2) → Dense(64)
+  - Task-Specific Heads: 8 separate Dense(32) → Dense(1, sigmoid) branches for each disease outcome
+  - Training: Multi-task loss = weighted sum of binary cross-entropy for each task
+  - Optimizer: Adam, learning rate 0.001
+  - Regularization: L2 (0.01), Dropout, Early stopping
+  
+- XGBoost Models:
+  - Separate XGBoost classifier for each outcome
+  - Features: Same 150 as DNN + additional engineered features (interaction terms)
+  - Parameters: max_depth=6, n_estimators=500, learning_rate=0.05
+  
+- Ensemble:
+  - Final prediction = 0.6 × DNN_prediction + 0.4 × XGBoost_prediction
+  - Weights learned through validation set optimization
+  
+- Training Data:
+  - Longitudinal EHR data from 250,000 patients with 5-15 years follow-up
+  - Balanced sampling to address class imbalance (SMOTE for minority classes)
+  
+- Features (Key Categories):
+  - Demographics: Age, gender, race/ethnicity
+  - Clinical: BP, BMI, lipids, HbA1c, eGFR, inflammatory markers
+  - Medications: Classes of drugs (ACEi, statins, metformin, etc.)
+  - Behaviors: Smoking, alcohol, activity level
+  - Family History: From Agent 9
+  - Trajectories: Trends in BP, weight, HbA1c over past 2 years
+
+**Performance Metrics:**
+- Cardiovascular Event (5-year): AUC 0.82, PPV 23%, NPV 97%
+- Diabetic Retinopathy (5-year): AUC 0.79
+- CKD Progression to ESRD (10-year): C-statistic 0.84
+- Calibration: Hosmer-Lemeshow test p>0.05 (well-calibrated)
+
+**Alternative Considered:**
+- **Cox Proportional Hazards**: Classical survival model but assumes proportional hazards (often violated) and linear relationships
+- **Single-Task Models**: Less data-efficient, doesn't leverage shared risk patterns
+- **Transformer Models**: Promising for sequential EHR data but requires massive datasets (>1M patients)
+
+**Integration with MCP/A2A:**
+- MCP tool `calculate_risk_score` wraps ensemble prediction
+- Uses MCP context from all monitoring and profile agents
+- Integrates Neo4j family history (Agent 9) and medication patterns (Agent 11)
+- Publishes A2A PREDICTION message with risk scores and timeframes
+- Agent 17 (Prescription) uses predictions for preventive medication decisions
+- Agent 16 (Coaching) uses predictions to motivate lifestyle changes
+- MCP context includes risk trajectory for longitudinal tracking
+
+**Clinical Applications:**
+- High CVD risk (>20% 10-year) → Start statin, aspirin, intensive BP control
+- High retinopathy risk → Annual dilated eye exams
+- High CKD progression risk → Nephrology referral, start SGLT2 inhibitor
+- Personalized screening: Prioritize colonoscopy for high colorectal cancer risk
+
+---
+
+### **Agent 14: Comorbidity Risk Assessment Agent**
+**Primary Algorithm: Attention-Based Multi-Modal Deep Neural Network**
+
+**Algorithm Description:**
+Deep learning architecture integrating heterogeneous data:
+1. **Multi-modal input branches**: Separate encoders for time-series (vitals), tabular (labs), text (clinical notes), graph (medication interactions)
+2. **Attention mechanism** weighs importance of each data modality for risk assessment
+3. **Fusion layer** integrates representations from all modalities
+4. **Output**: Real-time composite risk score (0-100)
+
+**Justification:**
+1. **Multi-Modal Integration**: Comorbidity risk depends on diverse data types that simple models can't integrate:
+   - Time-series: Vital sign trends
+   - Tabular: Labs, demographics
+   - Graph: Medication interactions, disease relationships
+   - Text: Clinical notes capturing subjective symptoms
+
+2. **Attention for Interpretability**: Attention weights show which data sources drive current risk score (e.g., "Risk elevated primarily due to declining eGFR and medication non-adherence").
+
+3. **Real-Time Updates**: Unlike models requiring batch retraining, this architecture updates risk scores as new data arrives through streaming inference.
+
+4. **Comorbidity Synergy**: Attention mechanism learns that certain combinations are higher risk than sum of parts (e.g., diabetes + CKD + heart failure → exponential risk increase).
+
+5. **Adaptive Weighting**: For patients with incomplete data (common in rural settings), attention automatically upweights available modalities.
+
+**Technical Specifications:**
+- Time-Series Branch (Vitals):
+  - Input: 7-day vital signs (BP, HR, glucose, weight, temp)
+  - LSTM(64) → Dense(32)
+  
+- Tabular Branch (Labs):
+  - Input: Recent labs (HbA1c, lipids, CBC, metabolic panel)
+  - Dense(64) → Dense(32)
+  
+- Graph Branch (Medications/Diseases):
+  - Input: Patient subgraph from Neo4j (medications, conditions, interactions)
+  - Graph Convolutional Network (GCN): 2 layers
+  - Output: Graph embedding (32-dim)
+  
+- Text Branch (Clinical Notes):
+  - Input: Most recent clinical note
+  - BioBERT embeddings → Dense(32)
+  
+- Attention & Fusion:
+  - Attention weights over 4 modality embeddings
+  - Weighted sum → Dense(64) → Dense(32) → Dense(1, sigmoid)
+  - Output: Risk score 0-100
+  
+- Training:
+  - Supervised: Labels = adverse events in next 30 days (hospitalization, ED visit, death)
+  - Dataset: 100,000 patients with comorbidities, 5 years data
+  - Loss: Binary cross-entropy + attention regularization
+  - Optimizer: Adam, learning rate 1e-4
+
+**Risk Score Interpretation:**
+- 0-25 (Green): Low risk, routine monitoring
+- 26-50 (Yellow): Moderate risk, weekly check-ins
+- 51-75 (Orange): High risk, daily monitoring + proactive interventions
+- 76-100 (Red): Critical risk, consider hospitalization or intensive intervention
+
+**Alternative Considered:**
+- **Simple Risk Scores (CHA2DS2-VASc)**: Don't integrate multi-modal data, fixed weights
+- **Separate Models per Modality**: Misses cross-modal interactions
+- **Early Fusion (Concatenate All Inputs)**: Doesn't handle missing modalities well
+
+**Integration with MCP/A2A:**
+- Continuously receives A2A messages from all Tier 1-2 agents
+- MCP context aggregates patient state from all data sources
+- Publishes A2A RISK_ASSESSMENT every 4 hours (more frequently if risk changes >10 points)
+- Agent 18 (Triage) uses risk score for prioritization
+- MCP context includes risk trajectory (trend over past week)
+
+**Dynamic Risk Updates:**
+- New abnormal ECG (Agent 5) → Risk score increases by 15-20 points
+- Temperature spike + pneumonia on X-ray (Agents 4, 7) → Risk score increases by 20-30 points
+- Improved HbA1c from medication adjustment → Risk score decreases by 5-10 points
+
+---
+
+### **Agent 15: Predictive Analytics Agent**
+**Primary Algorithm: Multi-Task LSTM with Temporal Attention**
+
+**Algorithm Description:**
+Recurrent neural network predicting near-term adverse events:
+1. **Multi-Task LSTM** with shared recurrent layers and task-specific heads
+2. **Temporal Attention** identifies critical time windows driving predictions
+3. **Multiple prediction horizons**: 7-day, 14-day, 30-day forecasts
+
+**Justification:**
+1. **Sequential Nature**: Patient health evolves sequentially. LSTMs capture temporal dependencies (e.g., gradual BP increase over 2 weeks preceding stroke).
+
+2. **Multi-Horizon Prediction**: Different interventions suit different timeframes:
+   - 7-day: Schedule urgent appointment
+   - 14-day: Medication adjustment
+   - 30-day: Lifestyle intervention
+
+3. **Temporal Attention**: Shows clinicians which recent events drive predictions (e.g., "Risk elevated due to missed medications 3 days ago + elevated BP yesterday").
+
+4. **Complementary to Agent 14**: Agent 14 provides instantaneous risk; Agent 15 provides forecasted trajectory.
+
+5. **Early Warning**: 7-day predictions enable proactive interventions before crises occur.
+
+**Technical Specifications:**
+- Architecture:
+  - Input: 30-day patient history (vitals, labs, medications, symptoms) as sequence
+  - Embedding Layer: Projects categorical features (medications, diagnoses) to dense vectors
+  - Bidirectional LSTM(128) → Temporal Attention → LSTM(64)
+  - Task-Specific Heads:
+    - Hospital Readmission (7, 14, 30-day)
+    - ED Visit (7, 14, 30-day)
+    - Acute Decompensation (7, 14, 30-day)
+  - Output: 9 probabilities (3 outcomes × 3 horizons)
+  
+- Temporal Attention:
+  - Learns weights over input sequence (30 days)
+  - Visualization shows which days contribute most to prediction
+  
+- Training:
+  - Dataset: 150,000 patient-months with outcome labels
+  - Multi-task loss: Weighted sum of binary cross-entropy for each task
+  - Time-aware train/test split (no data leakage)
+  
+- Performance:
+  - 30-day hospital readmission: AUC 0.79
+  - 7-day ED visit: AUC 0.73
+  - 14-day acute decompensation: AUC 0.81
+
+**Alternative Considered:**
+- **Statistical Time-Series (ARIMA)**: Can't handle multivariate sequences with complex interactions
+- **Transformer**: Better for very long sequences (months-years) but overkill for 30-day windows
+- **GRU**: Similar to LSTM but LSTM's separate forget gate provides better performance on medical sequences
+
+**Integration with MCP/A2A:**
+- Runs daily batch predictions for all patients
+- MCP context includes complete 30-day patient history
+- Publishes A2A PREDICTION with forecast probabilities
+- Agent 18 (Triage) uses predictions for proactive scheduling
+- Agent 21 (Appointment Scheduling) books preemptive appointments for high-risk patients
+- MCP context includes prediction trajectory for trend analysis
+
+**Proactive Interventions Triggered:**
+- 7-day readmission risk >50% → Schedule home health visit
+- 14-day acute decompensation risk >40% → Intensive telemonitoring + medication review
+- 30-day ED visit risk >30% → Proactive outreach, care plan adjustment
+
+---
+
+## **4. TIER 4: INTERVENTION & RECOMMENDATION AGENTS (Agents 16-18)**
+
+### **Agent 16: Personalized Coaching Agent**
+**Primary Algorithm: Contextual Multi-Armed Bandit (Reinforcement Learning)**
+
+**Algorithm Description:**
+Reinforcement learning system optimizing patient engagement:
+1. **Context**: Patient state (demographics, health status, past interactions)
+2. **Actions**: 12 coaching strategies (educational content, goal-setting, motivational messages, behavioral nudges, gamification, social support)
+3. **Reward**: Patient engagement (app opens, goal achievement, behavior change)
+4. **Algorithm**: Thompson Sampling with Bayesian updates
+
+**Justification:**
+1. **Personalization**: Different patients respond to different coaching approaches. RL learns optimal strategy for each individual.
+
+2. **Exploration-Exploitation Balance**: Thompson Sampling balances trying new strategies (exploration) with using proven ones (exploitation).
+
+3. **Continuous Learning**: As patient responds, algorithm updates beliefs about strategy effectiveness in real-time.
+
+4. **Context-Aware**: Coaching adapts to patient state (e.g., motivational messages when patient discouraged, practical tips when patient engaged).
+
+5. **Measurable Outcomes**: Engagement is directly observable, providing clear reward signal for RL.
+
+**Technical Specifications:**
+- State Space (Context Features):
+  - Demographics: Age, gender, education level
+  - Health Status: Current risk score, disease control (HbA1c, BP)
+  - Psychosocial: Health literacy score, self-efficacy, depression screen
+  - Behavioral: Past engagement, goal achievement rate
+  - Temporal: Day of week, time of day, season
+  
+- Action Space (12 Coaching Strategies):
+  1. Educational content (disease information, medication guides)
+  2. Goal-setting (SMART goals, progress tracking)
+  3. Motivational interviewing (change talk, values alignment)
+  4. Behavioral nudges (reminders, implementation intentions)
+  5. Gamification (points, badges, leaderboards)
+  6. Social support (peer groups, family involvement)
+  7. Problem-solving (barrier identification, action planning)
+  8. Positive reinforcement (praise, success stories)
+  9. Concrete tips (recipes, exercise routines)
+  10. Visualization (progress graphs, future health projection)
+  11. Accountability (self-monitoring, reporting)
+  12. Professional connection (encourage doctor visits)
+  
+- Reward Signal:
+  - App engagement: +1 point per login
+  - Goal achievement: +5 points per completed goal
+  - Behavior change: +10 points for sustained change (7+ days)
+  - Health improvement: +20 points for improved metrics (HbA1c, weight)
+  
+- Thompson Sampling:
+  - Maintains Beta distribution for each action's success probability
+  - At each coaching opportunity, samples from all distributions, selects action with highest sample
+  - After observing outcome, updates Beta parameters with Bayesian update
+  
+- Personalization:
+  - Each patient has individual Beta distributions
+  - Initialization: Weakly informative prior (α=1, β=1)
+  - After 100 interactions, distributions reflect patient-specific preferences
+
+**Example Learning Process:**
+- Patient A: Responds to gamification (β distribution shifts to higher success rate)
+- Patient B: Ignores gamification, responds to educational content
+- System learns to show gamification to Patient A, education to Patient B
+
+**Alternative Considered:**
+- **Fixed Coaching Protocol**: Doesn't adapt to individual preferences, lower engagement
+- **Deep RL (DQN, A3C)**: Requires massive data (millions of interactions), overkill for 12 actions
+- **Supervised Learning**: Needs labeled "best strategy" data, can't explore new strategies
+
+**Integration with MCP/A2A:**
+- Receives A2A messages from all monitoring agents (risk changes, goal progress)
+- MCP context includes patient profile, preferences, engagement history
+- Publishes coaching recommendations via Agent 20 (Patient Notification)
+- Uses MCP tool `send_notification` with personalized content
+- A2A feedback loop: Patient engagement → updates RL model
+
+**Adaptive Coaching Examples:**
+- High health literacy patient → Technical medical explanations
+- Low health literacy patient → Visual aids, simple language
+- Morning person → Send reminders at 7 AM
+- Evening person → Send reminders at 7 PM
+- Motivated patient → Stretch goals
+- Struggling patient → Small, achievable goals
+
+---
+
+### **Agent 17: Prescription & Treatment Recommendation Agent**
+**Primary Algorithm: RAG-Enhanced Clinical Decision Support System (hybrid symbolic + neural)**
+
+**Algorithm Description:**
+Multi-component system combining:
+1. **RAG (Retrieval-Augmented Generation)** retrieves relevant clinical guidelines from vector database
+2. **Llama 3.2 LLM** generates evidence-based recommendations using retrieved context
+3. **Rule-Based Safety Checker** verifies recommendations against hard constraints
+4. **MCP Tool Integration** checks drug interactions, contraindications
+
+**Justification:**
+1. **Evidence-Based**: RAG ensures recommendations cite current clinical guidelines (ADA, ACC/AHA, KDIGO), not outdated LLM training data.
+
+2. **Flexibility**: LLM handles nuanced clinical scenarios that rule-based systems struggle with (e.g., patient with multiple contraindications requiring creative solutions).
+
+3. **Safety**: Rule-based safety layer provides guardrails, preventing dangerous recommendations even if LLM hallucinates.
+
+4. **Explainability**: RAG provides citations; clinicians can verify recommendations against source guidelines.
+
+5. **Continuous Updates**: Update vector database with new guidelines without retraining LLM.
+
+**Technical Specifications:**
+- RAG Pipeline:
+  1. **Query Construction**: Patient case summary + clinical question
+  2. **Vector Search** (Qdrant):
+     - Collections: clinical_guidelines, drug_information
+     - Top-K=5 most relevant guideline passages
+     - Filters: Published after 2020, evidence level A or B
+  3. **Context Augmentation**: Prepend retrieved guidelines to LLM prompt
+  
+- LLM Generation (Llama 3.2):
+  - Model: llama-3.2-3b-instruct (local deployment)
+  - Prompt Template:
+```
+    You are an expert clinical pharmacologist. Based on the following guidelines and patient case, recommend treatment.
+    
+    GUIDELINES:
+    {retrieved_guideline_passages}
+    
+    PATIENT CASE:
+    Age: {age}, Conditions: {conditions}, Current Meds: {medications}
+    Recent Labs: HbA1c {hba1c}, eGFR {egfr}, BP {bp}
+    
+    QUESTION: What medication should be added for optimal diabetes control and cardiovascular protection?
+    
+    Provide recommendation in JSON:
+    {
+      "medication": "drug name",
+      "dose": "starting dose",
+      "rationale": "clinical reasoning with guideline citations",
+      "monitoring": "parameters to track",
+      "patient_education": "key points"
+    }

@@ -1,0 +1,82 @@
+def enhance_image(image, defects):
+      """
+      Apply corrections for fixable issues
+      """
+      enhanced = image.copy()
+      
+      # Contrast enhancement for under/overexposure
+      if defects['underexposed'] > 0.5 or defects['overexposed'] > 0.5:
+          enhanced = apply_clahe(enhanced)  # Adaptive histogram equalization
+      
+      # Noise reduction
+      if defects['noise'] > 0.5:
+          enhanced = apply_bilateral_filter(enhanced)
+      
+      # Sharpening (mild, to avoid amplifying noise)
+      enhanced = apply_unsharp_mask(enhanced, amount=0.3)
+      
+      return enhanced
+```
+
+- Feedback Display (Tablet UI):
+```
+  ┌─────────────────────────────────────────┐
+  │  📷 X-Ray Image Quality Check           │
+  ├─────────────────────────────────────────┤
+  │                                         │
+  │  Status: ⚠️ NEEDS IMPROVEMENT           │
+  │                                         │
+  │  Issues Found:                          │
+  │  • Patient moved during capture         │
+  │  • Lungs not fully inflated            │
+  │                                         │
+  │  Instructions:                          │
+  │  1. Ask patient to take deep breath    │
+  │     and hold it                         │
+  │  2. Remind patient to stay very still   │
+  │  3. Count down: "3, 2, 1, X-ray"       │
+  │  4. Take image when patient exhales    │
+  │                                         │
+  │  [RETAKE IMAGE]  [ACCEPT ANYWAY]       │
+  │                                         │
+  └─────────────────────────────────────────┘
+```
+
+- Quality Thresholds for Downstream Agents:
+```
+  Agent 7 (Pneumonia Detection) Requirements:
+  - Minimum Quality: ACCEPTABLE (80% confidence)
+  - Maximum Motion Blur: 0.4
+  - Minimum Contrast: 0.6
+  - Required Anatomy: Full lungs visible
+  
+  Agent 8 (COVID-19 Detection) Requirements:
+  - Minimum Quality: ACCEPTABLE
+  - Maximum Motion Blur: 0.4
+  - Preferred View: PA (posterior-anterior) chest
+  
+  Agent 5 (ECG Analysis) Requirements:
+  - Minimum Quality: ACCEPTABLE
+  - Maximum Noise: 0.3
+  - Required: All 12 leads present
+  - Maximum Baseline Wander: 0.4
+```
+
+**Integration with Diagnostic Workflow:**
+```
+Workflow for Portable X-Ray at Rural Clinic:
+
+1. Health worker opens imaging app on tablet
+2. App connects to portable X-ray device via Bluetooth
+3. App displays patient positioning guide (skeleton overlay)
+4. Health worker positions patient using guide
+5. Health worker clicks "Preview"
+6. Agent 25 analyzes preview image in real-time
+7. If quality issues: Display feedback, suggest corrections
+8. Health worker makes adjustments
+9. Repeat preview until Agent 25 approves quality
+10. Health worker clicks "Capture"
+11. Agent 25 performs final quality check on full-resolution image
+12. If acceptable: Apply automatic enhancements, send to cloud
+13. Agent 7 or 8 analyzes image for diagnostic findings
+14. Results returned to health worker within 2 minutes

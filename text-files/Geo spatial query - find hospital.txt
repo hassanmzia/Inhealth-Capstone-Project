@@ -1,0 +1,42 @@
+-- Find hospitals within 50 miles with cath lab available
+  SELECT 
+      id, name, 
+      ST_Distance(location, ST_MakePoint($patient_lon, $patient_lat)::geography) / 1609.34 AS distance_miles
+  FROM hospitals
+  WHERE 
+      ST_DWithin(
+          location, 
+          ST_MakePoint($patient_lon, $patient_lat)::geography,
+          80467  -- 50 miles in meters
+      )
+      AND has_cath_lab = true
+      AND on_diversion = false
+  ORDER BY distance_miles
+  LIMIT 10;
+```
+
+- Multi-Criteria Ranking:
+```
+  Hospital_Score = (Distance_Score × 0.35) + 
+                   (Capability_Score × 0.30) + 
+                   (Quality_Score × 0.20) + 
+                   (Availability_Score × 0.15)
+  
+  Distance_Score = 1 - (distance / max_acceptable_distance)
+    - CRITICAL cases: max_acceptable = 30 miles
+    - URGENT cases: max_acceptable = 50 miles
+    - ROUTINE cases: max_acceptable = 100 miles
+  
+  Capability_Score = (matched_capabilities / required_capabilities)
+    - Example: STEMI requires cath_lab + emergency_dept
+    - Hospital with both: 1.0
+    - Hospital with only ER: 0.5
+  
+  Quality_Score = weighted_average(door_to_balloon_time, mortality_index, patient_satisfaction)
+    - Normalize each metric to 0-1 scale
+  
+  Availability_Score:
+    - Available bed + low wait time: 1.0
+    - Available bed + high wait time: 0.7
+    - No bed, short waitlist: 0.4
+    - No bed, long waitlist: 0.1

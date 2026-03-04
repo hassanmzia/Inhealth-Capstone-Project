@@ -1,0 +1,221 @@
+Priority = (Urgency × 0.6) + (Severity × 0.3) + (Patient_Risk × 0.1)
+    Urgency: CRITICAL=1.0, URGENT=0.7, SOON=0.4, ROUTINE=0.1
+    Severity: From Agent 18 triage
+    Patient_Risk: From Agent 14
+```
+  - Queue Operations:
+    - Insert: O(log n)
+    - Extract-min: O(log n) - delivers highest priority notification
+    - Peek: O(1) - checks next notification without removing
+  
+- Batching Rules:
+  - CRITICAL: Deliver immediately (no batching)
+  - URGENT: Deliver within 5 minutes or batch up to 3 urgent alerts
+  - SOON: Batch up to 10 alerts, deliver every 30 minutes
+  - ROUTINE: Batch unlimited, deliver once daily at preferred time
+
+- Channel Selection:
+  - CRITICAL:
+    - Primary: SMS + Page (simultaneous)
+    - Secondary: Phone call (if no acknowledgment in 5 minutes)
+    - Tertiary: Escalate to backup physician (15 minutes)
+  - URGENT:
+    - Primary: Email with high-priority flag
+    - Secondary: SMS (if no acknowledgment in 30 minutes)
+  - SOON:
+    - Primary: Email (normal priority)
+  - ROUTINE:
+    - Primary: EHR inbox message
+    - Secondary: Daily digest email
+
+- Template-Based NLG:
+```
+  Template for STEMI Alert:
+  
+  🚨 CRITICAL ALERT: STEMI - {patient_name}
+  
+  ECG shows {ecg_finding} with {confidence}% confidence.
+  
+  PATIENT CONTEXT:
+  • Age: {age}, Gender: {gender}
+  • Medical History: {conditions}
+  • Current Medications: {medications}
+  • Recent Vitals: BP {bp}, HR {hr}
+  • Risk Score: {risk_score}/100
+  
+  SYSTEM ACTIONS TAKEN:
+  ✓ Patient notified to call 911
+  ✓ County Regional Hospital alerted (cath lab ready)
+  ✓ ECG transmitted to ED
+  ✓ Medical summary sent to receiving physician
+  
+  RECOMMENDED ACTIONS:
+  1. Confirm patient has called 911
+  2. Review ECG: [View ECG Image]
+  3. Review full patient chart: [View Dashboard]
+  
+  ETA to Hospital: 18 minutes
+  Cath Lab Ready: 10:52 AM
+  
+  [ACKNOWLEDGE] [VIEW DETAILS] [ESCALATE]
+```
+
+- Message Personalization:
+  - Physician preference learning (time-of-day, channel preferences)
+  - Medical specialty customization (cardiologist gets different detail than PCP)
+  - Complexity adjustment (more detail for complex patients)
+
+- Acknowledgment Tracking:
+  - Database stores: notification_id, physician_id, sent_timestamp, acknowledged_timestamp, action_taken
+  - Metrics: Response time, acknowledgment rate, action completion rate
+  - Escalation triggers: No response within timeout
+
+**Alternative Considered:**
+- **Neural NLG (GPT-based)**: Risk of inconsistent formats, potential errors, regulatory concerns
+- **Simple Alert Firing**: Causes alert fatigue, 90%+ alerts ignored
+- **Rule-Based Without Queue**: Can't prioritize, all alerts treated equally
+
+**Integration with MCP/A2A:**
+- Subscribes to A2A channels: agent.action, agent.intervention
+- Receives TRIAGE_DECISION from Agent 18 with priority level
+- MCP context includes physician contact info, on-call schedule, preferences
+- Uses MCP tool `send_notification` with appropriate channel
+- Publishes A2A ACTION_COMPLETE when physician acknowledges
+- Publishes A2A ESCALATION if no response within timeout
+
+**Quality Metrics:**
+- Average response time by priority level
+- Acknowledgment rate (target: >95% for CRITICAL, >85% for URGENT)
+- False positive rate (physician marks as not actionable)
+- Physician satisfaction survey (alert fatigue assessment)
+
+**Example Workflow:**
+```
+Time 10:45 AM: Agent 5 detects STEMI
+  → Agent 18 triages as CRITICAL
+  → Agent 19 receives A2A with priority=1.0
+  → Immediately sends SMS + Page to Dr. Johnson
+  
+Time 10:45:42 AM: Dr. Johnson clicks acknowledgment link
+  → Agent 19 logs acknowledgment
+  → Publishes A2A ACTION_COMPLETE
+  → No escalation needed
+  
+Time 11:05 AM: Dr. Johnson calls patient to confirm 911 called
+  → Enters note in EHR
+  → Agent 19 logs action completion
+```
+
+---
+
+### **Agent 20: Patient Notification Agent**
+**Primary Algorithm: Multi-Channel Communication Manager + Readability Optimization**
+
+**Algorithm Description:**
+Patient-centric notification system:
+1. **Channel Preference Engine**: Learns and respects patient communication preferences
+2. **Readability Optimizer**: Adjusts language complexity based on health literacy
+3. **Timing Optimization**: Delivers messages at times maximizing engagement
+4. **Multi-Modal Delivery**: Supports SMS, email, phone calls, app push notifications
+
+**Justification:**
+1. **Patient-Centeredness**: Different patients prefer different channels (elderly prefer calls, younger prefer texts). Preference learning maximizes reach.
+
+2. **Health Literacy Adaptation**: 40% of rural adults have limited health literacy. Readability optimization ensures comprehension across education levels.
+
+3. **Engagement Optimization**: Timing matters—messages sent at optimal times have 3× higher open rates. System learns patient-specific optimal times.
+
+4. **Accessibility**: Multi-modal support accommodates visual/hearing impairments, language barriers, limited smartphone access.
+
+5. **Trust Building**: Consistent, clear, respectful communication builds patient trust in automated system.
+
+**Technical Specifications:**
+- Channel Preference Learning:
+  - **Features**: Age, prior engagement rates by channel, smartphone ownership, vision/hearing status
+  - **Algorithm**: Multi-Armed Bandit (Thompson Sampling)
+  - **Actions**: SMS, Email, App Push, Phone Call
+  - **Reward**: Message opened + action taken (e.g., took medication, reported symptom)
+  - **Update**: After each message, update channel success probabilities
+  
+- Readability Optimization:
+  - **Input**: Health literacy score (1-5 scale, from intake assessment)
+  - **Method**: Template selection + text simplification
+  - **Levels**:
+    - Level 1 (Graduate education): Medical terminology, complex sentences
+    - Level 2 (College): Moderate terminology, clear explanations
+    - Level 3 (High school): Simple language, analogies
+    - Level 4 (Middle school): Very simple, visual aids
+    - Level 5 (Elementary): Icons, emojis, minimal text
+  - **Validation**: Flesch-Kincaid Grade Level, SMOG Index
+  
+  Example Message Across Literacy Levels:
+```
+  Level 1: "Your HbA1c is 8.2%, indicating suboptimal glycemic control. Consider intensification of antihyperglycemic therapy."
+  
+  Level 3: "Your diabetes blood test (HbA1c) is 8.2%, which is higher than the goal of 7.0%. This means your blood sugar has been too high. We should talk about adjusting your medications."
+  
+  Level 5: "😊 Blood test result: Your diabetes number is 8.2. 🎯 Goal is 7 or less. 💊 Let's work together to improve this!"
+```
+
+- Timing Optimization:
+  - **Data**: Historical open times, action times, patient-reported preferences
+  - **Algorithm**: Gaussian Mixture Model clustering patient behavior
+  - **Output**: Optimal send window for each patient (e.g., "7-9 AM" or "6-8 PM")
+  - **Constraints**: Never send 10 PM - 7 AM (unless CRITICAL alert)
+  
+- Content Types:
+  1. **Medication Reminders**: Daily reminders with dosing instructions
+  2. **Appointment Reminders**: 48 hours, 24 hours, 2 hours before
+  3. **Lab Result Notifications**: Results with interpretation
+  4. **Health Coaching**: From Agent 16, personalized tips
+  5. **Symptom Check-ins**: Weekly surveys (How are you feeling?)
+  6. **Educational Content**: Disease management, lifestyle tips
+  7. **Alerts**: Urgent actions needed (Schedule appointment, Call doctor)
+  
+- Multi-Language Support:
+  - Primary languages: English, Spanish
+  - Machine translation for other languages
+  - Cultural adaptation (not just word-for-word translation)
+  
+- Accessibility Features:
+  - **Vision Impairment**: Large font SMS, text-to-speech phone calls, high-contrast emails
+  - **Hearing Impairment**: Text-based channels only, video calls with captions
+  - **Limited Smartphone**: SMS-only mode, phone calls
+  - **No Internet**: SMS and phone calls only
+
+**Channel-Specific Formats:**
+
+SMS (160 characters):
+```
+Hi John! Reminder: Take your metformin 1000mg with breakfast & dinner. Your glucose was 145 this AM - great job! Keep it up. Reply HELP for support.
+```
+
+Email (Rich formatting):
+```
+Subject: Your Weekly Diabetes Update
+
+Hi John,
+
+Great news! Your average glucose this week was 138 mg/dL, down from 152 last week. You're making excellent progress toward your goal of <130.
+
+📊 This Week's Summary:
+- Average Glucose: 138 mg/dL (↓ 14 from last week)
+- Medication Adherence: 95% (excellent!)
+- Activity: 8,500 steps/day average
+
+💊 Reminder: Take metformin 1000mg twice daily with meals
+
+📅 Next Steps:
+- Continue current routine
+- Next lab check: March 15
+- Next appointment: Dr. Johnson, March 22
+
+Questions? Reply to this email or call 555-0123.
+
+Stay healthy!
+Your AI Health Team
+```
+
+Phone Call (Text-to-Speech):
+```
+"Hello John, this is your health assistant calling. I have an important message. Your recent chest X-ray shows signs of pneumonia. Dr. Johnson recommends you start antibiotics today. Please call the clinic at 555-0123 to arrange pickup of your prescription. If you have difficulty breathing, fever over 101, or chest pain, call 911 immediately. Press 1 to repeat this message, or press 2 to confirm you understand. Thank you."

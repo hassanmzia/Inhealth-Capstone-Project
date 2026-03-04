@@ -1,0 +1,136 @@
+async def coordinate_admission(patient, hospital, condition):
+      # Parallel tasks initiated simultaneously
+      tasks = [
+          call_hospital_ed(hospital, patient, condition),
+          transmit_medical_records(hospital, patient),
+          transmit_diagnostic_images(hospital, patient),
+          notify_accepting_physician(hospital, patient, condition),
+          arrange_transport(patient, hospital),
+          notify_family(patient, hospital)
+      ]
+      
+      # Wait for all critical tasks
+      results = await asyncio.gather(*tasks)
+      
+      # Verify all succeeded
+      if all(task.success for task in results):
+          transition_to(TRANSPORT_ARRANGED)
+      else:
+          handle_failures(results)
+```
+
+- SBAR Communication Format:
+```
+  Phone Call to Hospital ED:
+  
+  "This is the AI Health System calling about a patient transfer.
+  
+  SITUATION:
+  We have a 68-year-old male with an acute ST-elevation myocardial infarction 
+  requiring immediate cardiac catheterization.
+  
+  BACKGROUND:
+  Patient John Doe, DOB 3/15/1957, has a history of Type 2 diabetes, 
+  hypertension, and stage 3 CKD. He developed chest pain 25 minutes ago. 
+  12-lead ECG shows ST elevations in leads II, III, and aVF consistent with 
+  inferior wall STEMI.
+  
+  ASSESSMENT:
+  This is a time-sensitive cardiac emergency requiring immediate intervention. 
+  The patient is hemodynamically stable with BP 150/95, HR 105. He has called 
+  911 and EMS is en route to his location.
+  
+  RECOMMENDATION:
+  We request acceptance for immediate transfer to your facility for emergent 
+  cardiac catheterization. Estimated arrival time is 20 minutes. We are 
+  transmitting the ECG and medical summary now.
+  
+  Do you accept this patient? What is your cath lab availability?"
+```
+
+- Medical Record Transmission:
+  - **FHIR Bundle**: Complete patient record in HL7 FHIR format
+  - **Priority Documents**:
+    1. Current problem list (active conditions)
+    2. Medication list (current prescriptions)
+    3. Allergy list
+    4. Recent labs (past 90 days)
+    5. Relevant imaging (X-rays, ECGs)
+    6. Advance directives (code status, healthcare proxy)
+  - **Transmission Methods**:
+    - Primary: Direct EHR integration (FHIR API)
+    - Secondary: Secure email (encrypted PDF)
+    - Tertiary: Fax (last resort)
+  - **Confirmation**: Verify receipt, retry if failed
+
+- Transport Coordination:
+  - **Ambulance Dispatch**:
+    - Integrate with local EMS system
+    - Provide patient address, condition, destination hospital
+    - Request ALS (Advanced Life Support) for critical patients
+  - **Helicopter Transport** (if needed):
+    - Weather-dependent availability check
+    - Calculate if time savings justify cost
+    - Arrange landing zone coordination
+  - **Private Transport** (non-emergency):
+    - Medical van services for stable patients
+    - Patient family members (if appropriate)
+  - **Tracking**: Real-time GPS tracking of transport vehicle
+
+- Handoff Protocol:
+  - **Notification**: Call ED 10 minutes before arrival
+  - **Warm Handoff**: EMS paramedics give verbal report to ED physician
+  - **Documentation**: System-generated summary available in ED
+  - **Confirmation**: ED nurse acknowledges receipt, logs in system
+
+**Error Handling:**
+- **Hospital Refuses**: Automatically call next hospital on ranked list (from Agent 22)
+- **Phone Busy**: Retry every 30 seconds, max 5 attempts, then escalate to human
+- **Record Transmission Fails**: Try alternate method (FHIR → Email → Fax)
+- **Transport Unavailable**: Arrange alternative (family transport, request mutual aid)
+- **Patient Condition Deteriorates En Route**: Notify receiving ED, prepare for higher acuity
+
+**Alternative Considered:**
+- **Manual Coordination**: Too slow, error-prone, doesn't scale
+- **Simple Alert System**: Doesn't ensure closed-loop completion
+- **Rule-Based Without State Machine**: Can't handle complex error scenarios
+
+**Integration with MCP/A2A:**
+- Receives A2A ACTION_REQUEST from Agent 18 with hospital admission need
+- Uses Agent 22 results for hospital selection
+- MCP context includes complete patient record, imaging, provider notes
+- Uses MCP tools:
+  - `send_notification` for hospital contact
+  - `query_fhir_database` to compile medical summary
+  - External APIs for transport dispatch
+- Publishes A2A HOSPITAL_ADMISSION with status updates at each state transition
+- Agents 19 (Doctor) and 20 (Patient) receive updates
+- Final A2A ACTION_COMPLETE when patient admitted
+
+**Quality Metrics:**
+- Time from agent activation to hospital acceptance (target: <10 minutes)
+- Successful admission rate without escalation (target: >90%)
+- Record completeness at handoff (target: 100% critical documents)
+- Transport arrival time accuracy (target: ±15 minutes)
+- Hospital satisfaction with coordination quality
+
+**Example Workflow Timeline:**
+```
+10:45:00 - Agent 5 detects STEMI
+10:45:30 - Agent 18 triages CRITICAL, routes to Agent 23
+10:45:35 - Agent 23 state: INITIATED
+10:45:40 - Agent 22 selects County Regional Hospital
+10:45:45 - Call hospital ED (state: HOSPITAL_CONTACTED)
+10:46:20 - Hospital accepts (state: ACCEPTANCE_CONFIRMED)
+10:46:25 - Transmit ECG via FHIR (parallel task)
+10:46:30 - Transmit medical summary (parallel task)
+10:46:35 - Notify cath lab team (parallel task)
+10:46:40 - Dispatch EMS ambulance (parallel task)
+10:47:00 - All transmissions confirmed (state: RECORDS_TRANSMITTED)
+10:47:30 - EMS en route (state: TRANSPORT_ARRANGED)
+10:52:00 - EMS picks up patient (state: PATIENT_EN_ROUTE)
+11:02:00 - Notification: ETA 10 minutes
+11:12:00 - Patient arrives ED (state: HANDOFF_COMPLETE)
+11:15:00 - Patient in cath lab (state: ADMITTED)
+
+Total time: 30 minutes from detection to cath lab

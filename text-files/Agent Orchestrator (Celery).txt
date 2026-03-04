@@ -1,0 +1,80 @@
+# apps/agents/orchestrator.py
+
+from celery import shared_task, chain, group
+from .monitoring_agents import GlucoseAgent, CardiacAgent, TemperatureAgent
+from .diagnostic_agents import ECGAgent, KidneyAgent
+from .intervention_agents import PrescriptionAgent, TriageAgent
+from .action_agents import DoctorNotificationAgent, PatientNotificationAgent
+
+class AgentOrchestrator:
+    """Central orchestrator for all 25 agents"""
+    
+    def __init__(self):
+        self.agents = self._initialize_agents()
+    
+    def _initialize_agents(self):
+        """Initialize all agents with shared resources"""
+        # Shared resources
+        from apps.fhir.services import FHIRService
+        from vector_db.embeddings import VectorDBClient
+        from ml_models.loader import ModelLoader
+        
+        fhir_service = FHIRService()
+        vector_db = VectorDBClient()
+        model_loader = ModelLoader()
+        
+        return {
+            1: GlucoseAgent(fhir_service, vector_db),
+            2: CardiacAgent(fhir_service, vector_db),
+            # ... initialize all 25 agents
+            17: PrescriptionAgent(fhir_service, vector_db, model_loader),
+            18: TriageAgent(fhir_service, vector_db),
+            19: DoctorNotificationAgent(fhir_service),
+            20: PatientNotificationAgent(fhir_service),
+        }
+    
+    @shared_task
+    def monitor_patient(patient_id):
+        """Celery task: Continuous patient monitoring"""
+        orchestrator = AgentOrchestrator()
+        
+        # Run monitoring agents in parallel
+        monitoring_results = group(
+            run_agent.s(1, patient_id),  # Glucose
+            run_agent.s(2, patient_id),  # Cardiac
+            run_agent.s(3, patient_id),  # Activity
+            run_agent.s(4, patient_id),  # Temperature
+        ).apply_async()
+        
+        results = monitoring_results.get()
+        
+        # Check if any alerts triggered
+        alerts = [r for r in results if r.get('alert')]
+        
+        if alerts:
+            # Trigger triage agent
+            orchestrator.agents[18].process_alerts(patient_id, alerts)
+        
+        return results
+    
+    @shared_task
+    def run_agent(agent_id, patient_id, **kwargs):
+        """Celery task: Run specific agent"""
+        orchestrator = AgentOrchestrator()
+        agent = orchestrator.agents[agent_id]
+        return agent.execute(patient_id, **kwargs)
+    
+    def run_specific_agent(self, agent_name, patient_id):
+        """Run a specific agent by name"""
+        agent_map = {
+            'prescription': 17,
+            'triage': 18,
+            'disease_prediction': 13,
+            # ... map all agents
+        }
+        
+        agent_id = agent_map.get(agent_name)
+        if not agent_id:
+            raise ValueError(f"Unknown agent: {agent_name}")
+        
+        return run_agent.delay(agent_id, patient_id).get()

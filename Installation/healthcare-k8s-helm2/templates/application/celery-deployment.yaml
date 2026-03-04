@@ -1,0 +1,143 @@
+{{- if .Values.application.celery.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "healthcare.fullname" . }}-celery-worker
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-worker
+spec:
+  {{- if not .Values.application.celery.workers.autoscaling.enabled }}
+  replicas: {{ .Values.application.celery.workers.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-worker
+  template:
+    metadata:
+      annotations:
+        {{- include "healthcare.podAnnotations" . | nindent 8 }}
+      labels:
+        {{- include "healthcare.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-worker
+    spec:
+      {{- include "healthcare.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "healthcare.serviceAccountName" . }}
+      containers:
+      - name: celery-worker
+        image: "{{ .Values.application.celery.workers.image.repository }}:{{ .Values.application.celery.workers.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        command: ["celery"]
+        args:
+          - "-A"
+          - "healthcare"
+          - "worker"
+          - "--loglevel=info"
+          - "--concurrency=4"
+          - "--max-tasks-per-child=1000"
+        env:
+        - name: CELERY_BROKER_URL
+          value: "amqp://{{ .Values.data.rabbitmq.auth.username }}:{{ .Values.data.rabbitmq.auth.password }}@{{ include "healthcare.fullname" . }}-rabbitmq:5672/"
+        - name: CELERY_RESULT_BACKEND
+          value: "redis://{{ include "healthcare.fullname" . }}-redis-master:6379/1"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "healthcare.fullname" . }}-django-secrets
+              key: database-url
+        livenessProbe:
+          exec:
+            command:
+            - celery
+            - -A
+            - healthcare
+            - inspect
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 30
+          timeoutSeconds: 10
+        resources:
+          requests:
+            cpu: {{ .Values.application.celery.workers.resources.requests.cpu }}
+            memory: {{ .Values.application.celery.workers.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.application.celery.workers.resources.limits.cpu }}
+            memory: {{ .Values.application.celery.workers.resources.limits.memory }}
+{{- if .Values.application.celery.workers.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "healthcare.fullname" . }}-celery-worker
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-worker
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "healthcare.fullname" . }}-celery-worker
+  minReplicas: {{ .Values.application.celery.workers.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.application.celery.workers.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+{{- end }}
+---
+{{- if .Values.application.celery.beat.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "healthcare.fullname" . }}-celery-beat
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: celery-beat
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: celery-beat
+  template:
+    metadata:
+      labels:
+        {{- include "healthcare.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: celery-beat
+    spec:
+      {{- include "healthcare.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "healthcare.serviceAccountName" . }}
+      containers:
+      - name: celery-beat
+        image: "{{ .Values.application.celery.workers.image.repository }}:{{ .Values.application.celery.workers.image.tag }}"
+        command: ["celery"]
+        args:
+          - "-A"
+          - "healthcare"
+          - "beat"
+          - "--loglevel=info"
+        env:
+        - name: CELERY_BROKER_URL
+          value: "amqp://{{ .Values.data.rabbitmq.auth.username }}:{{ .Values.data.rabbitmq.auth.password }}@{{ include "healthcare.fullname" . }}-rabbitmq:5672/"
+        resources:
+          requests:
+            cpu: {{ .Values.application.celery.beat.resources.requests.cpu }}
+            memory: {{ .Values.application.celery.beat.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.application.celery.beat.resources.limits.cpu }}
+            memory: {{ .Values.application.celery.beat.resources.limits.memory }}
+{{- end }}
+{{- end }}

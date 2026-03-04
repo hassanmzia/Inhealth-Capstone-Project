@@ -1,0 +1,152 @@
+{{- if .Values.application.django.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "healthcare.fullname" . }}-django
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: django
+spec:
+  {{- if not .Values.application.django.autoscaling.enabled }}
+  replicas: {{ .Values.application.django.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: django
+  template:
+    metadata:
+      annotations:
+        {{- include "healthcare.podAnnotations" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/application/django-configmap.yaml") . | sha256sum }}
+      labels:
+        {{- include "healthcare.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: django
+    spec:
+      {{- include "healthcare.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "healthcare.serviceAccountName" . }}
+      {{- include "healthcare.securityContext" . | nindent 6 }}
+      containers:
+      - name: django
+        image: "{{ .Values.application.django.image.repository }}:{{ .Values.application.django.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8000
+          protocol: TCP
+        env:
+        {{- range .Values.application.django.env }}
+        - name: {{ .name }}
+          value: {{ .value | quote }}
+        {{- end }}
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "healthcare.fullname" . }}-django-secrets
+              key: database-url
+        - name: SECRET_KEY
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "healthcare.fullname" . }}-django-secrets
+              key: secret-key
+        - name: REDIS_URL
+          value: "redis://{{ include "healthcare.fullname" . }}-redis-master:6379/0"
+        - name: RABBITMQ_URL
+          value: "amqp://{{ .Values.data.rabbitmq.auth.username }}:{{ .Values.data.rabbitmq.auth.password }}@{{ include "healthcare.fullname" . }}-rabbitmq:5672/"
+        livenessProbe:
+          httpGet:
+            path: /health/
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready/
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+        resources:
+          requests:
+            cpu: {{ .Values.application.django.resources.requests.cpu }}
+            memory: {{ .Values.application.django.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.application.django.resources.limits.cpu }}
+            memory: {{ .Values.application.django.resources.limits.memory }}
+        volumeMounts:
+        - name: tmp
+          mountPath: /tmp
+        - name: static
+          mountPath: /app/staticfiles
+      volumes:
+      - name: tmp
+        emptyDir: {}
+      - name: static
+        emptyDir: {}
+      affinity:
+        podAntiAffinity:
+          preferredDuringSchedulingIgnoredDuringExecution:
+          - weight: 100
+            podAffinityTerm:
+              labelSelector:
+                matchExpressions:
+                - key: app.kubernetes.io/component
+                  operator: In
+                  values:
+                  - django
+              topologyKey: kubernetes.io/hostname
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "healthcare.fullname" . }}-django
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: django
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "healthcare.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: django
+{{- if .Values.application.django.autoscaling.enabled }}
+---
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: {{ include "healthcare.fullname" . }}-django
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: django
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: {{ include "healthcare.fullname" . }}-django
+  minReplicas: {{ .Values.application.django.autoscaling.minReplicas }}
+  maxReplicas: {{ .Values.application.django.autoscaling.maxReplicas }}
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.application.django.autoscaling.targetCPUUtilizationPercentage }}
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: {{ .Values.application.django.autoscaling.targetMemoryUtilizationPercentage }}
+{{- end }}
+{{- end }}

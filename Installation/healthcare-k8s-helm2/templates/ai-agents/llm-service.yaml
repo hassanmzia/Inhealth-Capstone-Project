@@ -1,0 +1,130 @@
+{{- if .Values.aiAgents.llm.enabled }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "healthcare.fullname" . }}-llm-service
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm-service
+spec:
+  replicas: {{ .Values.aiAgents.llm.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: llm-service
+  template:
+    metadata:
+      annotations:
+        {{- include "healthcare.podAnnotations" . | nindent 8 }}
+      labels:
+        {{- include "healthcare.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: llm-service
+    spec:
+      {{- include "healthcare.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "healthcare.serviceAccountName" . }}
+      {{- if .Values.aiAgents.llm.gpu.enabled }}
+      nodeSelector:
+        nvidia.com/gpu.product: {{ .Values.aiAgents.llm.gpu.type }}
+      tolerations:
+      - key: nvidia.com/gpu
+        operator: Exists
+        effect: NoSchedule
+      {{- end }}
+      containers:
+      - name: llm-service
+        image: "{{ .Values.aiAgents.llm.image.repository }}:{{ .Values.aiAgents.llm.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        - name: grpc
+          containerPort: 9090
+          protocol: TCP
+        env:
+        - name: MODEL_PATH
+          value: "/models"
+        - name: GPU_ENABLED
+          value: "{{ .Values.aiAgents.llm.gpu.enabled }}"
+        - name: MAX_BATCH_SIZE
+          value: "32"
+        - name: MAX_SEQUENCE_LENGTH
+          value: "4096"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: {{ .Values.aiAgents.llm.resources.requests.cpu }}
+            memory: {{ .Values.aiAgents.llm.resources.requests.memory }}
+            {{- if .Values.aiAgents.llm.gpu.enabled }}
+            nvidia.com/gpu: {{ index .Values.aiAgents.llm.resources.requests "nvidia.com/gpu" }}
+            {{- end }}
+          limits:
+            cpu: {{ .Values.aiAgents.llm.resources.limits.cpu }}
+            memory: {{ .Values.aiAgents.llm.resources.limits.memory }}
+            {{- if .Values.aiAgents.llm.gpu.enabled }}
+            nvidia.com/gpu: {{ index .Values.aiAgents.llm.resources.limits "nvidia.com/gpu" }}
+            {{- end }}
+        volumeMounts:
+        - name: models
+          mountPath: /models
+        - name: tmp
+          mountPath: /tmp
+      volumes:
+      - name: models
+        persistentVolumeClaim:
+          claimName: {{ include "healthcare.fullname" . }}-llm-models
+      - name: tmp
+        emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "healthcare.fullname" . }}-llm-service
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: llm-service
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: 9090
+    targetPort: grpc
+    protocol: TCP
+    name: grpc
+  selector:
+    {{- include "healthcare.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: llm-service
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "healthcare.fullname" . }}-llm-models
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteMany
+  storageClassName: {{ .Values.global.storageClass }}
+  resources:
+    requests:
+      storage: 100Gi
+{{- end }}

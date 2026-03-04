@@ -1,0 +1,42 @@
+def schedule_appointment(patient, urgency, preferences):
+      # Priority scoring
+      priority = urgency_score(urgency) + risk_score(patient) + wait_time_penalty(patient)
+      
+      # Get available slots matching constraints
+      slots = get_available_slots(
+          provider_type=get_required_specialty(patient),
+          after_datetime=get_earliest_time(urgency),
+          before_datetime=get_latest_time(urgency),
+          duration=get_visit_duration(patient, visit_type)
+      )
+      
+      # Forward checking: Remove slots violating constraints
+      slots = filter_by_patient_preferences(slots, preferences)
+      slots = filter_by_resource_availability(slots)
+      
+      # If no slots found, relax constraints
+      if not slots:
+          slots = relax_constraints(preferences)  # Drop soft constraints
+      
+      # Select best slot (highest preference match)
+      best_slot = max(slots, key=lambda s: preference_score(s, preferences))
+      
+      # Book appointment
+      reserve_slot(best_slot, patient)
+      
+      return best_slot
+```
+
+- Priority Scoring:
+```
+  Priority = (Urgency × 0.5) + (Clinical_Risk × 0.3) + (Wait_Time × 0.2)
+  
+  Urgency:
+    CRITICAL: 1.0 (same-day or urgent ED transfer)
+    URGENT: 0.8 (within 24-48 hours)
+    SOON: 0.5 (within 1 week)
+    ROUTINE: 0.2 (within 1 month)
+  
+  Clinical_Risk: Agent 14 risk score (0-1 normalized)
+  
+  Wait_Time: Days since scheduling request / 30 (caps at 1.0)

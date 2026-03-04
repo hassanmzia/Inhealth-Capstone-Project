@@ -1,0 +1,378 @@
+<mxfile host="app.diagrams.net" modified="2025-10-29T00:00:00.000Z" agent="Claude" version="21.0.0">
+  <diagram name="ML Pipeline" id="ml-pipeline">
+    <mxGraphModel dx="1434" dy="790" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1400" pageHeight="1000" math="0" shadow="0">
+      <root>
+        <mxCell id="0" />
+        <mxCell id="1" parent="0" />
+        
+        <!-- Title -->
+        <mxCell id="title" value="Machine Learning Pipeline for COPD Exacerbation Prediction" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="250" y="20" width="900" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Phase 1: Data Collection -->
+        <mxCell id="phase1_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1565C0;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="40" y="80" width="400" height="180" as="geometry" />
+        </mxCell>
+        <mxCell id="phase1_title" value="PHASE 1: DATA COLLECTION" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#1565C0;" vertex="1" parent="1">
+          <mxGeometry x="50" y="85" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Historical Data -->
+        <mxCell id="historical_data" value="📚 Historical Patient Data&#xa;(Retrospective EHR)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="125" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="historical_details" value="• 5+ years patient records&#xa;• 10,000+ patient dataset&#xa;• Confirmed exacerbation events&#xa;• Demographics &amp; comorbidities" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1976D2;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="195" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Real-time Data -->
+        <mxCell id="realtime_data" value="⏱️ Real-Time Wearable Data&#xa;(Prospective Collection)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#BBDEFB;strokeColor=#1976D2;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="260" y="125" width="160" height="60" as="geometry" />
+        </mxCell>
+        <mxCell id="realtime_details" value="• Continuous vital monitoring&#xa;• 50,000 observations/day&#xa;• SpO2, HR, RR, Activity&#xa;• Sleep patterns, BP" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E3F2FD;strokeColor=#1976D2;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="260" y="195" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Phase 2: Data Preprocessing -->
+        <mxCell id="phase2_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="40" y="300" width="400" height="220" as="geometry" />
+        </mxCell>
+        <mxCell id="phase2_title" value="PHASE 2: DATA PREPROCESSING" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="50" y="305" width="350" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Cleaning -->
+        <mxCell id="cleaning" value="🧹 Data Cleaning" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#EF6C00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="345" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="cleaning_list" value="• Remove duplicates&#xa;• Handle missing values&#xa;• Outlier detection" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#EF6C00;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="400" width="160" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Feature Engineering -->
+        <mxCell id="feature_eng" value="⚙️ Feature Engineering" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#EF6C00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="260" y="345" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="feature_list" value="• Rolling averages (7/14 days)&#xa;• Trend detection (slope)&#xa;• Deviation from baseline&#xa;• Time-based features" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#EF6C00;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="260" y="400" width="160" height="65" as="geometry" />
+        </mxCell>
+        
+        <!-- Normalization -->
+        <mxCell id="normalization" value="📊 Normalization" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFE0B2;strokeColor=#EF6C00;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="60" y="460" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="norm_list" value="• Min-Max scaling (0-1)&#xa;• Z-score standardization&#xa;• Patient-specific baselines" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#EF6C00;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="260" y="475" width="160" height="40" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows Phase 1 to Phase 2 -->
+        <mxCell id="arrow_p1_p2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=3;strokeColor=#1976D2;" edge="1" parent="1" source="historical_details" target="cleaning">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_p1_p2b" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=3;strokeColor=#1976D2;" edge="1" parent="1" source="realtime_details" target="feature_eng">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        
+        <!-- Phase 3: Model Training -->
+        <mxCell id="phase3_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="480" y="80" width="440" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="phase3_title" value="PHASE 3: MODEL TRAINING" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="490" y="85" width="300" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Train/Test Split -->
+        <mxCell id="train_test" value="🎯 Train/Test Split" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="620" y="130" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="split_details" value="• Training: 70%&#xa;• Validation: 15%&#xa;• Testing: 15%&#xa;• Temporal split (no leakage)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="620" y="185" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Model 1: LSTM -->
+        <mxCell id="model1_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="500" y="260" width="120" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="model1_title" value="Model 1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="505" y="263" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="model1" value="LSTM Network" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#1B5E20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="510" y="290" width="100" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="model1_details" value="Time-series&#xa;prediction&#xa;14-day window" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor#388E3C;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="510" y="330" width="100" height="45" as="geometry" />
+        </mxCell>
+        
+        <!-- Model 2: Random Forest -->
+        <mxCell id="model2_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="640" y="260" width="120" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="model2_title" value="Model 2" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="645" y="263" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="model2" value="Random Forest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#1B5E20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="650" y="290" width="100" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="model2_details" value="Risk&#xa;classification&#xa;Low/Med/High" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#388E3C;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="650" y="330" width="100" height="45" as="geometry" />
+        </mxCell>
+        
+        <!-- Model 3: XGBoost -->
+        <mxCell id="model3_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#C8E6C9;strokeColor=#388E3C;strokeWidth=2;dashed=1;" vertex="1" parent="1">
+          <mxGeometry x="780" y="260" width="120" height="120" as="geometry" />
+        </mxCell>
+        <mxCell id="model3_title" value="Model 3" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=12;fontStyle=1;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="785" y="263" width="110" height="20" as="geometry" />
+        </mxCell>
+        <mxCell id="model3" value="XGBoost" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#81C784;strokeColor=#1B5E20;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="790" y="290" width="100" height="35" as="geometry" />
+        </mxCell>
+        <mxCell id="model3_details" value="7-day&#xa;probability&#xa;score (0-100%)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#A5D6A7;strokeColor=#388E3C;fontSize=9;" vertex="1" parent="1">
+          <mxGeometry x="790" y="330" width="100" height="45" as="geometry" />
+        </mxCell>
+        
+        <!-- Validation -->
+        <mxCell id="validation" value="✅ Model Validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#AED581;strokeColor=#33691E;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="620" y="400" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="validation_metrics" value="Metrics: Accuracy, Precision,&#xa;Recall, F1-Score, AUC-ROC&#xa;Cross-validation: 5-fold" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#388E3C;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="620" y="455" width="160" height="55" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows from preprocessing to training -->
+        <mxCell id="arrow_p2_p3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=3;strokeColor=#EF6C00;" edge="1" parent="1" source="normalization" target="train_test">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="460" y="485" />
+              <mxPoint x="460" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Arrows from split to models -->
+        <mxCell id="arrow_split_m1" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="split_details" target="model1">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="620" y="260" />
+              <mxPoint x="560" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_split_m2" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="split_details" target="model2">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_split_m3" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="split_details" target="model3">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="780" y="260" />
+              <mxPoint x="840" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Arrows from models to validation -->
+        <mxCell id="arrow_m1_val" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0;entryY=0.5;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="model1_details" target="validation">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="560" y="390" />
+              <mxPoint x="600" y="390" />
+              <mxPoint x="600" y="425" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_m2_val" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="model2_details" target="validation">
+          <mxGeometry relative="1" as="geometry" />
+        </mxCell>
+        <mxCell id="arrow_m3_val" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=1;entryY=0.5;strokeWidth=2;strokeColor=#388E3C;" edge="1" parent="1" source="model3_details" target="validation">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="840" y="390" />
+              <mxPoint x="800" y="390" />
+              <mxPoint x="800" y="425" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Phase 4: Deployment -->
+        <mxCell id="phase4_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#4A148C;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="960" y="80" width="400" height="440" as="geometry" />
+        </mxCell>
+        <mxCell id="phase4_title" value="PHASE 4: DEPLOYMENT &amp; MONITORING" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="970" y="85" width="380" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Model Registry -->
+        <mxCell id="model_registry" value="📦 Model Registry" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1080" y="130" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="registry_details" value="• Version control&#xa;• Metadata tracking&#xa;• A/B testing support&#xa;• Rollback capability" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="185" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Inference Service -->
+        <mxCell id="inference" value="🚀 Real-Time Inference" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="980" y="270" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="inference_details" value="• API endpoint&#xa;• <100ms latency&#xa;• Auto-scaling&#xa;• Load balancing" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="980" y="325" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Monitoring -->
+        <mxCell id="monitoring" value="📊 Model Monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1BEE7;strokeColor=#6A1B9A;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1180" y="270" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="monitoring_details" value="• Performance metrics&#xa;• Drift detection&#xa;• Alert thresholds&#xa;• Prediction confidence" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="325" width="160" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Retraining -->
+        <mxCell id="retraining" value="🔄 Automated Retraining" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#CE93D8;strokeColor=#4A148C;fontStyle=1" vertex="1" parent="1">
+          <mxGeometry x="1080" y="410" width="160" height="50" as="geometry" />
+        </mxCell>
+        <mxCell id="retrain_details" value="• Monthly batch updates&#xa;• Continuous learning&#xa;• Performance triggers&#xa;• A/B test new models" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#6A1B9A;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1080" y="465" width="160" height="50" as="geometry" />
+        </mxCell>
+        
+        <!-- Arrows from validation to deployment -->
+        <mxCell id="arrow_p3_p4" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=0.5;entryX=0;entryY=0.5;strokeWidth=3;strokeColor=#388E3C;" edge="1" parent="1" source="validation_metrics" target="model_registry">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="940" y="483" />
+              <mxPoint x="940" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Arrows within deployment -->
+        <mxCell id="arrow_reg_inf" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="registry_details" target="inference">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1080" y="260" />
+              <mxPoint x="1060" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_reg_mon" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=1;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="registry_details" target="monitoring">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1240" y="260" />
+              <mxPoint x="1260" y="260" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="arrow_mon_ret" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0.5;exitY=1;entryX=0.5;entryY=0;strokeWidth=2;strokeColor=#6A1B9A;" edge="1" parent="1" source="monitoring_details" target="retraining">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1260" y="395" />
+              <mxPoint x="1160" y="395" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Feedback loop -->
+        <mxCell id="feedback" style="edgeStyle=orthogonalEdgeStyle;rounded=0;orthogonalLoop=1;jettySize=auto;html=1;exitX=0;exitY=0.5;entryX=1;entryY=0.5;strokeWidth=3;strokeColor=#4A148C;dashed=1;dashPattern=8 8;" edge="1" parent="1" source="retrain_details" target="train_test">
+          <mxGeometry relative="1" as="geometry">
+            <Array as="points">
+              <mxPoint x="1050" y="490" />
+              <mxPoint x="1050" y="560" />
+              <mxPoint x="820" y="560" />
+              <mxPoint x="820" y="155" />
+            </Array>
+          </mxGeometry>
+        </mxCell>
+        <mxCell id="feedback_label" value="FEEDBACK LOOP" style="edgeLabel;html=1;align=center;verticalAlign=middle;resizable=0;points=[];fontSize=11;fontStyle=1;fillColor=#FFFFFF;fontColor=#4A148C;" vertex="1" connectable="0" parent="feedback">
+          <mxGeometry x="-0.1" y="-2" relative="1" as="geometry">
+            <mxPoint x="-2" y="133" as="offset" />
+          </mxGeometry>
+        </mxCell>
+        
+        <!-- Phase 5: Production Metrics -->
+        <mxCell id="phase5_bg" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFFDE7;strokeColor=#F57F17;strokeWidth=3;" vertex="1" parent="1">
+          <mxGeometry x="40" y="560" width="1320" height="160" as="geometry" />
+        </mxCell>
+        <mxCell id="phase5_title" value="PRODUCTION PERFORMANCE METRICS" style="text;html=1;strokeColor=none;fillColor=none;align=left;verticalAlign=top;whiteSpace=wrap;rounded=0;fontSize=16;fontStyle=1;fontColor=#F57F17;" vertex="1" parent="1">
+          <mxGeometry x="50" y="565" width="400" height="30" as="geometry" />
+        </mxCell>
+        
+        <!-- Metric boxes -->
+        <mxCell id="metric1" value="🎯 LSTM Model" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="60" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric1_vals" value="Accuracy: 87%&#xa;Precision: 84%&#xa;Recall: 89%&#xa;F1-Score: 0.86" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="60" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metric2" value="🎯 Random Forest" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="220" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric2_vals" value="Accuracy: 82%&#xa;Precision: 85%&#xa;Recall: 80%&#xa;F1-Score: 0.82" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="220" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metric3" value="🎯 XGBoost" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="380" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric3_vals" value="Accuracy: 90%&#xa;Precision: 91%&#xa;Recall: 88%&#xa;AUC-ROC: 0.94" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="380" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metric4" value="⚡ Inference Speed" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="540" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric4_vals" value="Avg Latency: 45ms&#xa;95th %ile: 85ms&#xa;99th %ile: 120ms&#xa;Throughput: 1000/s" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="540" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metric5" value="📈 Clinical Impact" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="700" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric5_vals" value="Early Detection: 72hrs&#xa;False Positives: 18%&#xa;Hosp. Reduction: 35%&#xa;Patient Satisfaction: 4.6/5" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="700" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metric6" value="🔄 Model Updates" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="860" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric6_vals" value="Retraining: Monthly&#xa;Last Update: 2 days ago&#xa;Version: v2.3.1&#xa;Drift: Minimal (<5%)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="860" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metric7" value="💾 Resource Usage" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="1020" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric7_vals" value="CPU: 45% avg&#xa;Memory: 8GB&#xa;GPU: Not required&#xa;Cost: $0.02/prediction" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1020" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <mxCell id="metric8" value="🔒 Compliance" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F57F17;fontStyle=1;align=center" vertex="1" parent="1">
+          <mxGeometry x="1180" y="605" width="140" height="40" as="geometry" />
+        </mxCell>
+        <mxCell id="metric8_vals" value="HIPAA: Compliant✓&#xa;Data Privacy: Enforced✓&#xa;Audit Logs: Complete✓&#xa;PHI Encryption: AES-256✓" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF9C4;strokeColor=#F9A825;align=left;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1180" y="650" width="140" height="60" as="geometry" />
+        </mxCell>
+        
+        <!-- Best Practices Box -->
+        <mxCell id="best_practices" value="🏆 ML BEST PRACTICES&#xa;✓ Version control (Git + DVC)&#xa;✓ Automated testing&#xa;✓ CI/CD pipeline&#xa;✓ Feature store&#xa;✓ Experiment tracking (MLflow)&#xa;✓ Model explainability (SHAP)&#xa;✓ Bias detection&#xa;✓ Continuous monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E1F5FE;strokeColor=#01579B;align=left;verticalAlign=top;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="40" y="750" width="280" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- Data Pipeline -->
+        <mxCell id="data_pipeline" value="📊 DATA PIPELINE&#xa;• Kafka for streaming&#xa;• Airflow for orchestration&#xa;• Spark for batch processing&#xa;• InfluxDB for time-series&#xa;• Redis for caching&#xa;• S3 for model artifacts&#xa;• Data quality checks&#xa;• Schema validation" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#FFF3E0;strokeColor=#E65100;align=left;verticalAlign=top;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="350" y="750" width="280" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- Tech Stack -->
+        <mxCell id="tech_stack" value="🛠️ TECH STACK&#xa;• Python 3.11&#xa;• TensorFlow 2.15&#xa;• Scikit-learn 1.4&#xa;• XGBoost 2.0&#xa;• FastAPI for serving&#xa;• Docker containers&#xa;• Kubernetes orchestration&#xa;• Prometheus monitoring" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#E8F5E9;strokeColor=#2E7D32;align=left;verticalAlign=top;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="660" y="750" width="280" height="170" as="geometry" />
+        </mxCell>
+        
+        <!-- Future Enhancements -->
+        <mxCell id="future" value="🚀 FUTURE ENHANCEMENTS&#xa;• Federated learning&#xa;• Transfer learning&#xa;• Multi-modal models (ECG+Vitals)&#xa;• Attention mechanisms&#xa;• Causal inference&#xa;• Patient-specific fine-tuning&#xa;• Real-time active learning&#xa;• Edge deployment" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#F3E5F5;strokeColor=#4A148C;align=left;verticalAlign=top;fontSize=11;fontStyle=2" vertex="1" parent="1">
+          <mxGeometry x="970" y="750" width="280" height="170" as="geometry" />
+        </mxCell>
+        
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>

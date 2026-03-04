@@ -1,0 +1,158 @@
+-- FHIR Patient Resource
+CREATE TABLE fhir_patient (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    identifier VARCHAR(255) UNIQUE NOT NULL, -- MRN
+    name_family VARCHAR(255),
+    name_given VARCHAR(255),
+    birth_date DATE,
+    gender VARCHAR(50),
+    address_line TEXT,
+    address_city VARCHAR(100),
+    address_state VARCHAR(50),
+    address_postal_code VARCHAR(20),
+    telecom_phone VARCHAR(50),
+    telecom_email VARCHAR(255),
+    active BOOLEAN DEFAULT TRUE,
+    meta_last_updated TIMESTAMP DEFAULT NOW(),
+    raw_fhir JSONB, -- Full FHIR resource as JSON
+    CONSTRAINT fhir_patient_check_gender CHECK (gender IN ('male', 'female', 'other', 'unknown'))
+);
+
+-- FHIR Observation Resource (Vitals, Labs)
+CREATE TABLE fhir_observation (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES fhir_patient(id),
+    status VARCHAR(50), -- registered, preliminary, final
+    category VARCHAR(100), -- vital-signs, laboratory, imaging
+    code_system VARCHAR(255), -- LOINC, SNOMED
+    code_code VARCHAR(100), -- e.g., "8867-4" for heart rate
+    code_display VARCHAR(255), -- "Heart rate"
+    value_quantity DECIMAL(10,2),
+    value_unit VARCHAR(50),
+    value_string TEXT,
+    effective_datetime TIMESTAMP,
+    issued TIMESTAMP,
+    performer_id UUID, -- Reference to Practitioner
+    device_id UUID, -- Reference to Device (wearable)
+    interpretation VARCHAR(50), -- normal, high, low, critical
+    raw_fhir JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    INDEX idx_observation_patient (patient_id),
+    INDEX idx_observation_code (code_code),
+    INDEX idx_observation_datetime (effective_datetime)
+);
+
+-- FHIR Condition Resource (Diagnoses)
+CREATE TABLE fhir_condition (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES fhir_patient(id),
+    clinical_status VARCHAR(50), -- active, recurrence, relapse, inactive, remission, resolved
+    verification_status VARCHAR(50), -- unconfirmed, provisional, differential, confirmed, refuted
+    category VARCHAR(100), -- problem-list-item, encounter-diagnosis
+    severity VARCHAR(50), -- mild, moderate, severe
+    code_system VARCHAR(255), -- ICD-10, SNOMED
+    code_code VARCHAR(100), -- e.g., "E11" for Type 2 Diabetes
+    code_display VARCHAR(255), -- "Type 2 diabetes mellitus"
+    onset_datetime TIMESTAMP,
+    recorded_date TIMESTAMP,
+    recorder_id UUID, -- Practitioner
+    raw_fhir JSONB,
+    INDEX idx_condition_patient (patient_id),
+    INDEX idx_condition_code (code_code)
+);
+
+-- FHIR MedicationRequest Resource (Prescriptions)
+CREATE TABLE fhir_medication_request (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES fhir_patient(id),
+    status VARCHAR(50), -- active, on-hold, cancelled, completed
+    intent VARCHAR(50), -- proposal, plan, order
+    priority VARCHAR(50), -- routine, urgent, asap, stat
+    medication_code_system VARCHAR(255), -- RxNorm
+    medication_code VARCHAR(100),
+    medication_display VARCHAR(255),
+    dosage_text TEXT,
+    dosage_timing_repeat JSONB, -- frequency, period, etc.
+    dosage_route VARCHAR(100), -- oral, IV, subcutaneous
+    dosage_quantity DECIMAL(10,2),
+    dosage_unit VARCHAR(50),
+    requester_id UUID, -- Practitioner
+    authored_on TIMESTAMP,
+    dispense_request JSONB,
+    raw_fhir JSONB,
+    INDEX idx_medication_patient (patient_id),
+    INDEX idx_medication_code (medication_code)
+);
+
+-- FHIR DiagnosticReport Resource (X-rays, ECG, Labs)
+CREATE TABLE fhir_diagnostic_report (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    patient_id UUID REFERENCES fhir_patient(id),
+    status VARCHAR(50), -- registered, partial, preliminary, final
+    category VARCHAR(100), -- radiology, cardiology, laboratory
+    code_system VARCHAR(255), -- LOINC
+    code_code VARCHAR(100),
+    code_display VARCHAR(255),
+    effective_datetime TIMESTAMP,
+    issued TIMESTAMP,
+    performer_id UUID,
+    result_observation_ids UUID[], -- Array of Observation IDs
+    conclusion TEXT, -- AI-generated interpretation
+    conclusion_code JSONB, -- Coded diagnoses
+    media JSONB[], -- Images, files
+    raw_fhir JSONB,
+    INDEX idx_report_patient (patient_id),
+    INDEX idx_report_category (category)
+);
+
+-- FHIR Appointment Resource
+CREATE TABLE fhir_appointment (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    status VARCHAR(50), -- proposed, pending, booked, arrived, fulfilled, cancelled
+    service_type VARCHAR(100), -- telehealth, in-person, emergency
+    appointment_type VARCHAR(100), -- routine, urgent, follow-up
+    priority INT,
+    description TEXT,
+    start_time TIMESTAMP,
+    end_time TIMESTAMP,
+    created TIMESTAMP,
+    participant_patient_id UUID REFERENCES fhir_patient(id),
+    participant_practitioner_id UUID,
+    participant_location_id UUID,
+    participant_status VARCHAR(50), -- accepted, declined, tentative, needs-action
+    raw_fhir JSONB,
+    INDEX idx_appointment_patient (participant_patient_id),
+    INDEX idx_appointment_time (start_time)
+);
+
+-- Agent Actions Log
+CREATE TABLE agent_action_log (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    agent_name VARCHAR(100),
+    agent_id INT,
+    patient_id UUID REFERENCES fhir_patient(id),
+    action_type VARCHAR(100), -- alert, notification, recommendation, escalation
+    action_data JSONB,
+    priority VARCHAR(50),
+    status VARCHAR(50), -- pending, executed, failed
+    executed_at TIMESTAMP,
+    result JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    INDEX idx_agent_log_patient (patient_id),
+    INDEX idx_agent_log_time (created_at)
+);
+
+-- Vector Embeddings Cache (for RAG)
+CREATE TABLE vector_embedding_cache (
+    id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+    content_type VARCHAR(100), -- clinical_note, guideline, research_paper
+    content_id VARCHAR(255),
+    content_text TEXT,
+    embedding vector(1536), -- pgvector extension
+    metadata JSONB,
+    created_at TIMESTAMP DEFAULT NOW(),
+    INDEX idx_embedding_type (content_type)
+);
+
+-- Install pgvector extension for vector similarity search
+CREATE EXTENSION IF NOT EXISTS vector;

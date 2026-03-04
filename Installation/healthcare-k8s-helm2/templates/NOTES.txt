@@ -1,0 +1,161 @@
+{{- if .Values.ingress.enabled }}
+🏥 Healthcare System has been installed!
+
+Your release is named {{ .Release.Name }} in namespace {{ .Release.Namespace }}.
+
+===========================================
+📋 INSTALLATION SUMMARY
+===========================================
+
+Environment: {{ .Values.global.environment }}
+Domain: {{ .Values.global.domain }}
+
+===========================================
+🌐 ACCESS YOUR APPLICATION
+===========================================
+
+{{- if .Values.ingress.tls.enabled }}
+Main Application: https://{{ .Values.global.domain }}
+API Gateway: https://api.{{ .Values.global.domain }}
+{{- if .Values.monitoring.grafana.enabled }}
+Grafana (Monitoring): https://monitoring.{{ .Values.global.domain }}
+{{- end }}
+{{- if .Values.logging.kibana.enabled }}
+Kibana (Logs): https://logs.{{ .Values.global.domain }}
+{{- end }}
+{{- else }}
+Main Application: http://{{ .Values.global.domain }}
+API Gateway: http://api.{{ .Values.global.domain }}
+
+⚠️  TLS is disabled. For production, enable TLS:
+  --set ingress.tls.enabled=true
+{{- end }}
+
+===========================================
+🔍 MONITOR YOUR DEPLOYMENT
+===========================================
+
+Check pod status:
+  kubectl get pods -n {{ .Release.Namespace }}
+
+Watch deployment:
+  kubectl get pods -n {{ .Release.Namespace }} -w
+
+Check services:
+  kubectl get svc -n {{ .Release.Namespace }}
+
+View logs:
+  kubectl logs -n {{ .Release.Namespace }} -l app.kubernetes.io/name={{ include "healthcare.name" . }} --tail=100 -f
+
+===========================================
+📊 MONITORING & DEBUGGING
+===========================================
+
+{{- if .Values.monitoring.grafana.enabled }}
+Port-forward Grafana:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "healthcare.fullname" . }}-grafana 3000:3000
+  Then visit: http://localhost:3000
+  Username: admin
+  Password: (check your secrets or values file)
+{{- end }}
+
+{{- if .Values.monitoring.prometheus.enabled }}
+Port-forward Prometheus:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "healthcare.fullname" . }}-prometheus-server 9090:9090
+  Then visit: http://localhost:9090
+{{- end }}
+
+{{- if .Values.logging.kibana.enabled }}
+Port-forward Kibana:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "healthcare.fullname" . }}-kibana 5601:5601
+  Then visit: http://localhost:5601
+{{- end }}
+
+===========================================
+🗄️  DATABASE ACCESS
+===========================================
+
+PostgreSQL:
+  kubectl exec -it {{ include "healthcare.fullname" . }}-postgresql-0 -n {{ .Release.Namespace }} -- psql -U {{ .Values.data.postgresql.auth.username }} {{ .Values.data.postgresql.auth.database }}
+
+Neo4j:
+  kubectl exec -it {{ include "healthcare.fullname" . }}-neo4j-0 -n {{ .Release.Namespace }} -- cypher-shell -u neo4j
+
+Redis:
+  kubectl exec -it {{ include "healthcare.fullname" . }}-redis-master-0 -n {{ .Release.Namespace }} -- redis-cli
+
+===========================================
+⚙️  CONFIGURATION
+===========================================
+
+View current configuration:
+  helm get values {{ .Release.Name }} -n {{ .Release.Namespace }}
+
+Upgrade with new values:
+  helm upgrade {{ .Release.Name }} ./healthcare-k8s-helm -n {{ .Release.Namespace }} --values new-values.yaml
+
+===========================================
+🔐 SECURITY REMINDERS
+===========================================
+
+{{- if eq .Values.global.environment "production" }}
+✓ Production environment detected
+{{- else }}
+⚠️  Non-production environment. Before going to production:
+  - Enable TLS (ingress.tls.enabled=true)
+  - Set strong passwords for all services
+  - Enable network policies (networkPolicies.enabled=true)
+  - Configure backup strategy (backup.enabled=true)
+  - Review resource limits and requests
+{{- end }}
+
+1. Rotate default passwords immediately
+2. Configure backup policies
+3. Enable monitoring and alerting
+4. Review and apply security policies
+5. Set up log aggregation
+6. Configure autoscaling rules
+7. Test disaster recovery procedures
+
+===========================================
+📚 DOCUMENTATION
+===========================================
+
+For more information:
+- README.md - Comprehensive guide
+- values.yaml - All configuration options
+- production-values.yaml - Production example
+
+===========================================
+🆘 TROUBLESHOOTING
+===========================================
+
+If pods are not starting:
+  kubectl describe pod <pod-name> -n {{ .Release.Namespace }}
+
+If services are not accessible:
+  kubectl get ingress -n {{ .Release.Namespace }}
+  kubectl describe ingress {{ include "healthcare.fullname" . }}-main -n {{ .Release.Namespace }}
+
+For PVC issues:
+  kubectl get pvc -n {{ .Release.Namespace }}
+  kubectl describe pvc <pvc-name> -n {{ .Release.Namespace }}
+
+===========================================
+📞 SUPPORT
+===========================================
+
+For issues and support:
+- Check logs: kubectl logs -n {{ .Release.Namespace }} <pod-name>
+- Review documentation in README.md
+- Contact: support@healthcare.example.com
+
+===========================================
+
+Thank you for using Healthcare System! 🚀
+
+{{- else }}
+Healthcare System has been installed, but ingress is disabled.
+To access your application, use port-forwarding:
+  kubectl port-forward -n {{ .Release.Namespace }} svc/{{ include "healthcare.fullname" . }}-django 8000:8000
+{{- end }}

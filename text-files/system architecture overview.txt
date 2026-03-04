@@ -1,0 +1,42 @@
+┌─────────────────────────────────────────────────────────────────────┐
+│                    PRESENTATION LAYER (Django)                       │
+├─────────────────────────────────────────────────────────────────────┤
+│  Patient Portal  │  Doctor Dashboard  │  Hospital Admin  │  Analytics│
+│  (React/Vue.js)  │   (React/Vue.js)   │   (React/Vue.js) │  Console  │
+└────────┬─────────────────┬─────────────────┬──────────────┬─────────┘
+         │                 │                 │              │
+         └─────────────────┼─────────────────┼──────────────┘
+                           │                 │
+                    ┌──────▼─────────────────▼──────┐
+                    │   Django REST API Layer       │
+                    │   - REST API (DRF)            │
+                    │   - GraphQL (optional)        │
+                    │   - WebSocket (real-time)     │
+                    │   - Authentication/Auth       │
+                    └──────┬────────────────────────┘
+                           │
+    ┌──────────────────────┼──────────────────────┐
+    │                      │                      │
+┌───▼────────┐    ┌───────▼────────┐    ┌───────▼────────┐
+│  Agent     │    │   LLM Engine   │    │  Data Access   │
+│ Orchestrator│   │   (Llama 3.2)  │    │     Layer      │
+│  (Celery)  │    │   + RAG        │    │   (ORM/SQL)    │
+└───┬────────┘    └───────┬────────┘    └───────┬────────┘
+    │                     │                     │
+    │         ┌───────────┴─────────────┐       │
+    │         │                         │       │
+┌───▼─────────▼─────────────────────────▼───────▼─────────┐
+│              INTELLIGENT AGENT LAYER (25 Agents)         │
+│  Agents use: RAG + Vector Search + LLM + Rules           │
+└──────────────────────┬───────────────────────────────────┘
+                       │
+    ┌──────────────────┼──────────────────┐
+    │                  │                  │
+┌───▼──────────┐  ┌───▼──────────┐  ┌───▼──────────┐
+│  PostgreSQL  │  │    Neo4j     │  │   Vector DB  │
+│  (FHIR/HL7)  │  │  (Graph DB)  │  │  (Qdrant/    │
+│   - Patient  │  │  - Drug Rels │  │   Weaviate)  │
+│   - Vitals   │  │  - Disease   │  │  - Medical   │
+│   - Orders   │  │  - Family    │  │    Knowledge │
+│   - Results  │  │  - Clinical  │  │  - RAG Index │
+└──────────────┘  └──────────────┘  └──────────────┘

@@ -1,0 +1,361 @@
+# ============================================================================
+# MCP Server Implementation (Django)
+# ============================================================================
+
+from django.http import JsonResponse
+from django.views.decorators.csrf import csrf_exempt
+import json
+
+class MCPServer:
+    """
+    Model Context Protocol Server
+    Provides standardized context and tools to LLM agents
+    """
+    
+    def __init__(self):
+        self.tool_registry = ToolRegistry()
+        self.context_manager = ContextManager()
+    
+    @csrf_exempt
+    def handle_context_request(self, request):
+        """
+        Endpoint: POST /mcp/context
+        Returns MCP-formatted context for agent
+        """
+        data = json.loads(request.body)
+        patient_id = data.get('patient_id')
+        agent_id = data.get('agent_id')
+        
+        # Build MCP context
+        context = {
+            "protocol": "MCP/1.0",
+            "version": "2024-10",
+            "timestamp": datetime.now().isoformat(),
+            "context": {
+                # Patient clinical context
+                "patient": self._get_patient_context(patient_id),
+                
+                # Conversation history (for multi-turn reasoning)
+                "conversation_history": self._get_conversation_history(
+                    patient_id, agent_id
+                ),
+                
+                # Available tools this agent can use
+                "available_tools": self.tool_registry.get_tools_for_agent(agent_id),
+                
+                # Clinical constraints and safety rules
+                "constraints": self._get_clinical_constraints(patient_id),
+                
+                # Retrieved knowledge (RAG results if any)
+                "knowledge_base": self._get_relevant_knowledge(patient_id, agent_id),
+                
+                # Inter-agent context (what other agents have found)
+                "agent_findings": self._get_agent_findings(patient_id)
+            },
+            
+            # Metadata
+            "metadata": {
+                "requesting_agent": agent_id,
+                "patient_consent": self._verify_consent(patient_id),
+                "data_sources": ["FHIR", "Neo4j", "Qdrant"],
+                "compliance": ["HIPAA", "21 CFR Part 11"]
+            }
+        }
+        
+        return JsonResponse(context)
+    
+    def _get_patient_context(self, patient_id):
+        """Retrieve comprehensive patient context from all databases"""
+        from apps.fhir.models import FHIRPatient, FHIRObservation, FHIRCondition
+        
+        patient = FHIRPatient.objects.get(id=patient_id)
+        
+        return {
+            "demographics": {
+                "id": str(patient.id),
+                "mrn": patient.identifier,
+                "name": f"{patient.name_given} {patient.name_family}",
+                "age": patient.calculate_age(),
+                "gender": patient.gender
+            },
+            
+            # Active conditions
+            "conditions": [
+                {
+                    "code": c.code_code,
+                    "display": c.code_display,
+                    "status": c.clinical_status,
+                    "onset": c.onset_datetime.isoformat() if c.onset_datetime else None
+                }
+                for c in FHIRCondition.objects.filter(
+                    patient=patient, 
+                    clinical_status='active'
+                )
+            ],
+            
+            # Current medications
+            "medications": self._get_medications(patient),
+            
+            # Recent vital signs (last 7 days)
+            "recent_vitals": self._get_recent_vitals(patient),
+            
+            # Lab results
+            "lab_results": self._get_lab_results(patient),
+            
+            # Family history (from Neo4j)
+            "family_history": self._get_family_history(patient_id),
+            
+            # Risk scores (from ML models)
+            "risk_scores": self._get_risk_scores(patient_id)
+        }
+    
+    def _get_conversation_history(self, patient_id, agent_id):
+        """
+        Retrieve multi-turn conversation history
+        Important for maintaining context across agent interactions
+        """
+        from apps.agents.models import ConversationHistory
+        
+        history = ConversationHistory.objects.filter(
+            patient_id=patient_id,
+            agent_id=agent_id
+        ).order_by('-timestamp')[:10]  # Last 10 interactions
+        
+        return [
+            {
+                "role": h.role,  # "agent" or "system"
+                "content": h.content,
+                "timestamp": h.timestamp.isoformat(),
+                "actions_taken": h.actions_taken
+            }
+            for h in history
+        ]
+    
+    @csrf_exempt
+    def handle_tool_execution(self, request):
+        """
+        Endpoint: POST /mcp/tools/execute
+        Execute tools on behalf of LLM
+        """
+        data = json.loads(request.body)
+        tool_name = data.get('tool_name')
+        parameters = data.get('parameters')
+        agent_id = data.get('agent_id')
+        
+        # Verify agent has permission to use this tool
+        if not self.tool_registry.can_agent_use_tool(agent_id, tool_name):
+            return JsonResponse({
+                "error": "Permission denied",
+                "message": f"Agent {agent_id} cannot use tool {tool_name}"
+            }, status=403)
+        
+        # Execute tool
+        try:
+            tool = self.tool_registry.get_tool(tool_name)
+            result = tool.execute(**parameters)
+            
+            return JsonResponse({
+                "protocol": "MCP/1.0",
+                "tool_name": tool_name,
+                "result": result,
+                "execution_time": tool.execution_time,
+                "success": True
+            })
+            
+        except Exception as e:
+            return JsonResponse({
+                "protocol": "MCP/1.0",
+                "tool_name": tool_name,
+                "error": str(e),
+                "success": False
+            }, status=500)
+
+
+# ============================================================================
+# MCP Tool Registry
+# ============================================================================
+
+class ToolRegistry:
+    """Registry of all MCP tools available to agents"""
+    
+    def __init__(self):
+        self.tools = {}
+        self.agent_permissions = {}
+        self._register_tools()
+    
+    def _register_tools(self):
+        """Register all available tools"""
+        
+        # Database query tools
+        self.register_tool(MCPTool(
+            name="query_fhir_database",
+            description="Query patient FHIR records from PostgreSQL",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "resource_type": {"type": "string", "enum": ["Patient", "Observation", "Condition", "Medication"]},
+                    "filters": {"type": "object"},
+                    "limit": {"type": "integer", "default": 100}
+                },
+                "required": ["resource_type"]
+            },
+            executor=self._query_fhir,
+            allowed_agents=[1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18]
+        ))
+        
+        self.register_tool(MCPTool(
+            name="query_graph_database",
+            description="Execute Cypher queries on Neo4j graph database",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "cypher_query": {"type": "string"},
+                    "params": {"type": "object"}
+                },
+                "required": ["cypher_query"]
+            },
+            executor=self._query_neo4j,
+            allowed_agents=[9, 12, 13, 17]  # Only certain agents can query graph
+        ))
+        
+        self.register_tool(MCPTool(
+            name="vector_search",
+            description="Semantic search over medical knowledge base",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "query": {"type": "string"},
+                    "collection": {"type": "string", "enum": ["clinical_guidelines", "drug_information", "medical_literature"]},
+                    "top_k": {"type": "integer", "default": 5}
+                },
+                "required": ["query", "collection"]
+            },
+            executor=self._vector_search,
+            allowed_agents=[13, 16, 17]  # RAG-enabled agents
+        ))
+        
+        self.register_tool(MCPTool(
+            name="check_drug_interactions",
+            description="Check for drug-drug interactions using graph database",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "drug_list": {"type": "array", "items": {"type": "string"}},
+                    "severity_threshold": {"type": "string", "enum": ["minor", "moderate", "major", "severe"], "default": "moderate"}
+                },
+                "required": ["drug_list"]
+            },
+            executor=self._check_drug_interactions,
+            allowed_agents=[12, 17]  # Drug safety agent and prescription agent
+        ))
+        
+        self.register_tool(MCPTool(
+            name="calculate_risk_score",
+            description="Calculate patient risk scores using ML models",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "patient_id": {"type": "string"},
+                    "risk_type": {"type": "string", "enum": ["cardiac_event", "hospital_readmission", "disease_progression"]},
+                    "timeframe_days": {"type": "integer", "default": 30}
+                },
+                "required": ["patient_id", "risk_type"]
+            },
+            executor=self._calculate_risk,
+            allowed_agents=[13, 14, 15]  # Predictive agents
+        ))
+        
+        # Action tools
+        self.register_tool(MCPTool(
+            name="send_notification",
+            description="Send notifications via email, SMS, or push",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "recipient_id": {"type": "string"},
+                    "recipient_type": {"type": "string", "enum": ["patient", "doctor", "hospital"]},
+                    "message": {"type": "string"},
+                    "channel": {"type": "string", "enum": ["email", "sms", "push", "phone"]},
+                    "priority": {"type": "string", "enum": ["low", "normal", "high", "critical"]}
+                },
+                "required": ["recipient_id", "recipient_type", "message", "channel"]
+            },
+            executor=self._send_notification,
+            allowed_agents=[19, 20]  # Notification agents
+        ))
+        
+        self.register_tool(MCPTool(
+            name="schedule_appointment",
+            description="Schedule medical appointments",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "patient_id": {"type": "string"},
+                    "provider_id": {"type": "string"},
+                    "appointment_type": {"type": "string"},
+                    "urgency": {"type": "string", "enum": ["routine", "soon", "urgent", "emergency"]},
+                    "preferred_date": {"type": "string", "format": "date"}
+                },
+                "required": ["patient_id", "appointment_type", "urgency"]
+            },
+            executor=self._schedule_appointment,
+            allowed_agents=[21]  # Appointment scheduling agent
+        ))
+        
+        self.register_tool(MCPTool(
+            name="find_hospital",
+            description="Find appropriate hospitals based on patient needs",
+            parameters={
+                "type": "object",
+                "properties": {
+                    "patient_location": {"type": "object", "properties": {"lat": {"type": "number"}, "lon": {"type": "number"}}},
+                    "requirements": {"type": "array", "items": {"type": "string"}},
+                    "max_distance_miles": {"type": "integer", "default": 50}
+                },
+                "required": ["patient_location", "requirements"]
+            },
+            executor=self._find_hospital,
+            allowed_agents=[22]  # Hospital finder agent
+        ))
+
+
+# ============================================================================
+# MCP Tool Class
+# ============================================================================
+
+class MCPTool:
+    """Represents a single MCP-compliant tool"""
+    
+    def __init__(self, name, description, parameters, executor, allowed_agents):
+        self.name = name
+        self.description = description
+        self.parameters = parameters
+        self.executor = executor
+        self.allowed_agents = allowed_agents
+        self.execution_time = None
+    
+    def execute(self, **kwargs):
+        """Execute the tool with given parameters"""
+        import time
+        start_time = time.time()
+        
+        # Validate parameters
+        self._validate_parameters(kwargs)
+        
+        # Execute
+        result = self.executor(**kwargs)
+        
+        self.execution_time = f"{(time.time() - start_time) * 1000:.2f}ms"
+        
+        return result
+    
+    def to_mcp_format(self):
+        """Return tool definition in MCP format"""
+        return {
+            "type": "function",
+            "function": {
+                "name": self.name,
+                "description": self.description,
+                "parameters": self.parameters
+            }
+        }

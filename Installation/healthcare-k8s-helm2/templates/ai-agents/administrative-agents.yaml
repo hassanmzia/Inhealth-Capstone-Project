@@ -1,0 +1,87 @@
+{{- range $agentName, $agentConfig := .Values.aiAgents.administrativeAgents }}
+{{- if $agentConfig.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "healthcare.fullname" $ }}-{{ $agentName | kebabcase }}
+  namespace: {{ $.Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+    agent-type: administrative
+spec:
+  replicas: {{ $agentConfig.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $agentName | kebabcase }}
+  template:
+    metadata:
+      annotations:
+        {{- include "healthcare.podAnnotations" $ | nindent 8 }}
+      labels:
+        {{- include "healthcare.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $agentName | kebabcase }}
+        agent-type: administrative
+    spec:
+      {{- include "healthcare.imagePullSecrets" $ | nindent 6 }}
+      serviceAccountName: {{ include "healthcare.serviceAccountName" $ }}
+      containers:
+      - name: {{ $agentName | kebabcase }}
+        image: "{{ $.Values.global.imageRegistry }}/healthcare/{{ $agentName | kebabcase }}:1.0.0"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 8080
+          protocol: TCP
+        env:
+        - name: AGENT_NAME
+          value: "{{ $agentName }}"
+        - name: DATABASE_URL
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "healthcare.fullname" $ }}-django-secrets
+              key: database-url
+        - name: REDIS_URL
+          value: "redis://{{ include "healthcare.fullname" $ }}-redis-master:6379/3"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: http
+          initialDelaySeconds: 30
+          periodSeconds: 20
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: http
+          initialDelaySeconds: 20
+          periodSeconds: 10
+        resources:
+          requests:
+            cpu: {{ $agentConfig.resources.requests.cpu }}
+            memory: {{ $agentConfig.resources.requests.memory }}
+          limits:
+            cpu: {{ $agentConfig.resources.limits.cpu }}
+            memory: {{ $agentConfig.resources.limits.memory }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "healthcare.fullname" $ }}-{{ $agentName | kebabcase }}
+  namespace: {{ $.Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8080
+    targetPort: http
+    protocol: TCP
+    name: http
+  selector:
+    {{- include "healthcare.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+{{- end }}
+{{- end }}

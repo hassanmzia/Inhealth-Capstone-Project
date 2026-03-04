@@ -1,0 +1,113 @@
+class PrescriptionAgent(RAGAgent):
+    def __init__(self, *args, **kwargs):
+        super().__init__(agent_name="Prescription Agent", *args, **kwargs)
+    
+    def recommend_treatment(self, patient_id):
+        """Generate treatment recommendations using RAG + Graph DB + LLM"""
+        
+        # Step 1: Get patient context from FHIR database
+        patient_data = self.get_patient_context(patient_id)
+        
+        # Step 2: Query Neo4j for drug interactions and contraindications
+        current_meds = self.query_graph_db(
+            """
+            MATCH (p:Patient {id: $patientId})-[:TAKES_MEDICATION]->(m:Medication)
+            RETURN m.name AS medication, m.rxnorm AS rxnorm
+            """,
+            {"patientId": patient_id}
+        )
+        
+        contraindications = self.query_graph_db(
+            """
+            MATCH (p:Patient {id: $patientId})-[:HAS_CONDITION]->(d:Disease)
+            MATCH (m:Medication)-[c:CONTRAINDICATED_IN]->(d)
+            RETURN m.name AS medication, c.reason AS reason, c.severity AS severity
+            """,
+            {"patientId": patient_id}
+        )
+        
+        # Step 3: Retrieve relevant clinical guidelines using RAG
+        query = f"""
+        Patient with {patient_data['conditions']} currently on {patient_data['medications']}.
+        What are evidence-based treatment recommendations?
+        """
+        
+        guideline_docs = self.retrieve_context(
+            query, 
+            collection_name="clinical_guidelines",
+            top_k=5
+        )
+        
+        drug_info_docs = self.retrieve_context(
+            query,
+            collection_name="drug_information",
+            top_k=3
+        )
+        
+        # Step 4: Construct comprehensive prompt for LLM
+        prompt = f"""You are an expert clinical pharmacologist. Analyze the patient case and provide treatment recommendations.
+
+PATIENT DATA:
+- Conditions: {', '.join(patient_data['conditions'])}
+- Current Medications: {', '.join([m['medication'] for m in current_meds])}
+- Kidney Function: eGFR {patient_data['egfr']} mL/min/1.73m²
+- Recent Labs: HbA1c {patient_data['hba1c']}%, BP {patient_data['bp']}
+
+CONTRAINDICATIONS:
+{self._format_contraindications(contraindications)}
+
+CLINICAL GUIDELINES:
+{self._format_retrieved_docs(guideline_docs)}
+
+DRUG INFORMATION:
+{self._format_retrieved_docs(drug_info_docs)}
+
+TASK: Provide evidence-based medication recommendations including:
+1. New medications to consider (with rationale)
+2. Dose adjustments needed
+3. Medications to discontinue
+4. Monitoring parameters
+5. Patient education points
+
+Format as structured JSON with strength of recommendation and evidence level for each.
+"""
+        
+        # Step 5: Generate recommendation using Llama 3.2
+        llm_response = self.generate_response(prompt, max_tokens=1024)
+        
+        # Step 6: Parse and structure recommendations
+        recommendations = self._parse_recommendations(llm_response)
+        
+        # Step 7: Safety check against contraindications
+        safe_recommendations = self._filter_contraindications(
+            recommendations, 
+            contraindications
+        )
+        
+        return {
+            "recommendations": safe_recommendations,
+            "sources": self._extract_sources(guideline_docs + drug_info_docs),
+            "safety_checks": self._document_safety_checks(contraindications),
+            "llm_reasoning": llm_response
+        }
+    
+    def get_patient_context(self, patient_id):
+        """Retrieve comprehensive patient data from FHIR database"""
+        query = """
+        SELECT 
+            p.identifier,
+            array_agg(DISTINCT c.code_display) AS conditions,
+            array_agg(DISTINCT m.medication_display) AS medications,
+            MAX(CASE WHEN o.code_code = '33914-3' THEN o.value_quantity END) AS egfr,
+            MAX(CASE WHEN o.code_code = '4548-4' THEN o.value_quantity END) AS hba1c,
+            MAX(o.value_string) FILTER (WHERE o.category = 'vital-signs' AND o.code_display LIKE '%Blood Pressure%') AS bp
+        FROM fhir_patient p
+        LEFT JOIN fhir_condition c ON p.id = c.patient_id AND c.clinical_status = 'active'
+        LEFT JOIN fhir_medication_request m ON p.id = m.patient_id AND m.status = 'active'
+        LEFT JOIN fhir_observation o ON p.id = o.patient_id
+        WHERE p.id = %s
+        GROUP BY p.id, p.identifier
+        """
+        
+        result = self.query_fhir_db(query, (patient_id,))
+        return self._process_patient_data(result[0])

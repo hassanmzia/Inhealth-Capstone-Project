@@ -1,0 +1,27 @@
+CREATE TABLE observations (
+      id TEXT PRIMARY KEY,
+      patient_id TEXT,
+      code TEXT,  -- LOINC code
+      value REAL,
+      timestamp INTEGER,
+      synced BOOLEAN DEFAULT 0,
+      vector_clock TEXT  -- For conflict resolution
+  );
+  
+  CREATE TABLE alerts (
+      id TEXT PRIMARY KEY,
+      severity TEXT,
+      message TEXT,
+      timestamp INTEGER,
+      synced BOOLEAN DEFAULT 0
+  );
+  
+  CREATE TABLE model_predictions (
+      id TEXT PRIMARY KEY,
+      agent_id INTEGER,
+      prediction_type TEXT,
+      prediction_value REAL,
+      confidence REAL,
+      timestamp INTEGER,
+      synced BOOLEAN DEFAULT 0
+  );

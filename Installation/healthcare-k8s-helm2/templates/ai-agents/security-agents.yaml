@@ -1,0 +1,49 @@
+{{- range $agentName, $agentConfig := .Values.aiAgents.securityAgents }}
+{{- if $agentConfig.enabled }}
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "healthcare.fullname" $ }}-{{ $agentName | kebabcase }}
+  namespace: {{ $.Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+spec:
+  replicas: {{ $agentConfig.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" $ | nindent 6 }}
+      app.kubernetes.io/component: {{ $agentName | kebabcase }}
+  template:
+    metadata:
+      labels:
+        {{- include "healthcare.selectorLabels" $ | nindent 8 }}
+        app.kubernetes.io/component: {{ $agentName | kebabcase }}
+    spec:
+      containers:
+      - name: {{ $agentName | kebabcase }}
+        image: "{{ $.Values.global.imageRegistry }}/healthcare/{{ $agentName | kebabcase }}:1.0.0"
+        ports:
+        - containerPort: 8080
+        resources:
+          requests:
+            cpu: {{ $agentConfig.resources.requests.cpu }}
+            memory: {{ $agentConfig.resources.requests.memory }}
+          limits:
+            cpu: {{ $agentConfig.resources.limits.cpu }}
+            memory: {{ $agentConfig.resources.limits.memory }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "healthcare.fullname" $ }}-{{ $agentName | kebabcase }}
+  namespace: {{ $.Values.namespace.name }}
+spec:
+  ports:
+  - port: 8080
+  selector:
+    {{- include "healthcare.selectorLabels" $ | nindent 4 }}
+    app.kubernetes.io/component: {{ $agentName | kebabcase }}
+{{- end }}
+{{- end }}

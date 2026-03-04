@@ -1,0 +1,15 @@
+def find_stemi_hospital(patient_location):
+    candidates = query_hospitals(
+        within_miles=50,
+        required_capabilities=['cath_lab_24_7', 'emergency_dept'],
+        on_diversion=False
+    )
+    
+    # Prioritize door-to-balloon time (target <90 minutes)
+    for hospital in candidates:
+        travel_time = get_travel_time(patient_location, hospital.location)
+        door_to_balloon = hospital.avg_door_to_balloon_time
+        total_time = travel_time + door_to_balloon
+        hospital.score = calculate_score(total_time, hospital.quality_metrics)
+    
+    return max(candidates, key=lambda h: h.score)

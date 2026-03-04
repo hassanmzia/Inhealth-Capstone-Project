@@ -1,0 +1,50 @@
+class ImageQualityAgent:
+      def __init__(self):
+          self.quality_model = load_model('quality_cnn.tflite')
+          self.defect_detector = load_model('defect_detector.tflite')
+      
+      def assess_image_realtime(self, image_stream):
+          """
+          Called during image acquisition for real-time feedback
+          """
+          # Capture preview frame
+          preview = image_stream.get_preview()
+          
+          # Assess quality
+          quality = self.quality_model.predict(preview)
+          defects = self.defect_detector.predict(preview)
+          
+          # Provide immediate feedback
+          if quality == 'POOR' or quality == 'NON_DIAGNOSTIC':
+              feedback = self.generate_feedback(quality, defects)
+              display_feedback(feedback)  # Show on tablet screen
+              return False  # Don't capture yet
+          
+          elif quality == 'ACCEPTABLE':
+              show_warning("Image acceptable but could be improved")
+              show_improvement_suggestions(defects)
+              offer_option("Capture anyway or retry?")
+          
+          elif quality == 'EXCELLENT':
+              show_success("Excellent quality - ready to capture")
+              return True  # Proceed with capture
+      
+      def generate_feedback(self, quality, defects):
+          """
+          Translate technical defects into actionable instructions
+          """
+          feedback = []
+          
+          if defects['motion_blur'] > 0.7:
+              feedback.append("⚠️ Image is blurry. Ask patient to hold very still and hold breath.")
+          
+          if defects['underexposed'] > 0.7:
+              feedback.append("⚠️ Image too light. Increase exposure settings.")
+          
+          if defects['poor_positioning'] > 0.7:
+              feedback.append("⚠️ Patient positioned incorrectly. Reposition to center chest in frame.")
+          
+          if defects['insufficient_inspiration'] > 0.7:
+              feedback.append("⚠️ Lungs not fully expanded. Have patient take deeper breath.")
+          
+          return feedback

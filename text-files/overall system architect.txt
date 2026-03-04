@@ -1,0 +1,955 @@
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                         PRESENTATION LAYER                                   │
+│  ┌──────────────┐  ┌──────────────┐  ┌──────────────┐  ┌─────────────────┐ │
+│  │   Patient    │  │   Doctor     │  │   Hospital   │  │    Analytics    │ │
+│  │   Portal     │  │  Dashboard   │  │    Admin     │  │     Console     │ │
+│  │  (React)     │  │   (React)    │  │   (React)    │  │    (React)      │ │
+│  └──────┬───────┘  └──────┬───────┘  └──────┬───────┘  └────────┬────────┘ │
+│         │                 │                  │                    │          │
+│         └─────────────────┴──────────────────┴────────────────────┘          │
+│                                     │                                        │
+│                              HTTPS/WSS                                       │
+└─────────────────────────────────────┼──────────────────────────────────────┘
+                                      │
+┌─────────────────────────────────────┼──────────────────────────────────────┐
+│                        APPLICATION LAYER (Django)                            │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │                    Django REST Framework                            │    │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────┐ │    │
+│  │  │ REST API     │  │  GraphQL API │  │  WebSocket (Channels)    │ │    │
+│  │  │ (FHIR R4)    │  │  (Optional)  │  │  (Real-time updates)     │ │    │
+│  │  └──────┬───────┘  └──────┬───────┘  └─────────┬────────────────┘ │    │
+│  └─────────┼──────────────────┼────────────────────┼──────────────────┘    │
+│            │                  │                    │                        │
+│  ┌─────────┴──────────────────┴────────────────────┴──────────────────┐    │
+│  │              Authentication & Authorization Layer                   │    │
+│  │  (JWT, OAuth 2.0, Role-Based Access Control)                        │    │
+│  └─────────┬────────────────────────────────────────────────────────┬─┘    │
+│            │                                                        │        │
+│  ┌─────────▼─────────────────┐                ┌────────────────────▼────┐  │
+│  │   Business Logic Layer    │                │   Background Tasks      │  │
+│  │  ┌──────────────────────┐ │                │   (Celery Worker)       │  │
+│  │  │ FHIR Services        │ │                │  ┌──────────────────┐   │  │
+│  │  │ Patient Services     │ │                │  │ Agent Orchestrator│  │  │
+│  │  │ Clinical Services    │ │                │  │ Scheduled Tasks   │  │  │
+│  │  │ Notification Services│ │                │  │ Async Processing  │  │  │
+│  │  └──────────────────────┘ │                │  └──────────────────┘   │  │
+│  └────────────┬───────────────┘                └─────────────┬───────────┘  │
+└───────────────┼──────────────────────────────────────────────┼──────────────┘
+                │                                              │
+                │                      ┌───────────────────────┘
+                │                      │
+┌───────────────▼──────────────────────▼──────────────────────────────────────┐
+│                        INTELLIGENT AGENT LAYER                               │
+│  ┌───────────────────────────────────────────────────────────────────────┐  │
+│  │                     Agent Orchestration Engine                         │  │
+│  │              (Coordinates 25 agents, manages workflows)                │  │
+│  └────┬──────────────────────────────────────────────────────────────┬───┘  │
+│       │                                                              │       │
+│  ┌────▼──────────────┐  ┌──────────────┐  ┌──────────────────────▼─────┐  │
+│  │  TIER 1-2         │  │  TIER 3      │  │  TIER 4-6                  │  │
+│  │  Monitoring &     │  │  Risk        │  │  Intervention &            │  │
+│  │  Diagnostic       │  │  Assessment  │  │  Action Agents             │  │
+│  │  Agents (1-8)     │  │  (9-15)      │  │  (16-25)                   │  │
+│  │                   │  │              │  │                            │  │
+│  │  • Glucose (1)    │  │  • Family    │  │  • Coaching (16)           │  │
+│  │  • Cardiac (2)    │  │    History   │  │  • Prescription (17)       │  │
+│  │  • Activity (3)   │  │    (9)       │  │  • Triage (18)             │  │
+│  │  • Temperature    │  │  • Obesity   │  │  • Doctor Notify (19)      │  │
+│  │    (4)            │  │    (10)      │  │  • Patient Notify (20)     │  │
+│  │  • ECG (5)        │  │  • Medication│  │  • Scheduling (21)         │  │
+│  │  • Kidney (6)     │  │    (11)      │  │  • Hospital Finder (22)    │  │
+│  │  • Pneumonia      │  │  • Drug      │  │  • Hospital Coord (23)     │  │
+│  │    Xray (7)       │  │    Safety    │  │  • Offline Resil (24)      │  │
+│  │  • COVID Xray     │  │    (12)      │  │  • Image Quality (25)      │  │
+│  │    (8)            │  │  • Disease   │  │                            │  │
+│  │                   │  │    Predict   │  │                            │  │
+│  │                   │  │    (13)      │  │                            │  │
+│  │                   │  │  • Risk (14) │  │                            │  │
+│  │                   │  │  • Predict   │  │                            │  │
+│  │                   │  │    (15)      │  │                            │  │
+│  └────┬──────────────┘  └──────┬───────┘  └──────────┬─────────────────┘  │
+│       │                        │                      │                     │
+└───────┼────────────────────────┼──────────────────────┼─────────────────────┘
+        │                        │                      │
+        └────────────────────────┴──────────────────────┘
+                                 │
+┌────────────────────────────────▼─────────────────────────────────────────────┐
+│                         AI/ML PROCESSING LAYER                                │
+│  ┌──────────────────────┐  ┌──────────────────────┐  ┌──────────────────┐  │
+│  │   Local LLM Engine   │  │    RAG Pipeline      │  │  ML Model Server │  │
+│  │   (Llama 3.2 3B)     │  │                      │  │                  │  │
+│  │  ┌────────────────┐  │  │  ┌───────────────┐  │  │  ┌────────────┐  │  │
+│  │  │ Inference      │  │  │  │ Query         │  │  │  │ ECG Model  │  │  │
+│  │  │ Engine         │  │  │  │ Embedding     │  │  │  │ X-ray Model│  │  │
+│  │  │ (Ollama)       │  │  │  └───────┬───────┘  │  │  │ Risk Model │  │  │
+│  │  └────────────────┘  │  │          │          │  │  └────────────┘  │  │
+│  │  ┌────────────────┐  │  │  ┌───────▼───────┐  │  │                  │  │
+│  │  │ Prompt         │  │  │  │ Vector        │  │  │                  │  │
+│  │  │ Templates      │  │  │  │ Search        │  │  │                  │  │
+│  │  └────────────────┘  │  │  │ (Top-K)       │  │  │                  │  │
+│  │                      │  │  └───────┬───────┘  │  │                  │  │
+│  │                      │  │          │          │  │                  │  │
+│  │                      │  │  ┌───────▼───────┐  │  │                  │  │
+│  │                      │  │  │ Context       │  │  │                  │  │
+│  │                      │  │  │ Augmentation  │  │  │                  │  │
+│  │                      │  │  └───────────────┘  │  │                  │  │
+│  └──────────────────────┘  └──────────────────────┘  └──────────────────┘  │
+└────────────────────────────────┬─────────────────────────────────────────────┘
+                                 │
+┌────────────────────────────────▼─────────────────────────────────────────────┐
+│                         DATA STORAGE LAYER                                    │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌────────────────────────────┐ │
+│  │   PostgreSQL     │  │     Neo4j        │  │   Vector Database          │ │
+│  │   (FHIR/HL7)     │  │  (Graph DB)      │  │   (Qdrant)                 │ │
+│  │                  │  │                  │  │                            │ │
+│  │ ┌──────────────┐ │  │ ┌──────────────┐ │  │ ┌────────────────────────┐ │ │
+│  │ │ fhir_patient │ │  │ │ :Patient     │ │  │ │ clinical_guidelines    │ │ │
+│  │ │ fhir_obs     │ │  │ │ :Medication  │ │  │ │ (embeddings)           │ │ │
+│  │ │ fhir_cond    │ │  │ │ :Disease     │ │  │ ├────────────────────────┤ │ │
+│  │ │ fhir_med_req │ │  │ │ :Gene        │ │  │ │ drug_information       │ │ │
+│  │ │ fhir_diag    │ │  │ │ :Hospital    │ │  │ │ (embeddings)           │ │ │
+│  │ │ agent_log    │ │  │ │              │ │  │ ├────────────────────────┤ │ │
+│  │ └──────────────┘ │  │ └──────────────┘ │  │ │ medical_literature     │ │ │
+│  │                  │  │                  │  │ │ (embeddings)           │ │ │
+│  │ ┌──────────────┐ │  │ ┌──────────────┐ │  │ ├────────────────────────┤ │ │
+│  │ │ Relationships│ │  │ │ Relationships│ │  │ │ patient_notes          │ │ │
+│  │ │ (Foreign     │ │  │ │ (Edges):     │ │  │ │ (embeddings)           │ │ │
+│  │ │  Keys)       │ │  │ │ -TAKES_MED   │ │  │ └────────────────────────┘ │ │
+│  │ └──────────────┘ │  │ │ -HAS_COND    │ │  │                            │ │
+│  │                  │  │ │ -INTERACTS   │ │  │                            │ │
+│  │                  │  │ │ -CONTRAIND   │ │  │                            │ │
+│  │                  │  │ │ -INCREASES   │ │  │                            │ │
+│  │                  │  │ │  _RISK_OF    │ │  │                            │ │
+│  │                  │  │ └──────────────┘ │  │                            │ │
+│  └──────────────────┘  └──────────────────┘  └────────────────────────────┘ │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │                         Redis (Message Broker)                           │ │
+│  │         (Celery task queue, caching, session storage)                    │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
+
+## **Diagram 2: Agent Interaction Workflow - Critical Patient Event**
+```
+┌─────────────────────────────────────────────────────────────────────────────┐
+│                    CRITICAL EVENT: Patient with Chest Pain                   │
+│                           Time: 10:45 AM                                     │
+└─────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TIER 1: MONITORING AGENTS (Continuous Data Ingestion)                      │
+│  ┌──────────────────┐  ┌──────────────────┐  ┌──────────────────────────┐  │
+│  │ Agent 2:         │  │ Agent 1:         │  │ Agent 4:                 │  │
+│  │ Cardiac Monitor  │  │ Glucose Monitor  │  │ Temperature Monitor      │  │
+│  │                  │  │                  │  │                          │  │
+│  │ HR: 105 → 125    │  │ Glucose: 180     │  │ Temp: 98.6°F            │  │
+│  │ BP: 160/95       │  │ (Elevated)       │  │ (Normal)                 │  │
+│  │ ⚠️ ALERT: Tachyc │  │                  │  │                          │  │
+│  └────────┬─────────┘  └──────────────────┘  └──────────────────────────┘  │
+│           │                                                                  │
+│           │ Triggers portable ECG device                                    │
+│           ▼                                                                  │
+│  ┌──────────────────────────────────────────────────────────────────────┐  │
+│  │ Agent 5: ECG Analysis Agent                                           │  │
+│  │ ┌──────────────────────────────────────────────────────────────────┐ │  │
+│  │ │ CNN Model processes 12-lead ECG                                   │ │  │
+│  │ │ ┌─────────────────────────────────────────────────────────────┐  │ │  │
+│  │ │ │ DETECTED: ST-Elevation in Leads II, III, aVF               │  │ │  │
+│  │ │ │ INTERPRETATION: Acute Inferior Wall STEMI                   │  │ │  │
+│  │ │ │ CONFIDENCE: 96%                                             │  │ │  │
+│  │ │ └─────────────────────────────────────────────────────────────┘  │ │  │
+│  │ │ 🚨 CRITICAL ALERT GENERATED                                       │ │  │
+│  │ └──────────────────────────────────────────────────────────────────┘ │  │
+│  └────────────────────────────┬─────────────────────────────────────────┘  │
+└───────────────────────────────┼────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TIER 3: RISK ASSESSMENT AGENTS (Context Integration)                       │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │ Agent 14: Comorbidity Risk Assessment                               │    │
+│  │                                                                      │    │
+│  │ Queries PostgreSQL FHIR DB:                                         │    │
+│  │ • Patient has Type 2 Diabetes (HbA1c 8.2%)                         │    │
+│  │ • Hypertension (BP usually 145/88)                                  │    │
+│  │ • Stage 3A CKD (eGFR 52)                                           │    │
+│  │                                                                      │    │
+│  │ Queries Neo4j Graph DB:                                             │    │
+│  │ • Current medications: Metformin, Lisinopril, Atorvastatin         │    │
+│  │ • No aspirin (❗treatment gap)                                      │    │
+│  │ • Father had MI at age 54 (familial risk)                          │    │
+│  │                                                                      │    │
+│  │ RISK CALCULATION:                                                   │    │
+│  │ ┌──────────────────────────────────────────────────────────────┐   │    │
+│  │ │ Composite Risk Score: 94/100 (CRITICAL)                      │   │    │
+│  │ │ • Cardiac Event Risk (next 30 days): 78%                     │   │    │
+│  │ │ • Mortality Risk (if untreated): 42%                         │   │    │
+│  │ │ • Time Sensitivity: IMMEDIATE                                 │   │    │
+│  │ └──────────────────────────────────────────────────────────────┘   │    │
+│  └────────────────────────────┬───────────────────────────────────────┘    │
+└───────────────────────────────┼────────────────────────────────────────────┘
+                                │
+                                ▼
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  TIER 4: INTERVENTION AGENTS (Decision Making)                              │
+│  ┌────────────────────────────────────────────────────────────────────┐    │
+│  │ Agent 18: Priority & Triage Agent                                   │    │
+│  │                                                                      │    │
+│  │ INPUT: STEMI alert + Critical risk score                           │    │
+│  │                                                                      │    │
+│  │ DECISION MATRIX:                                                    │    │
+│  │ ┌──────────────────────────────────────────────────────────────┐   │    │
+│  │ │ Condition: STEMI                    Priority: RED (1/4)      │   │    │
+│  │ │ Time Sensitivity: <5 minutes        Action: EMERGENCY        │   │    │
+│  │ │ Required Resources: Cath Lab        Route: Hospital          │   │    │
+│  │ │ Comorbidities: Diabetes, CKD        Special Considerations:  │   │    │
+│  │ │                                     - Contrast nephropathy   │   │    │
+│  │ │                                     - Glucose management     │   │    │
+│  │ └──────────────────────────────────────────────────────────────┘   │    │
+│  │                                                                      │    │
+│  │ ORCHESTRATION: Parallel activation of action agents                │    │
+│  └────┬────────────────────┬────────────────────┬──────────────────┬──┘    │
+└───────┼────────────────────┼────────────────────┼──────────────────┼────────┘
+        │                    │                    │                  │
+        │                    │                    │                  │
+   ┌────▼──────┐  ┌──────────▼──────┐  ┌─────────▼────────┐  ┌─────▼────────┐
+   │Agent 20:  │  │  Agent 19:      │  │  Agent 22:       │  │  Agent 23:   │
+   │Patient    │  │  Doctor         │  │  Hospital        │  │  Hospital    │
+   │Notify     │  │  Notification   │  │  Finder          │  │  Coordination│
+   └────┬──────┘  └──────────┬──────┘  └─────────┬────────┘  └─────┬────────┘
+        │                    │                    │                  │
+        │                    │                    │                  │
+┌───────▼────────────────────▼────────────────────▼──────────────────▼─────────┐
+│  TIER 5: PARALLEL ACTION EXECUTION (Time: 10:46 AM - 1 minute elapsed)      │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ ACTION 1: Patient Notification (Agent 20)                            │    │
+│  │ • Automated phone call to patient: "Call 911 immediately"           │    │
+│  │ • SMS with instructions: "You may be having a heart attack"         │    │
+│  │ • Family contact alert (wife's mobile)                              │    │
+│  │ STATUS: ✅ Call connected 10:46:15, Patient confirms chest pain     │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ ACTION 2: Doctor Notification (Agent 19)                             │    │
+│  │                                                                       │    │
+│  │ Email to Dr. Sarah Johnson (PCP):                                   │    │
+│  │ ┌───────────────────────────────────────────────────────────────┐  │    │
+│  │ │ 🚨 CRITICAL ALERT: STEMI - Patient John Doe                   │  │    │
+│  │ │                                                                │  │    │
+│  │ │ ECG shows ST-elevation inferior wall MI                       │  │    │
+│  │ │ Patient called 911, ETA to County Hospital 20 minutes         │  │    │
+│  │ │                                                                │  │    │
+│  │ │ PATIENT CONTEXT:                                              │  │    │
+│  │ │ • 68 yo male, Type 2 DM, HTN, CKD Stage 3A                   │  │    │
+│  │ │ • Father MI at 54                                             │  │    │
+│  │ │ • Not on aspirin (treatment gap identified)                  │  │    │
+│  │ │                                                                │  │    │
+│  │ │ RENAL CONSIDERATIONS:                                         │  │    │
+│  │ │ • eGFR 52 - monitor contrast dose, consider pre-hydration    │  │    │
+│  │ │                                                                │  │    │
+│  │ │ [View Full Dashboard] [ECG Image Attached]                    │  │    │
+│  │ └───────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                       │    │
+│  │ STATUS: ✅ Email sent 10:46:08, Dr. Johnson acknowledged 10:46:42   │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ ACTION 3: Hospital Selection (Agent 22)                              │    │
+│  │                                                                       │    │
+│  │ Query: Hospitals with 24/7 cath lab within 30 minutes               │    │
+│  │                                                                       │    │
+│  │ RESULTS:                                                              │    │
+│  │ ┌───────────────────────────────────────────────────────────────┐  │    │
+│  │ │ 1. County Regional Medical Center                 ⭐ SELECTED │  │    │
+│  │ │    Distance: 14.2 miles (18 min drive)                       │  │    │
+│  │ │    Cath Lab: Available (24/7)                                │  │    │
+│  │ │    STEMI Protocol: Active                                    │  │    │
+│  │ │    Door-to-balloon: Avg 67 minutes                          │  │    │
+│  │ │    Insurance: Accepts patient's Medicare                     │  │    │
+│  │ │                                                                │  │    │
+│  │ │ 2. University Hospital Heart Center                          │  │    │
+│  │ │    Distance: 42.1 miles (52 min) - TOO FAR                  │  │    │
+│  │ └───────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                       │    │
+│  │ STATUS: ✅ County Regional selected 10:46:12                         │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+│                                                                               │
+│  ┌─────────────────────────────────────────────────────────────────────┐    │
+│  │ ACTION 4: Hospital Coordination (Agent 23)                           │    │
+│  │                                                                       │    │
+│  │ Step 1: Call County Regional ED (10:46:18)                          │    │
+│  │ "Incoming STEMI patient, inferior wall MI, ETA 20 minutes via EMS"  │    │
+│  │                                                                       │    │
+│  │ Step 2: Transmit ECG to hospital PACS system (10:46:25)            │    │
+│  │ ✅ ECG transmitted, reviewed by ED physician                         │    │
+│  │                                                                       │    │
+│  │ Step 3: Send medical summary (10:46:30)                             │    │
+│  │ ┌───────────────────────────────────────────────────────────────┐  │    │
+│  │ │ John Doe, 68M, MRN: 123456                                    │  │    │
+│  │ │ Allergies: PCN                                                 │  │    │
+│  │ │ Medications: Metformin 1000mg BID, Lisinopril 20mg daily     │  │    │
+│  │ │              Atorvastatin 40mg daily                          │  │    │
+│  │ │ PMH: Type 2 DM (HbA1c 8.2%), HTN, CKD Stage 3A (eGFR 52)    │  │    │
+│  │ │ FH: Father MI age 54                                          │  │    │
+│  │ │ Recent labs attached (Cr 1.4, K 4.2)                         │  │    │
+│  │ └───────────────────────────────────────────────────────────────┘  │    │
+│  │                                                                       │    │
+│  │ Step 4: Alert cath lab team (10:46:35)                              │    │
+│  │ ✅ Cath lab team activated, OR prepared                              │    │
+│  │                                                                       │    │
+│  │ Step 5: Notify cardiologist on-call (10:46:40)                      │    │
+│  │ ✅ Dr. Martinez paged, en route to hospital                          │    │
+│  │                                                                       │    │
+│  │ STATUS: ✅ Hospital fully prepared, cath lab ready 10:52 AM          │    │
+│  └─────────────────────────────────────────────────────────────────────┘    │
+└───────────────────────────────────────────────────────────────────────────────┘
+                                      │
+                                      ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│  OUTCOME (Time: 11:08 AM - 23 minutes from alert to cath lab)                │
+│                                                                                │
+│  • Patient arrived County Regional ED via EMS: 11:02 AM                       │
+│  • Door-to-balloon time: 58 minutes (excellent for rural setting)            │
+│  • Successful PCI to RCA, 1 stent placed                                      │
+│  • Patient stable, transferred to CCU                                         │
+│                                                                                │
+│  System Performance Metrics:                                                  │
+│  ✅ Alert-to-notification: 68 seconds (target <5 min)                        │
+│  ✅ Alert-to-hospital-prep: 4.5 minutes (target <10 min)                     │
+│  ✅ Total system response: Excellent                                          │
+│                                                                                │
+│  AI Value Added:                                                              │
+│  • Detected STEMI from wearable data + portable ECG                          │
+│  • Coordinated multi-party response automatically                             │
+│  • Selected optimal hospital with real-time data                              │
+│  • Pre-positioned resources before patient arrival                            │
+│  • Provided complete medical context to receiving team                        │
+│  • Likely saved patient's life through rapid, coordinated response            │
+└───────────────────────────────────────────────────────────────────────────────┘
+```
+
+## **Diagram 3: RAG Pipeline Architecture**
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                    RAG (Retrieval-Augmented Generation) Pipeline              │
+│                     For Evidence-Based Clinical Decision Making               │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+STEP 1: KNOWLEDGE BASE CONSTRUCTION (Offline, One-Time Setup)
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  ┌─────────────────┐  ┌──────────────────┐  ┌─────────────────────────────┐ │
+│  │ Clinical        │  │ Medical          │  │ Drug & Protocol             │ │
+│  │ Guidelines      │  │ Literature       │  │ Databases                   │ │
+│  │                 │  │                  │  │                             │ │
+│  │ • ADA 2024      │  │ • PubMed Central │  │ • DrugBank                  │ │
+│  │ • ACC/AHA 2023  │  │ • UpToDate       │  │ • FDA Drug Labels           │ │
+│  │ │• KDIGO 2024    │  │ • Cochrane       │  │ • Clinical Protocols        │ │
+│  │ • JNC-8         │  │ • NEJM/JAMA      │  │ • Treatment Algorithms      │ │
+│  └────────┬────────┘  └────────┬─────────┘  └──────────┬──────────────────┘ │
+│           │                    │                        │                     │
+│           └────────────────────┴────────────────────────┘                     │
+│                                │                                              │
+│                                ▼                                              │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │                      DOCUMENT PROCESSING PIPELINE                        │ │
+│  │                                                                           │ │
+│  │  1. PDF/HTML/Text Extraction                                            │ │
+│  │  2. Section Parsing (Methods, Results, Recommendations)                 │ │
+│  │  3. Chunking (512-1024 tokens per chunk with overlap)                  │ │
+│  │  4. Metadata Extraction (title, date, evidence level, source)          │ │
+│  │  5. Quality Filtering (peer-reviewed, recent, authoritative)           │ │
+│  └─────────────────────────┬───────────────────────────────────────────────┘ │
+│                            │                                                  │
+│                            ▼                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │               EMBEDDING GENERATION (Sentence-BERT)                       │ │
+│  │                                                                           │ │
+│  │  Input: "Metformin is first-line therapy for type 2 diabetes..."       │ │
+│  │  Output: [0.23, -0.45, 0.67, ..., 0.12] (384-dim vector)               │ │
+│  │                                                                           │ │
+│  │  Total chunks embedded: ~500,000 across all sources                     │ │
+│  └─────────────────────────┬───────────────────────────────────────────────┘ │
+│                            │                                                  │
+│                            ▼                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │                      QDRANT VECTOR DATABASE                              │ │
+│  │                                                                           │ │
+│  │  Collection: clinical_guidelines (120,000 chunks)                       │ │
+│  │  Collection: drug_information (80,000 chunks)                           │ │
+│  │  Collection: medical_literature (250,000 chunks)                        │ │
+│  │  Collection: disease_knowledge (50,000 chunks)                          │ │
+│  │                                                                           │ │
+│  │  Indexed with HNSW algorithm for fast similarity search                 │ │
+│  └─────────────────────────────────────────────────────────────────────────┘ │
+│                                                                                │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+STEP 2: QUERY TIME (Real-Time, When Agent Makes Decision)
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                                                                                │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │ AGENT 17: PRESCRIPTION AGENT                                             │ │
+│  │                                                                           │ │
+│  │ Clinical Question:                                                       │ │
+│  │ "Patient has Type 2 diabetes with HbA1c 8.2%, eGFR 52 (CKD Stage 3A),  │ │
+│  │  and recent MI. Currently on metformin 1000mg BID. What medication      │ │
+│  │  should be added for optimal cardiovascular and renal protection?"       │ │
+│  └─────────────────────────┬───────────────────────────────────────────────┘ │
+│                            │                                                  │
+│                            ▼                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │              STEP 2A: QUERY EMBEDDING                                    │ │
+│  │                                                                           │ │
+│  │  Sentence-BERT encodes clinical question → 384-dim vector               │ │
+│  │  Query vector: [0.15, -0.32, 0.58, ..., 0.09]                          │ │
+│  └─────────────────────────┬───────────────────────────────────────────────┘ │
+│                            │                                                  │
+│                            ▼                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │              STEP 2B: VECTOR SIMILARITY SEARCH                           │ │
+│  │                                                                           │ │
+│  │  Search Qdrant collections with cosine similarity:                      │ │
+│  │  • clinical_guidelines (top-5 most relevant chunks)                     │ │
+│  │  • drug_information (top-3 most relevant chunks)                        │ │
+│  │                                                                           │ │
+│  │  Optional filters:                                                       │ │
+│  │  • Publication year >= 2020 (recent evidence)                           │ │
+│  │  • Evidence level: A or B                                               │ │
+│  │  • Guidelines: ADA, KDIGO, ACC/AHA                                      │ │
+│  └─────────────────────────┬───────────────────────────────────────────────┘ │
+│                            │                                                  │
+│                            ▼                                                  │
+│  ┌─────────────────────────────────────────────────────────────────────────┐ │
+│  │              STEP 2C: RETRIEVED CONTEXT                                  │ │
+│  │                                                                           │ │
+│  │  TOP RESULTS:                                                            │ │
+│  │                                                                           │ │
+│  │  [1] ADA Standards of Care 2024 (Score: 0.89)                          │ │
+│  │  "For patients with type 2 diabetes and established cardiovascular     │ │
+│  │   disease, SGLT2 inhibitors or GLP-1 receptor agonists with proven    │ │
+│  │   cardiovascular benefit are recommended..."                            │ │
+│  │                                                                           │ │
+│  │  [2] KDIGO CKD Guidelines 2024 (Score: 0.85)                           │ │
+│  │  "SGLT2 inhibitors reduce progression of kidney disease in patients    │ │
+│  │   with type 2 diabetes and CKD stages 2-4 (eGFR 25-90). Consider      │ │
+│  │   empagliflozin, dapagliflozin, or canagliflozin..."                  │ │
+│  │                                                                           │ │
+│  │  [3] EMPA-REG OUTCOME Trial (Score: 0.82)                              │ │
+│  │  "Empagliflozin reduced cardiovascular death by 38% and heart failure  │ │
+│  │   hospitalization by 35% in patients with type 2 diabetes and CVD..."  │ │
+│  │                                                                           │ │
+│  │  [4] DrugBank: Empagliflozin (Score: 0.80)                             │ │
+│  │  "Mechanism: SGLT2 inhibitor. Renal dosing: No adjustment for eGFR    │ │
+│  │   >45. Use with caution 30-45. Contraindicated <30..."                │ │
+│  │                                                                           │ │
+│  │  [5] ACC Expert Consensus 2023 (Score: 0.79)                           │ │
+│  │  "SGLT2 inhibitors should be initiated in all patients with type 2    │ │
+│  │   diabetes and atherosclerotic CVD unless contraindicated..."          │ │
+│  └─────────────────────────┬───────────────────────────────────────────────┘ │
+│                            │                                                  │
+└────────────────────────────┼──────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌────────────────────────────────────────────────────────────────────────────────┐
+│              STEP 3: CONTEXT AUGMENTATION & PROMPT CONSTRUCTION                │
+│                                                                                 │
+│  ┌──────────────────────────────────────────────────────────────────────────┐ │
+│  │                   AUGMENTED PROMPT FOR LLAMA 3.2                          │ │
+│  │                                                                            │ │
+│  │  You are an expert clinical pharmacologist. Use the following            │ │
+│  │  evidence-based context to provide medication recommendations.            │ │
+│  │                                                                            │ │
+│  │  CLINICAL CONTEXT FROM KNOWLEDGE BASE:                                    │ │
+│  │  ═══════════════════════════════════════════════════════════════════     │ │
+│  │  [Source: ADA Standards of Care 2024, Evidence Level: A]                 │ │
+│  │  For patients with type 2 diabetes and established cardiovascular        │ │
+│  │  disease, SGLT2 inhibitors or GLP-1 receptor agonists with proven       │ │
+│  │  cardiovascular benefit are recommended...                                │ │
+│  │                                                                            │ │
+│  │  [Source: KDIGO CKD Guidelines 2024, Evidence Level: A]                  │ │
+│  │  SGLT2 inhibitors reduce progression of kidney disease in patients       │ │
+│  │  with type 2 diabetes and CKD stages 2-4 (eGFR 25-90)...                │ │
+│  │                                                                            │ │
+│  │  [Source: EMPA-REG OUTCOME Trial, NEJM 2015]                             │ │
+│  │  Empagliflozin reduced cardiovascular death by 38% and heart failure     │ │
+│  │  hospitalization by 35% in patients with type 2 diabetes and CVD...      │ │
+│  │                                                                            │ │
+│  │  [Source: DrugBank - Empagliflozin]                                      │ │
+│  │  Renal dosing: No adjustment for eGFR >45. Use with caution 30-45...    │ │
+│  │  ═══════════════════════════════════════════════════════════════════     │ │
+│  │                                                                            │ │
+│  │  PATIENT CASE:                                                            │ │
+│  │  68-year-old male with:                                                   │ │
+│  │  • Type 2 diabetes (HbA1c 8.2%, diagnosed 15 years ago)                  │ │
+│  │  • Recent myocardial infarction (3 months ago, s/p PCI)                  │ │
+│  │  • Chronic kidney disease Stage 3A (eGFR 52 mL/min/1.73m²)              │ │
+│  │  • Hypertension (BP 145/88 on treatment)                                  │ │
+│  │                                                                            │ │
+│  │  Current medications:                                                     │ │
+│  │  • Metformin 1000mg twice daily                                          │ │
+│  │  • Lisinopril 20mg daily                                                  │ │
+│  │  • Atorvastatin 40mg daily                                                │ │
+│  │  • Aspirin 81mg daily                                                     │ │
+│  │                                                                            │ │
+│  │  QUESTION:                                                                │ │
+│  │  Based on the evidence above, what medication should be added for        │ │
+│  │  optimal cardiovascular and renal protection?                             │ │
+│  │                                                                            │ │
+│  │  Provide your recommendation in the following JSON format:                │ │
+│  │  {                                                                        │ │
+│  │    "medication": "drug name",                                            │ │
+│  │    "dose": "starting dose",                                              │ │
+│  │    "rationale": "clinical reasoning",                                    │ │
+│  │    "evidence_level": "A/B/C",                                            │ │
+│  │    "sources": ["guideline citations"],                                   │ │
+│  │    "monitoring": "parameters to track",                                  │ │
+│  │    "patient_education": "key points"                                     │ │
+│  │  }                                                                        │ │
+│  └────────────────────────┬─────────────────────────────────────────────────┘ │
+└────────────────────────────┼─────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌────────────────────────────────────────────────────────────────────────────────┐
+│              STEP 4: LLM GENERATION (Llama 3.2)                                │
+│                                                                                 │
+│  ┌──────────────────────────────────────────────────────────────────────────┐ │
+│  │  Llama 3.2 processes augmented prompt with retrieved context             │ │
+│  │                                                                            │ │
+│  │  Parameters:                                                              │ │
+│  │  • Temperature: 0.7 (balanced creativity/consistency)                     │ │
+│  │  • Max tokens: 1024                                                       │ │
+│  │  • Top-p: 0.9                                                             │ │
+│  └────────────────────────┬─────────────────────────────────────────────────┘ │
+│                            │                                                   │
+│                            ▼                                                   │
+│  ┌──────────────────────────────────────────────────────────────────────────┐ │
+│  │                        LLM GENERATED RESPONSE                             │ │
+│  │                                                                            │ │
+│  │  {                                                                        │ │
+│  │    "medication": "Empagliflozin (Jardiance)",                            │ │
+│  │    "dose": "10mg once daily, may titrate to 25mg",                       │ │
+│  │    "rationale": "Based on the ADA 2024 and KDIGO 2024 guidelines,       │ │
+│  │                  SGLT2 inhibitors are strongly recommended for this      │ │
+│  │                  patient. Empagliflozin specifically demonstrated        │ │
+│  │                  cardiovascular benefit in EMPA-REG OUTCOME trial,       │ │
+│  │                  reducing CV death by 38% and HF hospitalization by      │ │
+│  │                  35%. It also provides renal protection, slowing CKD     │ │
+│  │                  progression. Patient's eGFR of 52 is above the          │ │
+│  │                  threshold where empagliflozin remains effective.",       │ │
+│  │    "evidence_level": "A",                                                │ │
+│  │    "sources": [                                                          │ │
+│  │      "ADA Standards of Medical Care in Diabetes 2024",                   │ │
+│  │      "KDIGO CKD Guidelines 2024",                                        │ │
+│  │      "EMPA-REG OUTCOME Trial (NEJM 2015)"                                │ │
+│  │    ],                                                                     │ │
+│  │    "monitoring": "Monitor eGFR and potassium after 2-4 weeks.           │ │
+│  │                   Assess for genital mycotic infections.                 │ │
+│  │                   Monitor HbA1c in 3 months (expect 0.5-0.8% reduction).│ │
+│  │                   Track blood pressure (may see modest reduction).       │ │
+│  │                   Counsel on DKA risk if patient becomes acutely ill.",  │ │
+│  │    "patient_education": "This medication helps protect your heart       │ │
+│  │                          and kidneys while also helping control blood    │ │
+│  │                          sugar. Take it once daily in the morning.       │ │
+│  │                          Stay well-hydrated. Report any unusual          │ │
+│  │                          fatigue, nausea, or difficulty breathing."      │ │
+│  │  }                                                                        │ │
+│  └────────────────────────┬─────────────────────────────────────────────────┘ │
+└────────────────────────────┼─────────────────────────────────────────────────┘
+                             │
+                             ▼
+┌────────────────────────────────────────────────────────────────────────────────┐
+│              STEP 5: POST-PROCESSING & SAFETY CHECKS                           │
+│                                                                                 │
+│  Agent 17 performs additional validation:                                      │
+│  ✅ Check Neo4j for drug-drug interactions (empagliflozin + current meds)     │
+│  ✅ Verify no contraindications for patient's conditions                       │
+│  ✅ Confirm renal dosing appropriate for eGFR 52                               │
+│  ✅ Validate recommendation against Agent 12 (Drug Safety)                     │
+│  ✅ Cross-reference with patient's allergy history                             │
+│                                                                                 │
+│  All checks passed ✅                                                          │
+│                                                                                 │
+│  Recommendation forwarded to:                                                  │
+│  • Agent 19 (Doctor Notification) → email to PCP for approval                 │
+│  • Agent 11 (Medication Tracking) → monitor future adherence                  │
+│  • Electronic Health Record → stored in patient chart as draft order           │
+└────────────────────────────────────────────────────────────────────────────────┘
+
+KEY BENEFITS OF RAG APPROACH:
+═══════════════════════════════════════════════════════════════════════════════
+✅ Evidence-Grounded: All recommendations cite authoritative sources
+✅ Current Knowledge: Can update vector DB with latest guidelines without retraining LLM
+✅ Explainable: Provides sources and reasoning for clinical decisions
+✅ Trustworthy: Clinicians can verify recommendations against cited literature
+✅ Adaptive: Retrieves most relevant context for each unique clinical scenario
+✅ Efficient: Only relevant knowledge retrieved, not entire medical encyclopedia
+✅ HIPAA-Compliant: Patient data never leaves local system; only de-identified queries to LLM
+```
+
+## **Diagram 4: Database Schema Relationships**
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                     MULTI-DATABASE ARCHITECTURE                                │
+│                  (PostgreSQL + Neo4j + Qdrant)                                 │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+┌────────────────── POSTGRESQL (FHIR/HL7) ───────────────────┐
+│                     Relational Database                      │
+│                  Stores Patient Health Records               │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │              fhir_patient (PRIMARY)                     │ │
+│  ├────────────────────────────────────────────────────────┤ │
+│  │ • id (UUID, PK)                                        │ │
+│  │ • identifier (MRN)                                      │ │
+│  │ • name_family                                          │ │
+│  │ • name_given                                           │ │
+│  │ • birth_date                                           │ │
+│  │ • gender                                               │ │
+│  │ • telecom_phone / telecom_email                        │ │
+│  │ • address_*                                            │ │
+│  │ • active (boolean)                                     │ │
+│  │ • raw_fhir (JSONB - full FHIR resource)               │ │
+│  │ • meta_last_updated                                    │ │
+│  └────┬───────────────────────────────────────────────────┘ │
+│       │ 1                                                    │
+│       │                                                      │
+│       │ ∞                                                    │
+│  ┌────▼───────────────────────────────────────────────────┐ │
+│  │              fhir_observation                           │ │
+│  ├────────────────────────────────────────────────────────┤ │
+│  │ • id (UUID, PK)                                        │ │
+│  │ • patient_id (FK → fhir_patient.id)                   │ │
+│  │ • status (final, preliminary)                          │ │
+│  │ • category (vital-signs, laboratory, imaging)          │ │
+│  │ • code_system (LOINC, SNOMED)                         │ │
+│  │ • code_code (e.g., "8867-4" for heart rate)          │ │
+│  │ • code_display ("Heart rate")                          │ │
+│  │ • value_quantity / value_unit                          │ │
+│  │ • effective_datetime                                   │ │
+│  │ • interpretation (normal, high, low, critical)         │ │
+│  │ • device_id (wearable device identifier)              │ │
+│  │ • raw_fhir (JSONB)                                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│       │ 1                                                    │
+│       │                                                      │
+│       │ ∞                                                    │
+│  ┌────▼───────────────────────────────────────────────────┐ │
+│  │              fhir_condition                             │ │
+│  ├────────────────────────────────────────────────────────┤ │
+│  │ • id (UUID, PK)                                        │ │
+│  │ • patient_id (FK → fhir_patient.id)                   │ │
+│  │ • clinical_status (active, inactive, resolved)         │ │
+│  │ • code_system (ICD-10, SNOMED)                        │ │
+│  │ • code_code (e.g., "E11" for Type 2 DM)              │ │
+│  │ • code_display ("Type 2 Diabetes Mellitus")           │ │
+│  │ • severity (mild, moderate, severe)                    │ │
+│  │ • onset_datetime                                       │ │
+│  │ • raw_fhir (JSONB)                                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│       │ 1                                                    │
+│       │                                                      │
+│       │ ∞                                                    │
+│  ┌────▼───────────────────────────────────────────────────┐ │
+│  │         fhir_medication_request                         │ │
+│  ├────────────────────────────────────────────────────────┤ │
+│  │ • id (UUID, PK)                                        │ │
+│  │ • patient_id (FK → fhir_patient.id)                   │ │
+│  │ • status (active, on-hold, completed)                  │ │
+│  │ • medication_code_system (RxNorm)                      │ │
+│  │ • medication_code                                       │ │
+│  │ • medication_display ("Metformin 1000mg")             │ │
+│  │ • dosage_text                                          │ │
+│  │ • dosage_timing_repeat (JSONB)                        │ │
+│  │ • requester_id (physician UUID)                        │ │
+│  │ • authored_on                                          │ │
+│  │ • raw_fhir (JSONB)                                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│       │ 1                                                    │
+│       │                                                      │
+│       │ ∞                                                    │
+│  ┌────▼───────────────────────────────────────────────────┐ │
+│  │           fhir_diagnostic_report                        │ │
+│  ├────────────────────────────────────────────────────────┤ │
+│  │ • id (UUID, PK)                                        │ │
+│  │ • patient_id (FK → fhir_patient.id)                   │ │
+│  │ • status (final, preliminary)                          │ │
+│  │ • category (radiology, cardiology, laboratory)         │ │
+│  │ • code_display ("Chest X-ray", "ECG")                 │ │
+│  │ • effective_datetime                                   │ │
+│  │ • result_observation_ids (UUID[])                      │ │
+│  │ • conclusion (AI-generated interpretation)             │ │
+│  │ • media (JSONB[] - images, files)                     │ │
+│  │ • raw_fhir (JSONB)                                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│       │ 1                                                    │
+│       │                                                      │
+│       │ ∞                                                    │
+│  ┌────▼───────────────────────────────────────────────────┐ │
+│  │            agent_action_log                             │ │
+│  ├────────────────────────────────────────────────────────┤ │
+│  │ • id (UUID, PK)                                        │ │
+│  │ • agent_name ("Prescription Agent")                    │ │
+│  │ • agent_id (17)                                        │ │
+│  │ • patient_id (FK → fhir_patient.id)                   │ │
+│  │ • action_type (alert, recommendation, escalation)      │ │
+│  │ • action_data (JSONB)                                  │ │
+│  │ • priority (critical, urgent, routine)                 │ │
+│  │ • status (pending, executed, failed)                   │ │
+│  │ • executed_at                                          │ │
+│  │ • result (JSONB)                                       │ │
+│  │ • created_at                                           │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  Queries PostgreSQL for:                                    │
+│  • Patient demographics and clinical history                │
+│  • Time-series vital signs from wearables                   │
+│  • Lab results and diagnostic reports                       │
+│  • Current medications and adherence                        │
+│  • Agent action audit trail                                 │
+└──────────────────────────────────────────────────────────────┘
+
+
+┌────────────────────── NEO4J (GRAPH) ───────────────────────┐
+│                     Graph Database                           │
+│            Stores Complex Medical Relationships              │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │                     NODE TYPES                          │ │
+│  │                                                          │ │
+│  │  (:Patient)          (:Medication)     (:Disease)       │ │
+│  │  • id               • rxnorm          • icd10           │ │
+│  │  • mrn              • name            • snomedCT        │ │
+│  │  • name             • genericName     • name            │ │
+│  │                     • class           • category        │ │
+│  │                                                          │ │
+│  │  (:FamilyMember)    (:Gene)           (:Hospital)       │ │
+│  │  • id               • hgncId          • id              │ │
+│  │  • relationship     • name            • name            │ │
+│  │  • livingStatus     • chromosome      • hasER           │ │
+│  │                                       • hasCathLab      │ │
+│  │                                                          │ │
+│  │  (:ClinicalGuideline)  (:LabTest)    (:Symptom)        │ │
+│  │  • id                  • loinc        • snomedCT        │ │
+│  │  • title               • name         • name            │ │
+│  │  • organization        • unit                           │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │                  RELATIONSHIP TYPES                     │ │
+│  │                                                          │ │
+│  │  Patient -[:TAKES_MEDICATION {                          │ │
+│  │    startDate,                                           │ │
+│  │    dosage,                                              │ │
+│  │    frequency,                                           │ │
+│  │    adherence                                            │ │
+│  │  }]→ Medication                                         │ │
+│  │                                                          │ │
+│  │  Patient -[:HAS_CONDITION {                             │ │
+│  │    onsetDate,                                           │ │
+│  │    status,                                              │ │
+│  │    severity                                             │ │
+│  │  }]→ Disease                                            │ │
+│  │                                                          │ │
+│  │  Medication -[:INTERACTS_WITH {                         │ │
+│  │    severity,                 (CRITICAL FOR AGENT 12)    │ │
+│  │    effect,                                              │ │
+│  │    mechanism,                                           │ │
+│  │    clinicalRelevance,                                   │ │
+│  │    source                                               │ │
+│  │  }]→ Medication                                         │ │
+│  │                                                          │ │
+│  │  Medication -[:CONTRAINDICATED_IN {                     │ │
+│  │    severity,                 (CRITICAL FOR AGENT 12)    │ │
+│  │    reason,                                              │ │
+│  │    eGFRThreshold,                                       │ │
+│  │    guidelineReference                                   │ │
+│  │  }]→ Disease                                            │ │
+│  │                                                          │ │
+│  │  Disease -[:INCREASES_RISK_OF {                         │ │
+│  │    relativeRisk,             (USED BY AGENT 13)         │ │
+│  │    mechanism,                                           │ │
+│  │    timeframe,                                           │ │
+│  │    preventable                                          │ │
+│  │  }]→ Disease                                            │ │
+│  │                                                          │ │
+│  │  Patient -[:HAS_FAMILY_MEMBER]→ FamilyMember           │ │
+│  │                                                          │ │
+│  │  FamilyMember -[:HAD_CONDITION {                        │ │
+│  │    ageAtOnset,              (USED BY AGENT 9)           │ │
+│  │    fatal                                                │ │
+│  │  }]→ Disease                                            │ │
+│  │                                                          │ │
+│  │  Medication -[:TREATS {                                 │ │
+│  │    efficacy,                                            │ │
+│  │    firstLine,                                           │ │
+│  │    mechanism                                            │ │
+│  │  }]→ Disease                                            │ │
+│  │                                                          │ │
+│  │  ClinicalGuideline -[:RECOMMENDS {                      │ │
+│  │    strength,                (USED BY AGENT 17)          │ │
+│  │    evidence,                                            │ │
+│  │    firstLine                                            │ │
+│  │  }]→ Medication                                         │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  EXAMPLE GRAPH QUERIES:                                     │
+│                                                              │
+│  Query 1: Find all drug interactions for patient            │
+│  MATCH (p:Patient {id: $patientId})-[:TAKES_MED]->(m1)     │
+│  MATCH (m1)-[i:INTERACTS_WITH]->(m2)                        │
+│  WHERE i.severity IN ['major', 'severe']                    │
+│  RETURN m1.name, m2.name, i.effect                          │
+│                                                              │
+│  Query 2: Disease prediction via risk pathways              │
+│  MATCH (p:Patient)-[:HAS_CONDITION]->(d1:Disease)           │
+│         -[r:INCREASES_RISK_OF]->(d2:Disease)                │
+│  WHERE NOT EXISTS((p)-[:HAS_CONDITION]->(d2))               │
+│  RETURN d2.name, r.relativeRisk, r.timeframe                │
+│  ORDER BY r.relativeRisk DESC                               │
+│                                                              │
+│  Query 3: Family history analysis                           │
+│  MATCH (p:Patient)-[:HAS_FAMILY_MEMBER]->(fm)               │
+│        -[hc:HAD_CONDITION]->(d:Disease)                     │
+│  WHERE hc.ageAtOnset < 60                                   │
+│  RETURN d.name, fm.relationship, hc.ageAtOnset              │
+│                                                              │
+│  Queries Neo4j for:                                         │
+│  • Drug-drug interactions (safety checks)                   │
+│  • Drug-disease contraindications                           │
+│  • Disease progression pathways                             │
+│  • Family medical history patterns                          │
+│  • Treatment protocol recommendations                       │
+│  • Hospital capability matching                             │
+└──────────────────────────────────────────────────────────────┘
+
+
+┌──────────────────── QDRANT (VECTOR DB) ────────────────────┐
+│                     Vector Database                          │
+│           Stores Semantic Embeddings for RAG                 │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  Collection: clinical_guidelines                        │ │
+│  │  ┌──────────────────────────────────────────────────┐  │ │
+│  │  │ Point ID: 1                                       │  │ │
+│  │  │ Vector: [0.23, -0.45, 0.67, ..., 0.12] (384-dim) │  │ │
+│  │  │ Payload: {                                        │  │ │
+│  │  │   "title": "ADA Diabetes Guidelines 2024",        │  │ │
+│  │  │   "section": "Medication Management",             │  │ │
+│  │  │   "content": "Metformin is first-line...",       │  │ │
+│  │  │   "evidence_level": "A",                          │  │ │
+│  │  │   "year": 2024,                                   │  │ │
+│  │  │   "source_url": "https://..."                     │  │ │
+│  │  │ }                                                 │  │ │
+│  │  └──────────────────────────────────────────────────┘  │ │
+│  │  Total points: ~120,000                                 │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  Collection: drug_information                           │ │
+│  │  ┌──────────────────────────────────────────────────┐  │ │
+│  │  │ Point ID: 5001                                    │  │ │
+│  │  │ Vector: [0.15, -0.32, 0.58, ..., 0.09] (384-dim) │  │ │
+│  │  │ Payload: {                                        │  │ │
+│  │  │   "drug_name": "Empagliflozin",                   │  │ │
+│  │  │   "rxnorm": "1545653",                            │  │ │
+│  │  │   "content": "SGLT2 inhibitor indicated...",     │  │ │
+│  │  │   "mechanism": "Inhibits renal glucose...",       │  │ │
+│  │  │   "dosing": "10mg-25mg once daily",              │  │ │
+│  │  │   "renal_dosing": "No adjustment eGFR >45"       │  │ │
+│  │  │ }                                                 │  │ │
+│  │  └──────────────────────────────────────────────────┘  │ │
+│  │  Total points: ~80,000                                  │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  Collection: medical_literature                         │ │
+│  │  ┌──────────────────────────────────────────────────┐  │ │
+│  │  │ Point ID: 10001                                   │  │ │
+│  │  │ Vector: [0.42, -0.18, 0.91, ..., 0.33] (384-dim) │  │ │
+│  │  │ Payload: {                                        │  │ │
+│  │  │   "title": "EMPA-REG OUTCOME Trial",              │  │ │
+│  │  │   "journal": "NEJM",                              │  │ │
+│  │  │   "year": 2015,                                   │  │ │
+│  │  │   "pmid": "26378978",                             │  │ │
+│  │  │   "content": "Empagliflozin reduced CV death...", │  │ │
+│  │  │   "study_type": "RCT",                            │  │ │
+│  │  │   "sample_size": 7020                             │  │ │
+│  │  │ }                                                 │  │ │
+│  │  └──────────────────────────────────────────────────┘  │ │
+│  │  Total points: ~250,000                                 │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  Collection: disease_knowledge                          │ │
+│  │  Total points: ~50,000                                  │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  VECTOR SIMILARITY SEARCH:                                  │
+│  ┌────────────────────────────────────────────────────────┐ │
+│  │  Query: "What medication for diabetes with CKD?"       │ │
+│  │  ↓ Embed query → [0.18, -0.29, 0.55, ..., 0.11]       │ │
+│  │  ↓ Cosine similarity search                            │ │
+│  │  ↓ Top-K results (K=5)                                 │ │
+│  │  Result 1: KDIGO CKD Guidelines (score: 0.89)         │ │
+│  │  Result 2: ADA Diabetes Standards (score: 0.85)       │ │
+│  │  Result 3: SGLT2 Inhibitor Trial (score: 0.82)        │ │
+│  │  ...                                                    │ │
+│  └────────────────────────────────────────────────────────┘ │
+│                                                              │
+│  Queries Qdrant for:                                        │
+│  • Evidence-based clinical recommendations (RAG)            │
+│  • Semantic search over medical literature                  │
+│  • Drug information retrieval                               │
+│  • Protocol and guideline lookups                           │
+└──────────────────────────────────────────────────────────────┘
+
+
+┌─────────────── DATABASE INTEGRATION FLOW ──────────────────┐
+│                                                              │
+│  When Agent 17 (Prescription) makes recommendation:         │
+│                                                              │
+│  Step 1: Query PostgreSQL for patient context               │
+│         SELECT conditions, medications, labs                │
+│         FROM fhir_patient p                                 │
+│         JOIN fhir_condition c ON p.id = c.patient_id        │
+│         JOIN fhir_medication_request m ON p.id = m.patient  │
+│         WHERE p.id = $patientId                             │
+│         ↓                                                    │
+│         Patient has: Diabetes, CKD, recent MI               │
+│         Current meds: Metformin, Lisinopril                 │
+│         eGFR: 52                                            │
+│                                                              │
+│  Step 2: Query Neo4j for safety checks                      │
+│         MATCH (p:Patient)-[:TAKES_MED]->(m1)               │
+│         MATCH (m1)-[i:INTERACTS_WITH]->(m2)                │
+│         WHERE proposed_drug = m2.name                       │
+│         ↓                                                    │
+│         Check: Empagliflozin interactions with current meds │
+│         Result: No major interactions found                 │
+│                                                              │
+│  Step 3: Query Qdrant for clinical evidence                 │
+│         Vector search: "SGLT2 inhibitor diabetes CKD CVD"  │
+│         ↓                                                    │
+│         Retrieved: ADA guidelines, KDIGO guidelines,        │
+│                   EMPA-REG trial results                    │
+│                                                              │
+│  Step 4: LLM generates recommendation using all sources     │
+│         ↓                                                    │
+│         Recommendation: Empagliflozin 10mg daily            │
+│         Evidence: Level A                                   │
+│         Sources: ADA 2024, KDIGO 2024, EMPA-REG            │
+│                                                              │
+│  Step 5: Store recommendation back to PostgreSQL            │
+│         INSERT INTO agent_action_log (                      │
+│           agent_name, action_type, action_data              │
+│         )                                                    │
+│         ↓                                                    │
+│         Audit trail created for compliance                  │
+│                                                              │
+└──────────────────────────────────────────────────────────────┘

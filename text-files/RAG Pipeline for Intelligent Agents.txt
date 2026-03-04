@@ -1,0 +1,90 @@
+# ============================================
+# RAG Agent Base Class
+# ============================================
+
+import torch
+from transformers import AutoTokenizer, AutoModel
+from qdrant_client import QdrantClient
+from sentence_transformers import SentenceTransformer
+
+class RAGAgent:
+    def __init__(self, agent_name, llm_model, vector_db_client, neo4j_driver, postgres_conn):
+        self.agent_name = agent_name
+        self.llm = llm_model  # Llama 3.2
+        self.tokenizer = AutoTokenizer.from_pretrained("meta-llama/Llama-3.2-3B")
+        self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')  # Fast embeddings
+        self.vector_db = vector_db_client
+        self.neo4j = neo4j_driver
+        self.postgres = postgres_conn
+        
+    def embed_query(self, query_text):
+        """Generate embedding for query"""
+        return self.embedding_model.encode(query_text).tolist()
+    
+    def retrieve_context(self, query, collection_name, top_k=5):
+        """RAG Retrieval Step"""
+        query_embedding = self.embed_query(query)
+        
+        search_results = self.vector_db.search(
+            collection_name=collection_name,
+            query_vector=query_embedding,
+            limit=top_k,
+            with_payload=True
+        )
+        
+        context_documents = [
+            {
+                "content": hit.payload["content"],
+                "metadata": hit.payload,
+                "score": hit.score
+            }
+            for hit in search_results
+        ]
+        
+        return context_documents
+    
+    def augment_prompt(self, user_query, retrieved_docs):
+        """RAG Augmentation Step"""
+        context_text = "\n\n".join([
+            f"[Source: {doc['metadata'].get('title', 'Unknown')}]\n{doc['content']}"
+            for doc in retrieved_docs
+        ])
+        
+        augmented_prompt = f"""You are a medical AI assistant. Use the following context to answer the question accurately.
+
+CONTEXT:
+{context_text}
+
+QUESTION: {user_query}
+
+ANSWER (cite sources):"""
+        
+        return augmented_prompt
+    
+    def generate_response(self, prompt, max_tokens=512):
+        """RAG Generation Step using Llama 3.2"""
+        inputs = self.tokenizer(prompt, return_tensors="pt", truncation=True, max_length=2048)
+        
+        with torch.no_grad():
+            outputs = self.llm.generate(
+                **inputs,
+                max_new_tokens=max_tokens,
+                temperature=0.7,
+                do_sample=True,
+                top_p=0.9
+            )
+        
+        response = self.tokenizer.decode(outputs[0], skip_special_tokens=True)
+        return response
+    
+    def query_graph_db(self, cypher_query, params=None):
+        """Query Neo4j for structured knowledge"""
+        with self.neo4j.session() as session:
+            result = session.run(cypher_query, params or {})
+            return [record.data() for record in result]
+    
+    def query_fhir_db(self, sql_query, params=None):
+        """Query PostgreSQL FHIR database"""
+        cursor = self.postgres.cursor()
+        cursor.execute(sql_query, params or ())
+        return cursor.fetchall()

@@ -1,0 +1,124 @@
+Patient with diabetes develops pneumonia:
+Agent 6 (Pneumonia X-ray) → detects infection
+     ↓
+Agent 1 (Glucose) → notices rising blood sugar (stress response)
+     ↓
+Agent 5 (Kidney) → monitors for AKI risk (dehydration + infection)
+     ↓
+Agent 8 (Risk Assessment) → calculates compound risk score
+     ↓
+Agent 12 (Triage) → PRIORITY: Hospitalization needed
+     ↓
+Agent 9 (Drug Safety) → recommends renal-safe antibiotics
+     ↓
+Agent 13 (Care Coordination) → arranges ambulance transport + alerts hospital
+```
+
+#### **Scenario 2: Conflicting Diagnostics**
+```
+Patient has chest X-ray with infiltrates:
+Agent 6 (Pneumonia) → 75% confidence: bacterial pneumonia
+Agent 7 (COVID) → 40% confidence: possible COVID
+Agent 2 (Cardiac) → notes elevated BNP (heart failure marker)
+     ↓
+Agent 12 (Triage) → negotiates between agents
+     ↓
+Decision: Order COVID test, treat presumptive pneumonia, monitor cardiac status
+     ↓
+Agent 13 → coordinates testing and treatment plan
+```
+
+#### **Scenario 3: Medication Safety Check**
+```
+Pneumonia detected, antibiotic needed:
+Agent 6 → recommends fluoroquinolone
+     ↓
+Agent 4 (ECG) → flags prolonged QT interval
+     ↓
+Agent 5 (Kidney) → eGFR = 35 (Stage 3B CKD)
+     ↓
+Agent 9 (Drug Safety) → ALERT: Fluoroquinolone risky (QT prolongation + renal dose needed)
+     ↓
+Recommendation: Alternative antibiotic (beta-lactam) with renal dosing
+```
+
+---
+
+## **Updated Algorithm Summary Table**
+
+| Agent # | Agent Name | Primary Algorithm | Key Function |
+|---------|-----------|-------------------|--------------|
+| 1 | Glucose Monitoring | Time-series Anomaly Detection | Real-time glucose tracking |
+| 2 | Basic Cardiac | Pattern Recognition | Basic vital monitoring |
+| 3 | Activity & Lifestyle | Clustering | Behavioral patterns |
+| **4** | **ECG/EKG Analysis** | **CNN (WaveNet)** | **Arrhythmia & ischemia detection** |
+| **5** | **Kidney Function** | **Gradient Boosting + Calculators** | **CKD staging & AKI prediction** |
+| **6** | **Pneumonia X-ray** | **Deep CNN (ResNet/DenseNet)** | **Pneumonia detection & grading** |
+| **7** | **COVID X-ray** | **Custom CNN (COVID-Net)** | **COVID-19 screening** |
+| 8 | Comorbidity Risk | XGBoost / Deep Neural Network | Multi-condition risk scoring |
+| 9 | Drug Safety | Knowledge Graphs | Medication interaction checks |
+| 10 | Predictive Analytics | Multi-task LSTM | Event forecasting |
+| 11 | Coaching | Reinforcement Learning | Personalized interventions |
+| 12 | Priority & Triage | Multi-criteria Decision Analysis | Alert prioritization |
+| 13 | Care Coordination | NLP + Rules | Provider communication |
+| 14 | Offline Resilience | Edge Computing | Connectivity management |
+| **15** | **Image Quality** | **Quality Assessment CNN** | **Diagnostic image validation** |
+
+---
+
+## **Clinical Justification for Additions**
+
+### **Why ECG Agent?**
+- **Cardiac patients need continuous electrical monitoring**, not just heart rate
+- Detects silent ischemia, arrhythmias that basic wearables miss
+- Monitors medication effects (QT prolongation)
+
+### **Why Kidney Agent?**
+- **80% of diabetes patients develop kidney disease**
+- Kidney function affects medication dosing for both diabetes and cardiac drugs
+- Early CKD detection prevents progression
+
+### **Why Pneumonia & COVID Agents?**
+- **Diabetes/CVD patients have 3x higher infection risk**
+- Pneumonia is leading cause of hospitalization in this population
+- COVID-19 has severe outcomes in comorbid patients
+- Rural areas need rapid diagnostic capabilities
+
+### **Why Image Quality Agent?**
+- **Garbage in, garbage out** - poor images → misdiagnosis
+- Rural health workers need guidance on proper acquisition
+- Reduces false positives/negatives from Agents 6 & 7
+
+---
+
+## **Rural Telehealth Integration**
+
+### **Workflow Example**:
+1. **Mobile X-ray unit visits rural clinic monthly**
+2. **Community health worker** acquires chest X-ray
+3. **Agent 15** validates image quality → provides immediate feedback
+4. **Agents 6 & 7** analyze X-ray → upload results to cloud
+5. **Agent 12** triages findings → escalates if needed
+6. **Agent 13** coordinates with telehealth hub for specialist review
+7. **All agents continue monitoring** via wearables between visits
+
+---
+
+## **Technical Architecture Considerations**
+
+### **Computational Distribution**:
+- **Edge (Local Device)**: Agents 1-3, 14, 15 (lightweight, offline-capable)
+- **Cloud**: Agents 4-7 (heavy AI models for ECG/X-ray analysis)
+- **Hybrid**: Agents 8-13 (can run locally with periodic cloud sync)
+
+### **Data Flow**:
+```
+Wearables → Agents 1-3 → Local Processing
+     ↓
+ECG Device → Agent 4 → Cloud Processing
+     ↓
+X-ray Images → Agent 15 (validation) → Agents 6-7 → Cloud Processing
+     ↓
+Lab Results → Agent 5 → Cloud Processing
+     ↓
+All Data → Agent 8 (Risk Assessment) → Agents 10-12 → Interventions

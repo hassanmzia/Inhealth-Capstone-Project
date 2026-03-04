@@ -1,0 +1,93 @@
+def find_stroke_hospital(patient_location, stroke_severity):
+    if stroke_severity == 'SEVERE':
+        # Need comprehensive stroke center
+        required_capabilities = ['comprehensive_stroke_center', 'neurosurgery']
+    else:
+        required_capabilities = ['primary_stroke_center', 'tPA_available']
+    
+    candidates = query_hospitals(
+        within_miles=60,
+        required_capabilities=required_capabilities,
+        on_diversion=False
+    )
+    
+    # Stroke: Time is brain. Prioritize proximity.
+    return nearest_hospital(patient_location, candidates)
+```
+
+**Alternative Considered:**
+- **Simple Nearest Hospital**: Ignores capabilities, may send patients to inadequate facilities
+- **Static Hospital List**: No real-time availability, results in diversions
+- **Manual Selection**: Too slow for emergencies, inconsistent
+
+**Integration with MCP/A2A:**
+- Receives A2A requests from Agent 18 (Triage) and Agent 23 (Hospital Coordination)
+- MCP context includes patient location, condition, insurance, transportation needs
+- Uses MCP tool `find_hospital` wrapping spatial queries
+- Publishes A2A message with ranked hospital list
+- Agent 23 calls selected hospital to confirm acceptance
+- MCP context includes hospital selection rationale for documentation
+
+**Special Considerations:**
+- **Rural Challenges**: May need to accept 60+ mile transfers for specialized care
+- **Transport Coordination**: If no hospital within reasonable distance, arrange helicopter transport
+- **Insurance**: Verify in-network status, but prioritize appropriate care in emergencies
+- **Language**: Identify hospitals with language services for non-English speakers
+- **Cultural Competence**: Consider hospitals with culturally appropriate care
+
+**Quality Metrics:**
+- Hospital selection accuracy (patient receives appropriate care)
+- Average distance to selected hospital by condition type
+- Transfer rate (patient sent elsewhere after initial hospital selection)
+- Door-to-treatment time for time-sensitive conditions
+- Patient/provider satisfaction with hospital selections
+
+---
+
+### **Agent 23: Hospital Contact & Admission Coordination Agent**
+**Primary Algorithm: Workflow Orchestration + State Machine**
+
+**Algorithm Description:**
+Complex coordination system:
+1. **State Machine**: Models hospital admission workflow (contact → confirmation → transfer → handoff → admission)
+2. **Task Orchestration**: Coordinates parallel tasks (call hospital, transmit records, arrange transport)
+3. **Communication Protocol**: Structured SBAR (Situation-Background-Assessment-Recommendation) format
+4. **Error Handling**: Retry logic, escalation, fallback hospitals
+
+**Justification:**
+1. **Complex Workflow**: Hospital admission requires coordinating multiple parties (ED, admitting physician, transport, patient, family). State machine ensures no steps missed.
+
+2. **Parallel Execution**: Many tasks can happen simultaneously (transmit ECG while arranging transport). Orchestration maximizes efficiency.
+
+3. **Structured Communication**: SBAR is healthcare standard for handoffs, reducing miscommunication errors by 60%.
+
+4. **Reliability**: Error handling ensures system gracefully handles busy signals, fax failures, transportation delays without human intervention.
+
+5. **Audit Trail**: State machine logs every transition, providing complete documentation for compliance and quality improvement.
+
+**Technical Specifications:**
+- State Machine (Finite State Automaton):
+```
+  States:
+  1. INITIATED - Agent 23 activated
+  2. HOSPITAL_CONTACTED - Phone call to ED initiated
+  3. ACCEPTANCE_CONFIRMED - Hospital confirms bed availability
+  4. RECORDS_TRANSMITTED - Medical records sent
+  5. TRANSPORT_ARRANGED - Ambulance/helicopter dispatched
+  6. PATIENT_EN_ROUTE - Patient traveling to hospital
+  7. HANDOFF_COMPLETE - ED received patient
+  8. ADMITTED - Patient formally admitted
+  
+  Transitions:
+  INITIATED → HOSPITAL_CONTACTED (action: call_hospital)
+  HOSPITAL_CONTACTED → ACCEPTANCE_CONFIRMED (action: verify_bed)
+  HOSPITAL_CONTACTED → INITIATED (if busy, retry)
+  ACCEPTANCE_CONFIRMED → RECORDS_TRANSMITTED (action: send_records)
+  ACCEPTANCE_CONFIRMED → HOSPITAL_CONTACTED (if bed unavailable, try next hospital)
+  RECORDS_TRANSMITTED → TRANSPORT_ARRANGED (action: dispatch_transport)
+  TRANSPORT_ARRANGED → PATIENT_EN_ROUTE (action: notify_en_route)
+  PATIENT_EN_ROUTE → HANDOFF_COMPLETE (action: ed_receives_patient)
+  HANDOFF_COMPLETE → ADMITTED (action: complete_admission)
+  
+  Error Transitions:
+  ANY_STATE → INITIATED (if critical error, restart with next hospital)

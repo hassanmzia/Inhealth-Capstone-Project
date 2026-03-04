@@ -1,0 +1,112 @@
+// frontend/patient-portal/src/components/Dashboard.jsx
+
+import React, { useState, useEffect } from 'react';
+import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from 'recharts';
+import { AlertCircle, Activity, Heart, Pill } from 'lucide-react';
+
+const PatientDashboard = () => {
+  const [patientData, setPatientData] = useState(null);
+  const [vitalTrends, setVitalTrends] = useState([]);
+  const [aiInsights, setAIInsights] = useState([]);
+  const [loading, setLoading] = useState(true);
+  
+  useEffect(() => {
+    fetchDashboardData();
+    
+    // WebSocket for real-time updates
+    const ws = new WebSocket('ws://localhost:8000/ws/patient/');
+    ws.onmessage = (event) => {
+      const data = JSON.parse(event.data);
+      handleRealtimeUpdate(data);
+    };
+    
+    return () => ws.close();
+  }, []);
+  
+  const fetchDashboardData = async () => {
+    try {
+      const response = await fetch('/api/v1/patients/me/dashboard/', {
+        headers: { 'Authorization': `Bearer ${localStorage.getToken('token')}` }
+      });
+      const data = await response.json();
+      
+      setPatientData(data.patient);
+      setVitalTrends(data.recent_vitals);
+      setAIInsights(data.agent_insights);
+      setLoading(false);
+    } catch (error) {
+      console.error('Error fetching dashboard:', error);
+    }
+  };
+  
+  const handleRealtimeUpdate = (data) => {
+    if (data.type === 'agent_alert') {
+      // Show real-time alert from agents
+      showNotification(data.message, data.priority);
+    } else if (data.type === 'vital_update') {
+      // Update vital trends
+      setVitalTrends(prev => [...prev, data.vital]);
+    }
+  };
+  
+  if (loading) return <div>Loading...</div>;
+  
+  return (
+    <div className="dashboard-container">
+      {/* Header */}
+      <div className="dashboard-header">
+        <h1>Welcome, {patientData.name_given}!</h1>
+        <div className="health-score">
+          <span>Health Score: {aiInsights.health_score}/100</span>
+        </div>
+      </div>
+      
+      {/* AI Insights Panel */}
+      <div className="ai-insights-panel">
+        <h2><Activity size={24} /> AI Health Insights</h2>
+        {aiInsights.recommendations?.map((rec, idx) => (
+          <div key={idx} className={`insight-card ${rec.priority}`}>
+            <AlertCircle size={20} />
+            <div>
+              <h4>{rec.title}</h4>
+              <p>{rec.message}</p>
+              <span className="ai-source">Source: {rec.agent_name}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+      
+      {/* Vital Signs Trends */}
+      <div className="vitals-panel">
+        <h2><Heart size={24} /> Your Vital Signs</h2>
+        <ResponsiveContainer width="100%" height={300}>
+          <LineChart data={vitalTrends}>
+            <XAxis dataKey="effective_datetime" />
+            <YAxis />
+            <Tooltip />
+            <Line type="monotone" dataKey="value_quantity" stroke="#8884d8" />
+          </LineChart>
+        </ResponsiveContainer>
+      </div>
+      
+      {/* Current Medications */}
+      <div className="medications-panel">
+        <h2><Pill size={24} /> Your Medications</h2>
+        {patientData.current_medications.map((med, idx) => (
+          <div key={idx} className="med-card">
+            <span>{med}</span>
+            <button>Take Now</button>
+          </div>
+        ))}
+      </div>
+      
+      {/* Upcoming Appointments */}
+      <div className="appointments-panel">
+        <h2>Upcoming Appointments</h2>
+        {/* Appointment list */}
+      </div>
+    </div>
+  );
+};
+
+export default PatientDashboard;

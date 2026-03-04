@@ -1,0 +1,844 @@
+┌───────────────────────────────────────────────────────────────────────────────┐
+│          END-TO-END WORKFLOW: Diabetes Patient with Rising HbA1c              │
+│                    (Demonstrates Multi-Agent Collaboration)                    │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+WEEK 1: CONTINUOUS MONITORING
+═══════════════════════════════════════════════════════════════════════════════
+
+Day 1-7: Patient wears CGM (Continuous Glucose Monitor) + Smartwatch
+         Data streams to system every 5 minutes
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ AGENT 1: Glucose Monitoring Agent                                       │
+│ • Receives 2,016 glucose readings (7 days × 24 hours × 12 per hour)    │
+│ • LSTM Autoencoder detects pattern: Frequent hyperglycemia post-dinner │
+│ • Average glucose: 165 mg/dL (target: <140 mg/dL)                      │
+│ • Glucose variability: High (CV = 38%, normal <36%)                    │
+│ • A2A Message → Agent 14 (Risk Assessment): "Suboptimal glucose control"│
+└────────────────────────────┬────────────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────────────┐
+│ AGENT 2: Cardiac Monitoring Agent                                       │
+│ • Heart rate average: 78 bpm (normal)                                   │
+│ • Blood pressure trend: Increasing (145/88 → 152/92 over week)         │
+│ • Heart rate variability: Decreasing (possible autonomic neuropathy)   │
+│ • A2A Message → Agent 14: "BP trending up, HRV concerning"             │
+└────────────────────────────┬────────────────────────────────────────────┘
+                             │
+┌────────────────────────────▼────────────────────────────────────────────┐
+│ AGENT 3: Activity & Lifestyle Agent                                     │
+│ • Step count: 3,200 steps/day (target: 7,000+)                         │
+│ • Sedentary time: 11 hours/day (excessive)                             │
+│ • HMM detects: Patient rarely exercises, mostly sedentary              │
+│ • A2A Message → Agent 16 (Coaching): "Low activity, sedentary lifestyle"│
+└────────────────────────────┬────────────────────────────────────────────┘
+                             │
+                             └───────────────────┐
+                                                 │
+WEEK 2: LAB RESULTS ARRIVE                      ▼
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ LAB SYSTEM: Quarterly Labs Completed                                    │
+│ • HbA1c: 8.5% (was 7.8% three months ago - worsening)                  │
+│ • eGFR: 48 mL/min/1.73m² (was 52 - declining kidney function)          │
+│ • LDL: 145 mg/dL (target <100)                                          │
+│ • Albumin/Creatinine Ratio: 35 mg/g (microalbuminuria present)        │
+│ → HL7 ORU message sent to Django FHIR API                              │
+│ → Stored in PostgreSQL as fhir_observation                             │
+│ → A2A DATA_UPDATE broadcast to all agents                              │
+└────────────────────────────┬────────────────────────────────────────────┘
+                             │
+                             ├──────────────────────────────────────┐
+                             │                                      │
+┌────────────────────────────▼────────────────────┐  ┌─────────────▼─────────┐
+│ AGENT 6: Kidney Function Monitoring             │  │ AGENT 9: Family       │
+│ • XGBoost model calculates:                     │  │ History Analysis      │
+│   - Current eGFR trajectory: -4 mL/min/year     │  │                       │
+│   - CKD progression risk (Stage 3A→3B): 45%    │  │ Neo4j query finds:    │
+│   - AKI risk (30-day): 12%                      │  │ • Father: Type 2 DM   │
+│ • Identifies: Progression to Stage 3B CKD       │  │   age 52, died of MI  │
+│ • A2A RISK_ASSESSMENT → Agent 13, 14, 17       │  │   age 68              │
+└────────────────────────────┬────────────────────┘  │ • Mother: Type 2 DM   │
+                             │                        │   age 58, CKD Stage 4 │
+                             │                        │ • GCN embedding:      │
+                             │                        │   High familial risk  │
+                             │                        │ • A2A → Agent 13      │
+                             │                        └───────────┬───────────┘
+                             │                                    │
+                             └────────────────┬───────────────────┘
+                                              │
+┌─────────────────────────────────────────────▼───────────────────────────┐
+│ AGENT 14: Comorbidity Risk Assessment Agent                             │
+│                                                                          │
+│ Multi-Modal Input Integration:                                          │
+│ ├─ Time-Series Branch: Glucose, BP, HR trends from Agents 1, 2         │
+│ ├─ Tabular Branch: Labs (HbA1c 8.5%, eGFR 48)                          │
+│ ├─ Graph Branch: Medications, conditions, family history from Neo4j    │
+│ └─ Text Branch: Recent clinical note (patient reports fatigue)         │
+│                                                                          │
+│ Attention-Based Fusion:                                                 │
+│ • Primary risk drivers (attention weights):                             │
+│   - Declining kidney function (0.35)                                    │
+│   - Poor glucose control (0.28)                                         │
+│   - Family history (0.20)                                               │
+│   - Sedentary lifestyle (0.10)                                          │
+│   - Rising BP (0.07)                                                    │
+│                                                                          │
+│ Composite Risk Score: 68/100 (HIGH)                                     │
+│ Risk Categories:                                                        │
+│ • Cardiovascular event (1-year): 18%                                    │
+│ • CKD progression to Stage 4 (2-year): 42%                             │
+│ • Diabetic retinopathy (3-year): 35%                                    │
+│ • Hospital admission (30-day): 8%                                       │
+│                                                                          │
+│ A2A RISK_ASSESSMENT → Agent 18 (Triage)                                │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ AGENT 13: Disease Prediction Agent                                      │
+│                                                                          │
+│ Multi-Task DNN + XGBoost Ensemble Predictions (5-year):                │
+│                                                                          │
+│ Cardiovascular:                                                         │
+│ • Myocardial Infarction: 22% (↑ from family history + poor control)   │
+│ • Heart Failure: 15%                                                    │
+│ • Stroke: 9%                                                            │
+│                                                                          │
+│ Diabetes Complications:                                                 │
+│ • Diabetic Retinopathy: 38% (needs annual eye exam)                   │
+│ • Peripheral Neuropathy: 28%                                            │
+│ • Diabetic Foot Ulcer: 12%                                             │
+│                                                                          │
+│ Kidney Disease:                                                         │
+│ • Progression to Stage 4 CKD: 48% (VERY HIGH)                          │
+│ • Progression to ESRD (dialysis): 8%                                   │
+│                                                                          │
+│ SHAP Analysis (Top Contributors):                                      │
+│ 1. eGFR decline trajectory (+12% to CKD Stage 4 risk)                 │
+│ 2. Microalbuminuria present (+9%)                                      │
+│ 3. HbA1c 8.5% (+8%)                                                    │
+│ 4. Maternal CKD family history (+6%)                                   │
+│ 5. Duration of diabetes (15 years) (+5%)                               │
+│                                                                          │
+│ A2A PREDICTION → Agent 17 (Prescription)                               │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ AGENT 18: Priority & Triage Agent                                       │
+│                                                                          │
+│ Multi-Criteria Decision Analysis:                                       │
+│                                                                          │
+│ Criteria Evaluation:                                                    │
+│ • Clinical Severity: 0.60 (High - worsening multi-organ involvement)   │
+│ • Time Sensitivity: 0.50 (Soon - needs action within 2 weeks)         │
+│ • Risk Score: 0.68 (from Agent 14)                                     │
+│ • Trajectory: 0.75 (Worsening - HbA1c ↑, eGFR ↓)                     │
+│ • Comorbidity Burden: 0.70 (Multiple conditions)                       │
+│ • Social Factors: 0.60 (Lives alone, limited support)                 │
+│                                                                          │
+│ Priority Score Calculation:                                             │
+│ = (0.60 × 0.30) + (0.50 × 0.25) + (0.68 × 0.20) +                     │
+│   (0.75 × 0.10) + (0.70 × 0.08) + (0.60 × 0.05)                       │
+│ = 0.18 + 0.125 + 0.136 + 0.075 + 0.056 + 0.030                        │
+│ = 0.602 (URGENT - Orange Level)                                        │
+│                                                                          │
+│ Decision: Requires physician review within 48-72 hours                 │
+│          + Medication optimization                                      │
+│          + Lifestyle intervention                                       │
+│                                                                          │
+│ A2A TRIAGE_DECISION:                                                    │
+│ • → Agent 17 (Prescription): Request treatment recommendation          │
+│ • → Agent 16 (Coaching): Intensify lifestyle intervention             │
+│ • → Agent 21 (Scheduling): Book appointment within 1 week             │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+        ┌─────────────────────────────────┼──────────────────────────────┐
+        │                                 │                              │
+┌───────▼──────────────┐  ┌───────────────▼──────────────┐  ┌───────────▼──────┐
+│ AGENT 17:            │  │ AGENT 16:                     │  │ AGENT 21:        │
+│ Prescription Agent   │  │ Personalized Coaching Agent   │  │ Appointment      │
+└──────────────────────┘  └───────────────────────────────┘  │ Scheduling Agent │
+                                                              └──────────────────┘
+
+AGENT 17 WORKFLOW (RAG-Enhanced Clinical Decision Support):
+════════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ STEP 1: Get MCP Context                                                 │
+│ POST /mcp/context                                                        │
+│                                                                          │
+│ Receives complete patient profile:                                      │
+│ • Demographics: 68 yo male                                              │
+│ • Conditions: Type 2 DM (15 years), HTN, CKD Stage 3A, Obesity         │
+│ • Current meds: Metformin 1000mg BID, Lisinopril 20mg daily           │
+│ • Recent labs: HbA1c 8.5%, eGFR 48, microalbuminuria                  │
+│ • Risk assessments from Agents 13, 14                                   │
+│ • Family history from Agent 9                                           │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ STEP 2: RAG - Vector Search for Clinical Guidelines                     │
+│ MCP Tool: vector_search                                                 │
+│                                                                          │
+│ Query: "Type 2 diabetes HbA1c 8.5% chronic kidney disease stage 3      │
+│         cardiovascular disease family history treatment intensification"│
+│                                                                          │
+│ Qdrant Vector Search Results (Top 5):                                  │
+│                                                                          │
+│ [1] ADA Standards of Care 2024 (Similarity: 0.91)                      │
+│     "For patients with type 2 diabetes and CKD, an SGLT2 inhibitor    │
+│      with proven kidney benefits should be added to metformin unless   │
+│      contraindicated. SGLT2i reduce CKD progression by 30-40% and     │
+│      provide cardiovascular protection."                                │
+│                                                                          │
+│ [2] KDIGO 2024 CKD Guidelines (Similarity: 0.89)                       │
+│     "For CKD patients with diabetes and albuminuria, SGLT2 inhibitors  │
+│      are strongly recommended (Grade 1A). Evidence shows significant   │
+│      slowing of eGFR decline. Continue if eGFR >20 mL/min/1.73m²."    │
+│                                                                          │
+│ [3] EMPA-KIDNEY Trial Results (Similarity: 0.86)                        │
+│     "Empagliflozin reduced CKD progression by 28% and cardiovascular   │
+│      death by 31% in patients with CKD (eGFR 20-45). Benefits seen    │
+│      regardless of diabetes status."                                    │
+│                                                                          │
+│ [4] ACC/AHA Diabetes Guidelines (Similarity: 0.84)                      │
+│     "For diabetes patients with strong CVD family history and elevated │
+│      risk, intensify ASCVD prevention with statin therapy. Consider    │
+│      high-intensity statin if LDL >100 mg/dL."                         │
+│                                                                          │
+│ [5] DrugBank: Empagliflozin (Similarity: 0.82)                         │
+│     "Mechanism: SGLT2 inhibitor. Renal dosing: Effective down to      │
+│      eGFR 20. Common side effects: Genital mycotic infections (10%),  │
+│      volume depletion (2%). Cost: $500-600/month."                     │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ STEP 3: Check Drug Interactions & Contraindications                     │
+│ MCP Tool: check_drug_interactions                                       │
+│                                                                          │
+│ Neo4j Cypher Query:                                                     │
+│ MATCH (m1:Medication {name: 'Empagliflozin'})-[i:INTERACTS_WITH]->(m2) │
+│ WHERE m2.name IN ['Metformin', 'Lisinopril']                          │
+│ RETURN i.severity, i.effect                                            │
+│                                                                          │
+│ Results: ✅ No significant interactions found                           │
+│                                                                          │
+│ Contraindication Check:                                                │
+│ MATCH (m:Medication {name: 'Empagliflozin'})-[c:CONTRAINDICATED_IN]-> │
+│       (d:Disease)                                                       │
+│ WHERE d.name IN patient.conditions                                     │
+│ RETURN c.severity, c.reason                                            │
+│                                                                          │
+│ Results: ✅ No contraindications (eGFR 48 is above threshold of 20)    │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ STEP 4: LLM Recommendation Generation (Llama 3.2 with MCP Context)     │
+│                                                                          │
+│ Prompt to LLM:                                                          │
+│ ┌─────────────────────────────────────────────────────────────────────┐│
+│ │ You are an expert endocrinologist and nephrologist. Based on the   ││
+│ │ following evidence-based guidelines and patient case, recommend     ││
+│ │ optimal treatment intensification.                                  ││
+│ │                                                                     ││
+│ │ CLINICAL GUIDELINES:                                                ││
+│ │ [Retrieved passages from ADA 2024, KDIGO 2024, EMPA-KIDNEY]       ││
+│ │                                                                     ││
+│ │ PATIENT CASE:                                                       ││
+│ │ • 68yo male, Type 2 DM × 15 years                                  ││
+│ │ • Current meds: Metformin 1000mg BID, Lisinopril 20mg daily       ││
+│ │ • HbA1c: 8.5% (goal <7.0%)                                         ││
+│ │ • eGFR: 48 mL/min/1.73m² (Stage 3A CKD, declining 4 mL/min/year) ││
+│ │ • Microalbuminuria: 35 mg/g                                        ││
+│ │ • LDL: 145 mg/dL (on no statin)                                    ││
+│ │ • Strong family history: Father MI age 68, Mother CKD Stage 4     ││
+│ │ • Risk: 48% progression to CKD Stage 4 in 2 years                 ││
+│ │                                                                     ││
+│ │ SAFETY CHECKS COMPLETED:                                            ││
+│ │ • Drug interactions: None                                           ││
+│ │ • Contraindications: None                                           ││
+│ │                                                                     ││
+│ │ Provide recommendations in JSON format:                             ││
+│ │ {                                                                   ││
+│ │   "medications": [...],                                            ││
+│ │   "lifestyle": [...],                                              ││
+│ │   "monitoring": [...],                                             ││
+│ │   "referrals": [...],                                              ││
+│ │   "rationale": "...",                                              ││
+│ │   "evidence_level": "A/B/C"                                        ││
+│ │ }                                                                   ││
+│ └─────────────────────────────────────────────────────────────────────┘│
+│                                                                          │
+│ LLM Response:                                                           │
+│ {                                                                        │
+│   "medications": [                                                      │
+│     {                                                                    │
+│       "action": "ADD",                                                  │
+│       "medication": "Empagliflozin (Jardiance)",                       │
+│       "dose": "10mg once daily",                                        │
+│       "rationale": "SGLT2 inhibitor provides dual benefit for diabetes │
+│                     control and CKD progression. Based on EMPA-KIDNEY  │
+│                     trial, reduces CKD progression by 28% and CV death │
+│                     by 31%. Patient's eGFR 48 is well above safety    │
+│                     threshold. ADA and KDIGO both give Grade 1A        │
+│                     recommendation for this patient profile.",         │
+│       "evidence_level": "A"                                             │
+│     },                                                                   │
+│     {                                                                    │
+│       "action": "ADD",                                                  │
+│       "medication": "Atorvastatin",                                     │
+│       "dose": "40mg once daily",                                        │
+│       "rationale": "High-intensity statin for ASCVD prevention. LDL   │
+│                     145 mg/dL exceeds goal <100. Strong CVD family    │
+│                     history (father MI age 68) plus diabetes indicates│
+│                     very high cardiovascular risk. ACC/AHA guidelines  │
+│                     recommend high-intensity statin.",                 │
+│       "evidence_level": "A"                                             │
+│     },                                                                   │
+│     {                                                                    │
+│       "action": "CONTINUE",                                             │
+│       "medication": "Metformin 1000mg BID",                            │
+│       "rationale": "First-line diabetes therapy, well-tolerated,      │
+│                     continue unless eGFR drops below 30."              │
+│     },                                                                   │
+│     {                                                                    │
+│       "action": "CONTINUE",                                             │
+│       "medication": "Lisinopril 20mg daily",                           │
+│       "rationale": "ACE inhibitor provides blood pressure control and  │
+│                     additional renal protection. Continue current dose.│
+│                     Monitor potassium closely with new SGLT2i."        │
+│     }                                                                    │
+│   ],                                                                     │
+│   "lifestyle": [                                                        │
+│     {                                                                    │
+│       "intervention": "Increase physical activity",                    │
+│       "target": "150 minutes moderate activity per week",              │
+│       "current": "Sedentary, 3200 steps/day",                          │
+│       "plan": "Start with 20-minute walks after dinner (when glucose  │
+│                highest), gradually increase to 30 min daily"           │
+│     },                                                                   │
+│     {                                                                    │
+│       "intervention": "Medical nutrition therapy",                     │
+│       "plan": "Reduce refined carbohydrates at dinner (identified as  │
+│                problem meal by CGM data), increase fiber intake,       │
+│                Mediterranean diet pattern for kidney health"           │
+│     },                                                                   │
+│     {                                                                    │
+│       "intervention": "Weight loss",                                   │
+│       "target": "10% body weight reduction (current BMI 32)",          │
+│       "rationale": "Will improve insulin sensitivity, reduce diabetes │
+│                     medications long-term, slow CKD progression"       │
+│     }                                                                    │
+│   ],                                                                     │
+│   "monitoring": [                                                       │
+│     "eGFR and potassium at 2-4 weeks (monitor for acute kidney injury│
+│      with new SGLT2 inhibitor)",                                       │
+│     "HbA1c in 3 months (expect 0.5-0.8% reduction with empagliflozin)",│
+│     "LDL cholesterol in 6 weeks (expect 40-50% reduction with        │
+│      atorvastatin 40mg)",                                              │
+│     "Urine albumin-to-creatinine ratio every 3 months",               │
+│     "Blood pressure weekly (SGLT2i may lower BP, consider lisinopril  │
+│      dose reduction if BP <120/70)",                                   │
+│     "Screen for genital mycotic infections (common SGLT2i side effect)"│
+│   ],                                                                     │
+│   "referrals": [                                                        │
+│     {                                                                    │
+│       "specialty": "Ophthalmology",                                    │
+│       "urgency": "Soon (within 3 months)",                             │
+│       "reason": "Annual dilated eye exam for diabetes. High           │
+│                 retinopathy risk (38% 5-year risk per Agent 13).      │
+│                 Last exam >18 months ago."                             │
+│     },                                                                   │
+│     {                                                                    │
+│       "specialty": "Nephrology",                                        │
+│       "urgency": "Routine (within 6 months)",                          │
+│       "reason": "Stage 3A CKD with declining function. Nephrology     │
+│                 co-management appropriate. Will provide expertise on   │
+│                 CKD-mineral bone disorder, anemia management."         │
+│     },                                                                   │
+│     {                                                                    │
+│       "specialty": "Registered Dietitian",                             │
+│       "urgency": "Soon (within 1 month)",                              │
+│       "reason": "Medical nutrition therapy for diabetes and CKD.      │
+│                 Specialized kidney diet (limit potassium, phosphorus)  │
+│                 while optimizing glucose control."                     │
+│     }                                                                    │
+│   ],                                                                     │
+│   "rationale": "This patient requires multi-pronged intervention for  │
+│                 diabetes, CKD, and cardiovascular risk. The addition   │
+│                 of empagliflozin addresses both poor glucose control   │
+│                 (HbA1c 8.5%) and rapidly declining kidney function    │
+│                 (eGFR dropping 4 mL/min/year), with strong Grade 1A   │
+│                 evidence from EMPA-KIDNEY trial. Atorvastatin addition│
+│                 addresses very high cardiovascular risk given family   │
+│                 history, diabetes, CKD, and elevated LDL. Lifestyle   │
+│                 interventions target identified issues (sedentary,     │
+│                 post-dinner hyperglycemia). This comprehensive approach│
+│                 aims to prevent progression to dialysis and reduce     │
+│                 48% risk of advancing to CKD Stage 4.",                │
+│   "evidence_level": "A",                                                │
+│   "guidelines_cited": [                                                 │
+│     "ADA Standards of Care 2024",                                      │
+│     "KDIGO 2024 Clinical Practice Guideline for CKD",                 │
+│     "ACC/AHA Guideline on Primary Prevention of CVD",                 │
+│     "EMPA-KIDNEY Trial (NEJM 2023)"                                    │
+│   ]                                                                     │
+│ }                                                                        │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ STEP 5: Agent 17 Sends A2A to Agent 18 (Triage)                        │
+│                                                                          │
+│ A2A Message:                                                            │
+│ {                                                                        │
+│   "protocol": "A2A/1.0",                                               │
+│   "sender": {"agent_id": 17, "agent_name": "Prescription Agent"},     │
+│   "recipient": {"agent_id": 18, "agent_name": "Triage Agent"},        │
+│   "message_type": "TREATMENT_PLAN",                                    │
+│   "priority": "HIGH",                                                   │
+│   "payload": {                                                          │
+│     "patient_id": "uuid",                                              │
+│     "recommendations": [LLM response above],                           │
+│     "requires_physician_approval": true,                               │
+│     "confidence": 0.94                                                  │
+│   }                                                                     │
+│ }                                                                        │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ STEP 6: Agent 18 (Triage) Routes to Doctor Notification                │
+│                                                                          │
+│ Triage Decision:                                                        │
+│ • Treatment plan is evidence-based (Grade A)                            │
+│ • Patient safety checks passed                                          │
+│ • Requires physician review and approval                                │
+│ • Timeline: Physician should review within 48 hours                     │
+│                                                                          │
+│ A2A → Agent 19 (Doctor Notification)                                   │
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+┌─────────────────────────────────────────▼───────────────────────────────┐
+│ AGENT 19: Doctor Notification                                           │
+│                                                                          │
+│ Email to Dr. Sarah Johnson:                                             │
+│ ┌─────────────────────────────────────────────────────────────────────┐│
+│ │ Subject: 📋 Treatment Plan for Review - John Doe (HIGH Priority)   ││
+│ │                                                                     ││
+│ │ Dr. Johnson,                                                        ││
+│ │                                                                     ││
+│ │ Our AI system has generated a comprehensive treatment plan for     ││
+│ │ your patient John Doe that requires your review and approval.      ││
+│ │                                                                     ││
+│ │ PATIENT SUMMARY:                                                    ││
+│ │ • John Doe, 68M, Type 2 DM × 15 years, CKD Stage 3A               ││
+│ │ • HbA1c: 8.5% (↑ from 7.8% 3 months ago)                          ││
+│ │ • eGFR: 48 (↓ from 52, declining 4 mL/min/year)                   ││
+│ │ • Risk Score: 68/100 (HIGH)                                        ││
+│ │ • 48% risk of progressing to CKD Stage 4 within 2 years           ││
+│ │                                                                     ││
+│ │ RECOMMENDED TREATMENT CHANGES:                                      ││
+│ │ 1. ✚ ADD: Empagliflozin 10mg daily                                ││
+│ │    Evidence: ADA/KDIGO Grade 1A recommendation                     ││
+│ │    Benefit: 28% reduction in CKD progression (EMPA-KIDNEY)        ││
+│ │                                                                     ││
+│ │ 2. ✚ ADD: Atorvastatin 40mg daily                                 ││
+│ │    Evidence: ACC/AHA guidelines for high CVD risk                  ││
+│ │    Target: Reduce LDL from 145 to <100 mg/dL                      ││
+│ │                                                                     ││
+│ │ 3. ✓ CONTINUE: Metformin 1000mg BID                               ││
+│ │ 4. ✓ CONTINUE: Lisinopril 20mg daily                              ││
+│ │                                                                     ││
+│ │ REFERRALS RECOMMENDED:                                              ││
+│ │ • Ophthalmology (soon - high retinopathy risk)                     ││
+│ │ • Nephrology (routine co-management)                               ││
+│ │ • Dietitian (kidney-specific nutrition)                            ││
+│ │                                                                     ││
+│ │ SAFETY CHECKS: ✅ All passed                                       ││
+│ │ • No drug interactions                                              ││
+│ │ • No contraindications                                              ││
+│ │ • Renal dosing appropriate                                          ││
+│ │                                                                     ││
+│ │ [APPROVE PLAN] [MODIFY PLAN] [VIEW FULL DETAILS]                  ││
+│ │                                                                     ││
+│ │ This plan was generated using evidence-based guidelines and         ││
+│ │ comprehensive patient data. Please review at your convenience.      ││
+│ │                                                                     ││
+│ │ Best regards,                                                       ││
+│ │ AI Health System                                                    ││
+│ └─────────────────────────────────────────────────────────────────────┘│
+└─────────────────────────────────────────┬───────────────────────────────┘
+                                          │
+                        ┌─────────────────┴───────────────┐
+                        │ Dr. Johnson Reviews & Approves  │
+                        │ (within 24 hours)               │
+                        └─────────────────┬───────────────┘
+                                          │
+            ┌─────────────────────────────┼──────────────────────────┐
+            │                             │                          │
+┌───────────▼───────────┐  ┌──────────────▼────────────┐  ┌─────────▼──────┐
+│ AGENT 20:             │  │ AGENT 21:                  │  │ AGENT 16:      │
+│ Patient Notification  │  │ Appointment Scheduling     │  │ Coaching Agent │
+│                       │  │                            │  │                │
+│ SMS to Patient:       │  │ Books appointment:         │  │ Coaching Plan: │
+│ "Hi John! Dr. Johnson │  │ • Dr. Johnson visit        │  │ • Daily step   │
+│  approved new meds to │  │   next Tuesday 2 PM        │  │   goal: 5000   │
+│  help your kidneys &  │  │ • Ophthalmology referral   │  │ • Post-dinner  │
+│  heart. Empagliflozin │  │   scheduled 3/15           │  │   walks        │
+│  + statin starting    │  │ • Dietitian consult 3/8    │  │ • Carb tracking│
+│  tomorrow. Check app  │  │                            │  │ • Weekly       │
+│  for details.         │  │ Sends confirmations via    │  │   check-ins    │
+│  Questions? Call us!" │  │ Agent 20                   │  │                │
+└───────────────────────┘  └───────────────────────────┘  └────────────────┘
+
+WEEK 3-12: ONGOING MONITORING & ADJUSTMENT
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────┐
+│ All Monitoring Agents Continue 24/7 Surveillance:                       │
+│                                                                          │
+│ Week 3: Patient starts empagliflozin & atorvastatin                    │
+│ • Agent 1: Glucose trending down (avg 145 → 138 mg/dL)                │
+│ • Agent 2: BP slightly lower (152/92 → 145/85) - expected SGLT2i effect│
+│ • Agent 6: Monitors for initial eGFR dip (normal with SGLT2i)         │
+│                                                                          │
+│ Week 4: Follow-up labs                                                  │
+│ • eGFR: 46 (slight dip expected, clinically stable)                    │
+│ • Potassium: 4.3 (normal, no ACEi + SGLT2i interaction)               │
+│ • No adverse effects reported                                           │
+│ • Agent 14: Risk score decreases to 61/100 (improvement)               │
+│                                                                          │
+│ Week 8: Patient seeing dietitian, exercising more                      │
+│ • Agent 3: Step count increasing (3200 → 4800/day)                    │
+│ • Agent 10: Weight down 6 lbs (beginning of 10% goal)                 │
+│ • Agent 16: Thompson sampling identifies exercise as highly effective  │
+│   motivator for this patient → increases exercise-focused coaching     │
+│                                                                          │
+│ Week 12: Quarterly labs                                                 │
+│ • HbA1c: 7.6% (↓ from 8.5% - excellent response!)                     │
+│ • eGFR: 47 (stable, no further decline)                                │
+│ • LDL: 88 mg/dL (↓ from 145, now at goal!)                            │
+│ • Albumin/Creatinine: 28 mg/g (↓ from 35 - kidney improving!)         │
+│                                                                          │
+│ Agent 14: New risk score: 52/100 (MODERATE - major improvement)        │
+│ • CKD Stage 4 risk (2-year): 42% → 28% (34% relative reduction)       │
+│ • CV event risk (1-year): 18% → 12% (33% relative reduction)          │
+│                                                                          │
+│ Agent 13: Updated predictions show reduced complication risks across   │
+│             all categories due to improved glycemic control and kidney  │
+│             function stabilization                                      │
+│                                                                          │
+│ Agent 18: Downgrades priority to ROUTINE (yellow) - patient stable    │
+│                                                                          │
+│ System continues monitoring, but less frequent physician notifications │
+└─────────────────────────────────────────────────────────────────────────┘
+
+OUTCOMES:
+═══════════════════════════════════════════════════════════════════════════════
+✅ HbA1c improved from 8.5% → 7.6% (0.9% reduction)
+✅ Kidney function stabilized (eGFR 48 → 47, decline halted)
+✅ Cardiovascular risk reduced (LDL 145 → 88 mg/dL)
+✅ Risk of CKD progression reduced by 34%
+✅ Patient engaged in lifestyle changes (weight loss, exercise)
+✅ No adverse events or hospitalizations
+✅ Multi-specialty care coordination accomplished seamlessly
+✅ All interventions evidence-based with guideline citations
+✅ Physician time investment: <30 minutes (plan review + approval)
+
+SYSTEM VALUE DEMONSTRATED:
+- Early detection of worsening trends (Agents 1, 2, 6)
+- Comprehensive risk assessment (Agents 13, 14)
+- Evidence-based treatment recommendations (Agent 17 with RAG)
+- Coordinated multi-agent collaboration via A2A protocol
+- Continuous monitoring ensuring patient safety
+- Proactive intervention preventing hospitalization
+- Cost savings: ~$15,000 (prevented CKD progression, CVD events)
+```
+
+---
+
+## **Diagram 6: Data Flow Architecture**
+```
+┌───────────────────────────────────────────────────────────────────────────────┐
+│                    COMPREHENSIVE DATA FLOW ARCHITECTURE                        │
+│              From Raw Sensor Data to Clinical Action                          │
+└───────────────────────────────────────────────────────────────────────────────┘
+
+LAYER 1: DATA SOURCES (Input Streams)
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐  ┌──────────┐
+│  Wearable   │  │  Medical    │  │  Lab        │  │  Imaging    │  │  EHR     │
+│  Devices    │  │  Devices    │  │  Systems    │  │  Systems    │  │  Systems │
+└──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └──────┬──────┘  └────┬─────┘
+       │                │                 │                 │              │
+       │ Bluetooth/     │ WiFi/           │ HL7             │ DICOM/       │ HL7/
+       │ BLE            │ Cellular        │ v2.x            │ HL7          │ FHIR
+       │                │                 │                 │              │
+       │ Examples:      │ Examples:       │ Examples:       │ Examples:    │ Queries
+       │ • Smartwatch   │ • CGM           │ • Quest         │ • X-ray      │
+       │ • Fitness      │ • BP cuff       │ • LabCorp       │ • ECG        │
+       │   tracker      │ • Glucometer    │ • Hospital      │ • Ultrasound │
+       │ • Smart scale  │ • Pulse ox      │   lab           │              │
+       │                │ • Thermometer   │                 │              │
+       │                │                 │                 │              │
+       ▼ 5-min          ▼ Real-time       ▼ Daily          ▼ On-demand    ▼ Query
+    intervals        streaming         batch            studies        based
+       │                │                 │                 │              │
+       └────────────────┴─────────────────┴─────────────────┴──────────────┘
+                                         │
+                                         ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ LAYER 2: DATA INGESTION & TRANSFORMATION                                      │
+│                                                                                │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                      Django FHIR API Gateway                            │  │
+│  │  ┌──────────────┐  ┌──────────────┐  ┌──────────────────────────────┐ │  │
+│  │  │ HL7 Parser   │  │ DICOM        │  │ Wearable Data                │ │  │
+│  │  │              │  │ Converter    │  │ Normalizer                   │ │  │
+│  │  │ HL7 v2.x →  │  │              │  │                              │ │  │
+│  │  │ FHIR R4      │  │ DICOM →     │  │ Proprietary →  FHIR          │ │  │
+│  │  │              │  │ FHIR         │  │ formats     Observation      │ │  │
+│  │  └──────┬───────┘  └──────┬───────┘  └────────┬─────────────────────┘ │  │
+│  │         │                  │                    │                       │  │
+│  │         └──────────────────┴────────────────────┘                       │  │
+│  │                             │                                            │  │
+│  │  ┌──────────────────────────▼─────────────────────────────────────────┐ │  │
+│  │  │                 Data Validation & Enrichment                        │ │  │
+│  │  │  • Schema validation (FHIR resource structure)                     │ │  │
+│  │  │  • Range validation (glucose 20-600 mg/dL, BP 50-250 mmHg)        │ │  │
+│  │  │  • Temporal validation (timestamp within 24 hours)                 │ │  │
+│  │  │  • Duplicate detection (prevent double-counting)                   │ │  │
+│  │  │  • Enrichment (add patient context, device metadata)              │ │  │
+│  │  └────────────────────────┬───────────────────────────────────────────┘ │  │
+│  └────────────────────────────┼─────────────────────────────────────────────┘  │
+└────────────────────────────────┼────────────────────────────────────────────────┘
+                                 │
+                    ┌────────────┴────────────┐
+                    │                         │
+                    ▼                         ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ LAYER 3: DATA STORAGE & INDEXING                                              │
+│                                                                                │
+│  ┌─────────────────────────┐  ┌─────────────────────┐  ┌──────────────────┐ │
+│  │   PostgreSQL (FHIR)     │  │   Neo4j (Graph)     │  │  Qdrant (Vector) │ │
+│  │                         │  │                     │  │                  │ │
+│  │ • fhir_patient          │  │ • :Patient          │  │ • Guidelines     │ │
+│  │ • fhir_observation      │  │ • :Medication       │  │ • Drug info      │ │
+│  │ • fhir_condition        │  │ • :Disease          │  │ • Literature     │ │
+│  │ • fhir_medication_req   │  │ • :FamilyMember     │  │                  │ │
+│  │ • fhir_diagnostic_rpt   │  │                     │  │                  │ │
+│  │                         │  │ Relationships:      │  │ 384-dim          │ │
+│  │ Indexed by:             │  │ • TAKES_MED         │  │ embeddings       │ │
+│  │ • patient_id            │  │ • INTERACTS_WITH    │  │                  │ │
+│  │ • timestamp             │  │ • HAS_CONDITION     │  │ HNSW index       │ │
+│  │ • code (LOINC/SNOMED)   │  │ • CONTRAINDICATED   │  │ for fast         │ │
+│  │                         │  │                     │  │ similarity       │ │
+│  │ Partitioned by month    │  │ Spatial indexes     │  │ search           │ │
+│  └────────┬────────────────┘  └─────────┬───────────┘  └────────┬─────────┘ │
+└───────────┼─────────────────────────────┼──────────────────────┼────────────────┘
+            │                             │                      │
+            └─────────────────┬───────────┴──────────────────────┘
+                              │
+                              ▼
+┌───────────────────────────────────────────────────────────────────────────────┐
+│ LAYER 4: STREAM PROCESSING & EVENT DETECTION                                  │
+│                (Real-Time Processing via Celery + Redis)                       │
+│                                                                                │
+│  ┌────────────────────────────────────────────────────────────────────────┐  │
+│  │                      Redis Message Broker                               │  │
+│  │  ┌──────────────────────────────────────────────────────────────────┐  │  │
+│  │  │  A2A Pub/Sub Channels:                                            │  │  │
+│  │  │  • agent.broadcast   → All agents                                 │  │  │
+│  │  │  • agent.monitoring  → Tier 1 agents (1-4)                       │  │  │
+│  │  │  • agent.diagnostic  → Tier 2 agents (5-8)                       │  │  │
+│  │  │  • agent.risk        → Tier 3 agents (9-15)                      │  │  │
+│  │  │  • agent.intervention → Tier 4 agents (16-18)                    │  │  │
+│  │  │  • agent.action      → Tier 5 agents (19-23)                     │  │  │
+│  │  │  • agent.direct.{id} → Point-to-point messaging                  │  │  │
+│  │  └──────────────────────────────────────────────────────────────────┘  │  │
+│  └─────────────────────────────┬──────────────────────────────────────────┘  │
+│                                │                                              │
+│  ┌─────────────────────────────▼──────────────────────────────────────────┐  │
+│  │                      Celery Worker Pool                                 │  │
+│  │  (20 workers processing agent tasks in parallel)                        │  │
+│  │                                                                          │  │
+│  │  Worker 1-4:   Monitoring Agents (1-4)  - Process incoming vitals      │  │
+│  │  Worker 5-8:   Diagnostic Agents (5-8)  - Analyze ECG, X-rays          │  │
+│  │  Worker 9-15:  Risk Agents (9-15)       - Calculate risk scores        │  │
+│  │  Worker 16-18: Intervention (16-18)     - Generate recommendations     │  │
+│  │  Worker 19-20: Action Agents (19-23)    - Send notifications, schedule │  │
+│  │                                                                          │  │
+│  │  Task Queue:                                                            │  │
+│  │  [High Priority] → CRITICAL alerts (STEMI, severe hypoglycemia)        │  │
+│  │  [Normal]        → Routine processing (continuous monitoring)           │  │
+│  │  [Low Priority]  → Batch jobs (reports, model retraining)              │  │
+│  └─────────────────────────────┬──────────────────────────────────────────┘  │
+└────────────────────────────────┼───────────────────────────────────────────────┘
+                                 │
+      ┌──────────────────────────┼──────────────────────────┐
+      │                          │                          │
+      ▼                          ▼                          ▼
+┌────────────────┐  ┌────────────────────┐  ┌──────────────────────────────┐
+│ AGENT 1:       │  │ AGENT 5:           │  │ AGENT 17:                    │
+│ Glucose        │  │ ECG Analysis       │  │ Prescription                 │
+│                │  │                    │  │                              │
+│ Input:         │  │ Input:             │  │ Input:                       │
+│ • FHIR Obs     │  │ • DICOM ECG        │  │ • MCP Context (all sources) │
+│ • Glucose      │  │ • 12-lead waveform │  │ • Risk scores               │
+│   readings     │  │   5000 samples @   │  │ • Guidelines (RAG)          │
+│                │  │   500Hz            │  │                              │
+│ Processing:    │  │                    │  │ Processing:                  │
+│ • LSTM         │  │ Processing:        │  │ • Vector search (Qdrant)    │
+│   autoencoder  │  │ • 1D CNN           │  │ • LLM generation (Llama 3.2)│
+│ • Anomaly      │  │   (DenseNet-style) │  │ • Safety checks (Neo4j)     │
+│   detection    │  │ • Multi-task head  │  │                              │
+│                │  │   (27 conditions)  │  │ Output:                      │
+│ Output:        │  │                    │  │ • Treatment plan (JSON)     │
+│ • Normal/      │  │ Output:            │  │ • Evidence citations        │
+│   Anomaly      │  │ • AFib: 0.03      │  │ • Monitoring plan            │
+│ • Severity     │  │ • VTach: 0.01     │  │                              │
+│ • Confidence   │  │ • STEMI: 0.96 ⚠️  │  │ A2A Message:                │
+│                │  │ • Normal: 0.00     │  │ → Agent 18 (Triage)         │
+│ A2A Message:   │  │                    │  │   TREATMENT_PLAN            │
+│ → Agent 14     │  │ A2A Message:       │  │                              │
+│   (if anomaly) │  │ → Agent 18 🚨      │  │                              │
+│                │  │   CRITICAL_FINDING │  │                              │
+└────────────────┘  └────────────────────┘  └──────────────────────────────┘
+
+LAYER 5: INTELLIGENT AGENT LAYER (Already detailed above)
+═══════════════════════════════════════════════════════════════════════════════
+
+LAYER 6: ACTION EXECUTION
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Decision Point: Agent 18 (Triage) evaluates all agent outputs              │
+│                                                                              │
+│  Example Decision Flow:                                                      │
+│  IF (Agent 5 detects STEMI with confidence >90%)                            │
+│     AND (Agent 2 reports tachycardia + elevated BP)                         │
+│     AND (Agent 14 risk score >75)                                           │
+│  THEN:                                                                       │
+│     Priority = CRITICAL (RED)                                                │
+│     Actions:                                                                 │
+│     1. Agent 20 → Call patient + SMS "Call 911 immediately"                 │
+│     2. Agent 22 → Find nearest hospital with cath lab                       │
+│     3. Agent 23 → Coordinate hospital admission                             │
+│     4. Agent 19 → Notify Dr. Johnson (SMS + Page)                           │
+│                                                                              │
+│  ELSE IF (Agent 17 has treatment recommendation)                            │
+│     AND (Agent 14 risk score 50-75)                                         │
+│  THEN:                                                                       │
+│     Priority = URGENT (ORANGE)                                               │
+│     Actions:                                                                 │
+│     1. Agent 19 → Email Dr. Johnson for review                              │
+│     2. Agent 21 → Schedule appointment within 1 week                        │
+│     3. Agent 20 → Notify patient of plan                                    │
+└────────────────────────────┬────────────────────────────────────────────────┘
+                             │
+      ┌──────────────────────┼──────────────────────┐
+      │                      │                      │
+      ▼                      ▼                      ▼
+┌─────────────┐  ┌───────────────────┐  ┌─────────────────────────────┐
+│ AGENT 19:   │  │ AGENT 20:         │  │ AGENT 23:                   │
+│ Doctor      │  │ Patient           │  │ Hospital Coordination       │
+│ Notify      │  │ Notification      │  │                             │
+│             │  │                   │  │ Actions:                    │
+│ Channel:    │  │ Channel Selection:│  │ 1. Call hospital ED         │
+│ • SMS       │  │ • SMS (mobile)    │  │ 2. Transmit medical summary │
+│ • Email     │  │ • Email           │  │    (FHIR bundle via API)    │
+│ • Page      │  │ • Phone call      │  │ 3. Transmit ECG (DICOM)     │
+│ • EHR msg   │  │ • App push        │  │ 4. Notify cath lab          │
+│             │  │                   │  │ 5. Arrange ambulance        │
+│ Priority    │  │ Readability Level:│  │ 6. Track patient en route   │
+│ Queue:      │  │ Adjusted to       │  │                             │
+│ • CRITICAL  │  │ patient health    │  │ State Machine:              │
+│   → Instant │  │ literacy score    │  │ INITIATED → CONTACTED →     │
+│ • URGENT    │  │                   │  │ CONFIRMED → TRANSMITTED →   │
+│   → 5 min   │  │ Example SMS:      │  │ EN_ROUTE → ADMITTED         │
+│ • ROUTINE   │  │ "Hi John! 🚨      │  │                             │
+│   → Daily   │  │  Important: Call  │  │ Success Rate: >95%          │
+│             │  │  911 now. You may │  │ Avg Time: 8 minutes         │
+│ Ack Track:  │  │  be having a heart│  │                             │
+│ • Timestamp │  │  attack. ECG shows│  │                             │
+│ • Response  │  │  concerning signs.│  │                             │
+│ • Escalate  │  │  Don't drive.     │  │                             │
+│   if none   │  │  Reply OK when    │  │                             │
+│             │  │  help called."    │  │                             │
+└─────────────┘  └───────────────────┘  └─────────────────────────────┘
+
+LAYER 7: FEEDBACK & LEARNING
+═══════════════════════════════════════════════════════════════════════════════
+
+┌─────────────────────────────────────────────────────────────────────────────┐
+│  Outcome Tracking & Model Updates                                           │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Outcome Database (PostgreSQL)                                          │ │
+│  │                                                                         │ │
+│  │ Tables:                                                                 │ │
+│  │ • agent_predictions  - What agents predicted                           │ │
+│  │ • actual_outcomes    - What actually happened                          │ │
+│  │ • prediction_accuracy - Calculated metrics                             │ │
+│  │                                                                         │ │
+│  │ Example Record:                                                         │ │
+│  │ ┌─────────────────────────────────────────────────────────────────┐   │ │
+│  │ │ patient_id: uuid                                                 │   │ │
+│  │ │ agent_id: 13 (Disease Prediction)                               │   │ │
+│  │ │ prediction_date: 2024-10-15                                      │   │ │
+│  │ │ prediction: "48% risk CKD Stage 4 in 2 years"                   │   │ │
+│  │ │ outcome_date: 2026-10-15                                         │   │ │
+│  │ │ actual_outcome: "Patient still Stage 3A CKD"                    │   │ │
+│  │ │ prediction_correct: TRUE (progression prevented by treatment)   │   │ │
+│  │ │ intervention: "Started SGLT2 inhibitor"                         │   │ │
+│  │ └─────────────────────────────────────────────────────────────────┘   │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+│                                                                              │
+│  ┌────────────────────────────────────────────────────────────────────────┐ │
+│  │ Model Retraining Pipeline (Monthly)                                    │ │
+│  │                                                                         │ │
+│  │ 1. Collect new data:                                                   │ │
+│  │    • 30 days of predictions vs. outcomes                               │ │
+│  │    • Edge cases flagged by clinicians                                  │ │
+│  │    • False positives/negatives                                         │ │
+│  │                                                                         │ │
+│  │ 2. Retrain models:                                                     │ │
+│  │    • Agent 1 LSTM autoencoder: New patient patterns                   │ │
+│  │    • Agent 5 ECG CNN: Fine-tune on rural population                   │ │
+│  │    • Agent 13 Risk DNN: Update with outcomes data                     │ │
+│  │    • Agent 16 Bandits: Posterior updates from engagement              │ │
+│  │                                                                         │ │
+│  │ 3. A/B Testing:                                                        │ │
+│  │    • Deploy new model to 20% of patients                              │ │
+│  │    • Compare metrics vs. current model (80% baseline)                 │ │
+│  │    • If improvement confirmed, roll out to 100%                       │ │
+│  │                                                                         │ │
+│  │ 4. Performance Monitoring:                                             │ │
+│  │    • Real-time dashboards track:                                       │ │
+│  │      - Prediction accuracy by agent                                    │ │
+│  │      - Alert precision/recall                                          │ │
+│  │      - Clinical outcomes (hospitalizations, A1c improvement)          │ │
+│  │      - User engagement metrics                                         │ │
+│  └────────────────────────────────────────────────────────────────────────┘ │
+└─────────────────────────────────────────────────────────────────────────────┘
+
+DATA FLOW METRICS:
+═══════════════════════════════════════════════════════════════════════════════
+- Data Ingestion Rate: 50,000 observations/day across 1,000 patients
+- Processing Latency: <100ms for monitoring agents, <2s for diagnostic agents
+- Storage: ~500KB per patient per month (compressed)
+- A2A Messages: ~200 messages/day per patient (mostly routine monitoring)
+- Critical Alerts: ~2-3 per patient per year (requiring immediate action)
+- Database Queries: ~1 million/day (mostly cached, <50ms response)
+- API Calls: 10,000 requests/day to external services (labs, EHR, imaging)
+
+DATA GOVERNANCE:
+═══════════════════════════════════════════════════════════════════════════════
+✓ HIPAA Encryption: AES-256 at rest, TLS 1.3 in transit
+✓ Access Control: Role-based (RBAC), least privilege
+✓ Audit Trail: Every data access logged with timestamp, user, purpose
+✓ Data Retention: 7 years (regulatory requirement)
+✓ Patient Rights: Access, correction, deletion requests honored
+✓ De-identification: All research data stripped of 18 HIPAA identifiers

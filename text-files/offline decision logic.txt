@@ -1,0 +1,182 @@
+class OfflineMonitoringAgent:
+      def __init__(self):
+          self.models = load_edge_models()  # TensorFlow Lite
+          self.db = sqlite3.connect('local_cache.db')
+          self.is_online = False
+          self.sync_queue = []
+      
+      def process_vital_sign(self, vital_sign):
+          # Store locally
+          self.db.execute(
+              "INSERT INTO observations VALUES (?, ?, ?, ?, ?, 0, ?)",
+              (generate_id(), patient_id, vital_sign.code, 
+               vital_sign.value, time.time(), generate_vector_clock())
+          )
+          
+          # Run edge models
+          glucose_alert = self.models['glucose'].predict(vital_sign)
+          cardiac_alert = self.models['cardiac'].predict(vital_sign)
+          
+          # Check for critical conditions
+          if glucose_alert.severity == 'CRITICAL':
+              self.trigger_local_alert(glucose_alert)
+              self.queue_for_sync(glucose_alert)
+          
+          # Attempt cloud sync if online
+          if self.is_online:
+              self.sync_to_cloud()
+      
+      def trigger_local_alert(self, alert):
+          # Local notification (doesn't need internet)
+          send_local_notification(alert.message)
+          
+          # If severe hypoglycemia, call emergency contact (stored locally)
+          if alert.type == 'SEVERE_HYPOGLYCEMIA':
+              call_emergency_contact()
+      
+      def sync_to_cloud(self):
+          # Delta sync: Only send unsynced records
+          unsynced = self.db.execute(
+              "SELECT * FROM observations WHERE synced = 0"
+          ).fetchall()
+          
+          # Compress and transmit
+          compressed = compress_records(unsynced)
+          response = send_to_cloud(compressed)
+          
+          # Mark as synced
+          if response.success:
+              self.db.execute(
+                  "UPDATE observations SET synced = 1 WHERE synced = 0"
+              )
+```
+
+- Delta Synchronization Protocol:
+  1. **Change Tracking**: Every local operation generates change log
+  2. **Vector Clocks**: Timestamp changes with logical clock for ordering
+  3. **Batch Transmission**: Compress multiple changes into single payload
+  4. **Acknowledgment**: Server confirms receipt, client marks records synced
+  5. **Bidirectional**: Server sends down new configuration, patient data from clinician
+
+- Conflict Resolution:
+```
+  Scenario: Patient glucose reading stored locally while offline. 
+  Cloud system receives reading from continuous glucose monitor during same period.
+  
+  Resolution Strategy:
+  - Both readings preserved (different devices may show slight differences)
+  - Vector clocks determine ordering
+  - Agent 1 uses both readings (more data = better anomaly detection)
+  - If readings drastically different (>30 mg/dL), flag for manual review
+```
+
+- Bandwidth Optimization:
+  - **Compression**: gzip compression reduces payload by 70-80%
+  - **Prioritization**: Critical alerts sent first, routine data batched
+  - **Adaptive Sync**: Sync frequency adjusts based on available bandwidth
+    - High bandwidth: Sync every 5 minutes
+    - Low bandwidth: Sync every 30 minutes
+    - Very low bandwidth: Sync critical only, defer routine
+  - **Resume Capability**: Interrupted sync resumes from checkpoint
+
+- Encryption:
+  - **Local Storage**: AES-256 encryption, key derived from device PIN
+  - **Transmission**: TLS 1.3 for all cloud communication
+  - **Key Management**: Secure Enclave (iOS) / Keystore (Android)
+
+**Offline Capabilities:**
+- ✅ Continuous vital sign monitoring
+- ✅ Glucose anomaly detection
+- ✅ Cardiac rhythm analysis (basic)
+- ✅ Local alert notifications
+- ✅ Emergency contact calls
+- ✅ Medication reminders (pre-synced schedule)
+- ✅ Data collection and queueing
+- ❌ Complex diagnostic analysis (ECG, X-ray) - requires cloud
+- ❌ Treatment recommendations - requires cloud + clinician
+- ❌ Appointment scheduling - requires cloud
+- ❌ Inter-agent communication - requires cloud
+
+**Alternative Considered:**
+- **Cloud-Only**: Fails completely during outages, excludes offline rural areas
+- **Full Offline Replication**: Too large (GB of data) for mobile devices
+- **Simple Caching**: Doesn't handle conflicts, loses data
+- **Manual Sync**: Requires user action, often forgotten
+
+**Integration with MCP/A2A:**
+- When online: Participates in A2A message bus normally
+- When offline: Stores outgoing A2A messages in local queue
+- MCP context includes online/offline status
+- Upon reconnection: Publishes queued A2A messages with offline timestamp
+- Other agents handle delayed messages appropriately
+- MCP tool `check_connectivity` used by all agents to adapt behavior
+
+**Quality Metrics:**
+- Offline operation success rate (target: 100% for core monitoring)
+- Data loss rate during outages (target: 0%)
+- Sync time after reconnection (target: <2 minutes for 1 day offline)
+- Battery impact (target: <15% additional drain)
+- Storage usage (target: <500MB for 7-day cache)
+
+**User Experience:**
+- Visual indicator: "Offline Mode" banner
+- Data collection continues seamlessly
+- Critical alerts still trigger
+- Non-critical features gracefully degrade
+- Automatic sync upon reconnection
+- Notification: "Synced 157 readings from yesterday"
+
+---
+
+### **Agent 25: Image Quality & Acquisition Agent**
+**Primary Algorithm: CNN-Based Image Quality Assessment + Active Feedback System**
+
+**Algorithm Description:**
+Real-time quality control for diagnostic imaging:
+1. **Quality Assessment CNN**: Classifies image quality (excellent, acceptable, poor, non-diagnostic)
+2. **Defect Detection**: Identifies specific issues (motion blur, underexposure, poor positioning)
+3. **Active Feedback**: Provides real-time guidance to rural health worker during acquisition
+4. **Automatic Enhancement**: Applies corrections (contrast adjustment, noise reduction) when possible
+
+**Justification:**
+1. **Quality Assurance**: Rural facilities often lack imaging technologists. Quality assessment prevents non-diagnostic images requiring patient recall.
+
+2. **Real-Time Correction**: Immediate feedback allows reacquisition before patient leaves, reducing delays from 1-2 weeks to minutes.
+
+3. **Diagnostic Accuracy Dependency**: Agents 7-8 (X-ray analysis) require minimum quality images. Poor images result in false negatives (missed diagnoses) or false positives (unnecessary interventions).
+
+4. **Training Aid**: Feedback helps train rural health workers, improving their imaging skills over time.
+
+5. **Cost Savings**: Preventing bad images saves cost of repeat studies, patient travel, and diagnostic delays.
+
+**Technical Specifications:**
+- Quality Assessment CNN:
+  - **Architecture**: ResNet-18 (lightweight for mobile deployment)
+  - **Input**: 224×224 grayscale image (X-ray) or 512×512 ECG trace
+  - **Output**: 4-class classification
+    - Excellent (>95% confidence diagnostic quality)
+    - Acceptable (80-95% confidence, usable but suboptimal)
+    - Poor (<80% confidence, likely non-diagnostic)
+    - Non-diagnostic (motion artifact, wrong anatomy, blank)
+  - **Training Dataset**: 50,000 labeled medical images with radiologist quality ratings
+  - **Performance**: 92% accuracy vs. radiologist quality assessment
+
+- Defect Detection (Multi-Head Classification):
+```
+  Detected Issues (Binary classification for each):
+  
+  X-Ray Specific:
+  • Motion Blur (probability 0-1)
+  • Underexposed (too light)
+  • Overexposed (too dark)
+  • Poor Positioning (anatomy cut off)
+  • Foreign Objects (jewelry, clothing)
+  • Patient Rotation
+  • Insufficient Inspiration (lungs not fully inflated)
+  
+  ECG Specific:
+  • Electrode Artifact (poor contact)
+  • 60 Hz Interference (electrical noise)
+  • Baseline Wander
+  • Missing Leads
+  • Excessive Patient Movement

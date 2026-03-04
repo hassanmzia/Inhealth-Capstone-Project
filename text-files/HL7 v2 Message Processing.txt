@@ -1,0 +1,18 @@
+-- HL7 Message Queue (for external system integration)
+CREATE TABLE hl7_message_queue (
+    id SERIAL PRIMARY KEY,
+    message_type VARCHAR(10), -- ADT, ORU, ORM, etc.
+    message_control_id VARCHAR(50),
+    sending_facility VARCHAR(255),
+    receiving_facility VARCHAR(255),
+    raw_message TEXT, -- Full HL7 message
+    parsed_data JSONB, -- Parsed segments
+    processing_status VARCHAR(50), -- pending, processed, failed
+    patient_id UUID REFERENCES fhir_patient(id),
+    created_at TIMESTAMP DEFAULT NOW(),
+    processed_at TIMESTAMP,
+    error_message TEXT,
+    INDEX idx_hl7_status (processing_status),
+    INDEX idx_hl7_patient (patient_id)
+);
+

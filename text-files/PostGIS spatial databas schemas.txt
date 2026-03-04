@@ -1,0 +1,38 @@
+CREATE TABLE hospitals (
+      id UUID PRIMARY KEY,
+      name VARCHAR(255),
+      location GEOGRAPHY(POINT, 4326),  -- Lat/Long
+      address TEXT,
+      phone VARCHAR(20),
+      
+      -- Capabilities
+      has_emergency_dept BOOLEAN,
+      has_icu BOOLEAN,
+      has_cath_lab BOOLEAN,
+      has_stroke_center BOOLEAN,
+      has_trauma_center BOOLEAN,
+      trauma_level VARCHAR(5),  -- Level I, II, III
+      
+      -- Specialties
+      specialties TEXT[],  -- ['Cardiology', 'Nephrology', ...]
+      
+      -- Real-time status
+      emergency_wait_minutes INTEGER,
+      available_med_surg_beds INTEGER,
+      available_icu_beds INTEGER,
+      on_diversion BOOLEAN,
+      
+      -- Quality metrics
+      door_to_balloon_time INTEGER,  -- Minutes, for STEMI
+      mortality_index FLOAT,
+      patient_satisfaction FLOAT,
+      
+      -- Insurance
+      insurance_accepted TEXT[],
+      
+      -- Updated timestamp
+      last_updated TIMESTAMP
+  );
+  
+  -- Spatial index for fast geoqueries
+  CREATE INDEX idx_hospital_location ON hospitals USING GIST(location);

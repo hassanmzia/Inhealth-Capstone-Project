@@ -1,0 +1,403 @@
+# Production values for Healthcare System
+# Copy this file and customize for your production environment
+
+global:
+  domain: healthcare.yourcompany.com  # CHANGE THIS
+  environment: production
+  imageRegistry: your-registry.io  # CHANGE THIS
+  storageClass: fast-ssd
+  timezone: America/New_York  # CHANGE THIS
+
+namespace:
+  create: true
+  name: healthcare-prod
+
+# Ingress with TLS
+ingress:
+  enabled: true
+  className: nginx
+  tls:
+    enabled: true
+    secretName: healthcare-tls-prod
+  annotations:
+    cert-manager.io/cluster-issuer: letsencrypt-prod
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+
+# Application Layer - Production Settings
+application:
+  django:
+    enabled: true
+    replicaCount: 10
+    image:
+      repository: your-registry.io/healthcare/django-app
+      tag: "1.0.0"
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    autoscaling:
+      enabled: true
+      minReplicas: 10
+      maxReplicas: 50
+      targetCPUUtilizationPercentage: 60
+      targetMemoryUtilizationPercentage: 75
+    env:
+      - name: DJANGO_SETTINGS_MODULE
+        value: "healthcare.settings.production"
+      - name: DEBUG
+        value: "False"
+      - name: SECURE_SSL_REDIRECT
+        value: "True"
+      - name: SESSION_COOKIE_SECURE
+        value: "True"
+      - name: CSRF_COOKIE_SECURE
+        value: "True"
+    secrets:
+      secretKey: ""  # SET VIA --set or external secret manager
+      databaseUrl: ""  # SET VIA --set or external secret manager
+  
+  celery:
+    enabled: true
+    workers:
+      replicaCount: 20
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 4Gi
+        limits:
+          cpu: 8000m
+          memory: 16Gi
+      autoscaling:
+        enabled: true
+        minReplicas: 20
+        maxReplicas: 60
+    beat:
+      enabled: true
+    flower:
+      enabled: true
+  
+  websocket:
+    enabled: true
+    replicaCount: 8
+    autoscaling:
+      enabled: true
+      minReplicas: 8
+      maxReplicas: 30
+
+# AI Agents - Full Production Setup
+aiAgents:
+  llm:
+    enabled: true
+    replicaCount: 5
+    gpu:
+      enabled: true
+      type: nvidia-tesla-a100
+  
+  rag:
+    enabled: true
+    replicaCount: 4
+  
+  # All medical agents enabled
+  medicalAgents:
+    diagnosticAgent:
+      enabled: true
+      replicaCount: 5
+    treatmentAgent:
+      enabled: true
+      replicaCount: 5
+    imagingAgent:
+      enabled: true
+      replicaCount: 4
+    labResultsAgent:
+      enabled: true
+      replicaCount: 3
+    medicationAgent:
+      enabled: true
+      replicaCount: 3
+    symptomsAgent:
+      enabled: true
+      replicaCount: 3
+    allergyAgent:
+      enabled: true
+      replicaCount: 2
+    chronicDiseaseAgent:
+      enabled: true
+      replicaCount: 3
+  
+  # All administrative agents enabled
+  administrativeAgents:
+    schedulingAgent:
+      enabled: true
+      replicaCount: 5
+    billingAgent:
+      enabled: true
+      replicaCount: 4
+    insuranceAgent:
+      enabled: true
+      replicaCount: 4
+    ehrIntegrationAgent:
+      enabled: true
+      replicaCount: 3
+    complianceAgent:
+      enabled: true
+      replicaCount: 3
+    auditAgent:
+      enabled: true
+      replicaCount: 3
+  
+  # All communication agents enabled
+  communicationAgents:
+    notificationAgent:
+      enabled: true
+      replicaCount: 5
+    emailAgent:
+      enabled: true
+      replicaCount: 4
+    smsAgent:
+      enabled: true
+      replicaCount: 4
+    chatAgent:
+      enabled: true
+      replicaCount: 6
+    translationAgent:
+      enabled: true
+      replicaCount: 3
+  
+  # All analytics agents enabled
+  analyticsAgents:
+    predictiveAgent:
+      enabled: true
+      replicaCount: 4
+    reportingAgent:
+      enabled: true
+      replicaCount: 3
+    populationHealthAgent:
+      enabled: true
+      replicaCount: 3
+    qualityMetricsAgent:
+      enabled: true
+      replicaCount: 3
+    clinicalResearchAgent:
+      enabled: true
+      replicaCount: 2
+  
+  # All security agents enabled
+  securityAgents:
+    authenticationAgent:
+      enabled: true
+      replicaCount: 5
+    authorizationAgent:
+      enabled: true
+      replicaCount: 5
+    encryptionAgent:
+      enabled: true
+      replicaCount: 3
+
+# Data Layer - Production Configuration
+data:
+  postgresql:
+    enabled: true
+    architecture: replication
+    auth:
+      username: healthcare
+      password: ""  # SET VIA --set or secret
+      database: healthcare_db
+    primary:
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 16Gi
+        limits:
+          cpu: 8000m
+          memory: 32Gi
+      persistence:
+        enabled: true
+        size: 1Ti
+        storageClass: fast-ssd
+    readReplicas:
+      replicaCount: 3
+      resources:
+        requests:
+          cpu: 4000m
+          memory: 16Gi
+        limits:
+          cpu: 8000m
+          memory: 32Gi
+      persistence:
+        enabled: true
+        size: 1Ti
+  
+  neo4j:
+    enabled: true
+    replicaCount: 3
+    resources:
+      requests:
+        cpu: 4000m
+        memory: 16Gi
+      limits:
+        cpu: 8000m
+        memory: 32Gi
+    persistence:
+      enabled: true
+      size: 500Gi
+      storageClass: fast-ssd
+  
+  redis:
+    enabled: true
+    architecture: replication
+    master:
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 8Gi
+        limits:
+          cpu: 4000m
+          memory: 16Gi
+      persistence:
+        enabled: true
+        size: 100Gi
+    replica:
+      replicaCount: 3
+      persistence:
+        enabled: true
+        size: 100Gi
+  
+  rabbitmq:
+    enabled: true
+    replicaCount: 3
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    persistence:
+      enabled: true
+      size: 200Gi
+  
+  minio:
+    enabled: true
+    mode: distributed
+    replicaCount: 4
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 8Gi
+      limits:
+        cpu: 4000m
+        memory: 16Gi
+    persistence:
+      enabled: true
+      size: 2Ti
+
+# Monitoring - Full Stack
+monitoring:
+  prometheus:
+    enabled: true
+    server:
+      resources:
+        requests:
+          cpu: 2000m
+          memory: 8Gi
+        limits:
+          cpu: 4000m
+          memory: 16Gi
+      persistentVolume:
+        enabled: true
+        size: 500Gi
+      retention: 90d
+    alertmanager:
+      enabled: true
+      persistentVolume:
+        enabled: true
+        size: 20Gi
+  
+  grafana:
+    enabled: true
+    replicas: 3
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+    persistence:
+      enabled: true
+      size: 50Gi
+
+# Logging - ELK Stack
+logging:
+  elasticsearch:
+    enabled: true
+    replicas: 5
+    resources:
+      requests:
+        cpu: 4000m
+        memory: 16Gi
+      limits:
+        cpu: 8000m
+        memory: 32Gi
+    volumeClaimTemplate:
+      resources:
+        requests:
+          storage: 1Ti
+      storageClassName: fast-ssd
+  
+  logstash:
+    enabled: true
+    replicas: 3
+    resources:
+      requests:
+        cpu: 2000m
+        memory: 4Gi
+      limits:
+        cpu: 4000m
+        memory: 8Gi
+    persistence:
+      enabled: true
+      size: 100Gi
+  
+  kibana:
+    enabled: true
+    replicas: 3
+    resources:
+      requests:
+        cpu: 1000m
+        memory: 2Gi
+      limits:
+        cpu: 2000m
+        memory: 4Gi
+  
+  filebeat:
+    enabled: true
+
+# Security
+networkPolicies:
+  enabled: true
+
+podSecurityPolicy:
+  enabled: true
+
+# Backup
+backup:
+  enabled: true
+  schedule: "0 2 * * *"  # Daily at 2 AM
+  retention: 90  # Keep 90 days
+
+# RBAC
+rbac:
+  create: true
+
+serviceAccount:
+  create: true
+  annotations:
+    # Add cloud provider annotations if needed
+    # eks.amazonaws.com/role-arn: arn:aws:iam::ACCOUNT:role/ROLE

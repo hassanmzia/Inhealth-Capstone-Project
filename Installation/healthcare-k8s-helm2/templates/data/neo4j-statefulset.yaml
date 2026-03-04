@@ -1,0 +1,165 @@
+{{- if .Values.data.neo4j.enabled }}
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: {{ include "healthcare.fullname" . }}-neo4j
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: neo4j
+spec:
+  serviceName: {{ include "healthcare.fullname" . }}-neo4j-headless
+  replicas: {{ .Values.data.neo4j.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "healthcare.selectorLabels" . | nindent 6 }}
+      app.kubernetes.io/component: neo4j
+  template:
+    metadata:
+      labels:
+        {{- include "healthcare.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: neo4j
+    spec:
+      {{- include "healthcare.imagePullSecrets" . | nindent 6 }}
+      serviceAccountName: {{ include "healthcare.serviceAccountName" . }}
+      containers:
+      - name: neo4j
+        image: "{{ .Values.data.neo4j.image.repository }}:{{ .Values.data.neo4j.image.tag }}"
+        imagePullPolicy: IfNotPresent
+        ports:
+        - name: http
+          containerPort: 7474
+          protocol: TCP
+        - name: bolt
+          containerPort: 7687
+          protocol: TCP
+        - name: cluster
+          containerPort: 7688
+          protocol: TCP
+        env:
+        - name: NEO4J_AUTH
+          value: "neo4j/$(NEO4J_PASSWORD)"
+        - name: NEO4J_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "healthcare.fullname" . }}-neo4j-secrets
+              key: neo4j-password
+        - name: NEO4J_ACCEPT_LICENSE_AGREEMENT
+          value: "yes"
+        - name: NEO4J_dbms_mode
+          value: "CORE"
+        - name: NEO4J_causal__clustering_minimum__core__cluster__size__at__formation
+          value: "3"
+        - name: NEO4J_causal__clustering_minimum__core__cluster__size__at__runtime
+          value: "3"
+        - name: NEO4J_causal__clustering_initial__discovery__members
+          value: "{{ include "healthcare.fullname" . }}-neo4j-0.{{ include "healthcare.fullname" . }}-neo4j-headless.{{ .Values.namespace.name }}.svc.cluster.local:5000,{{ include "healthcare.fullname" . }}-neo4j-1.{{ include "healthcare.fullname" . }}-neo4j-headless.{{ .Values.namespace.name }}.svc.cluster.local:5000,{{ include "healthcare.fullname" . }}-neo4j-2.{{ include "healthcare.fullname" . }}-neo4j-headless.{{ .Values.namespace.name }}.svc.cluster.local:5000"
+        - name: NEO4J_dbms_memory_heap_initial__size
+          value: "4G"
+        - name: NEO4J_dbms_memory_heap_max__size
+          value: "8G"
+        - name: NEO4J_dbms_memory_pagecache_size
+          value: "4G"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 120
+          periodSeconds: 30
+          timeoutSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: http
+          initialDelaySeconds: 60
+          periodSeconds: 10
+          timeoutSeconds: 5
+        resources:
+          requests:
+            cpu: {{ .Values.data.neo4j.resources.requests.cpu }}
+            memory: {{ .Values.data.neo4j.resources.requests.memory }}
+          limits:
+            cpu: {{ .Values.data.neo4j.resources.limits.cpu }}
+            memory: {{ .Values.data.neo4j.resources.limits.memory }}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: logs
+          mountPath: /logs
+      volumes:
+      - name: logs
+        emptyDir: {}
+  {{- if .Values.data.neo4j.persistence.enabled }}
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+      labels:
+        {{- include "healthcare.labels" . | nindent 8 }}
+    spec:
+      accessModes:
+        - ReadWriteOnce
+      storageClassName: {{ .Values.data.neo4j.persistence.storageClass }}
+      resources:
+        requests:
+          storage: {{ .Values.data.neo4j.persistence.size }}
+  {{- else }}
+      - name: data
+        emptyDir: {}
+  {{- end }}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "healthcare.fullname" . }}-neo4j
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: neo4j
+spec:
+  type: ClusterIP
+  ports:
+  - port: 7474
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: 7687
+    targetPort: bolt
+    protocol: TCP
+    name: bolt
+  selector:
+    {{- include "healthcare.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: neo4j
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "healthcare.fullname" . }}-neo4j-headless
+  namespace: {{ .Values.namespace.name }}
+  labels:
+    {{- include "healthcare.labels" . | nindent 4 }}
+    app.kubernetes.io/component: neo4j
+spec:
+  type: ClusterIP
+  clusterIP: None
+  publishNotReadyAddresses: true
+  ports:
+  - port: 7474
+    targetPort: http
+    protocol: TCP
+    name: http
+  - port: 7687
+    targetPort: bolt
+    protocol: TCP
+    name: bolt
+  - port: 7688
+    targetPort: cluster
+    protocol: TCP
+    name: cluster
+  - port: 5000
+    targetPort: 5000
+    protocol: TCP
+    name: discovery
+  selector:
+    {{- include "healthcare.selectorLabels" . | nindent 4 }}
+    app.kubernetes.io/component: neo4j
+{{- end }}
