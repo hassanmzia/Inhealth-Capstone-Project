@@ -1,0 +1,276 @@
+global:
+  resolve_timeout: 5m
+  slack_api_url: '${SLACK_WEBHOOK_URL}'
+  pagerduty_url: 'https://events.pagerduty.com/v2/enqueue'
+
+templates:
+  - '/etc/alertmanager/templates/*.tmpl'
+
+route:
+  group_by: ['alertname', 'cluster', 'service', 'severity']
+  group_wait: 30s
+  group_interval: 5m
+  repeat_interval: 4h
+  receiver: 'default-slack'
+
+  routes:
+    # Critical clinical alerts go to PagerDuty immediately (no grouping delay)
+    - match_re:
+        severity: critical
+        category: (glucose|blood_pressure|oxygen_saturation|lab_values|emergency)
+      receiver: 'pagerduty-critical-clinical'
+      group_wait: 0s
+      group_interval: 1m
+      repeat_interval: 4h
+      continue: false
+
+    # STEMI and other emergency protocols - immediate PagerDuty
+    - match:
+        alertname: STEMIProtocolTriggered
+      receiver: 'pagerduty-critical-clinical'
+      group_wait: 0s
+      repeat_interval: 4h
+      continue: false
+
+    - match:
+        alertname: CriticalAlertUnacknowledged
+      receiver: 'pagerduty-critical-clinical'
+      group_wait: 0s
+      repeat_interval: 4h
+      continue: false
+
+    # Infrastructure alerts go to Slack #alerts-infra
+    - match:
+        team: infrastructure
+      receiver: 'slack-infra'
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 24h
+      continue: false
+
+    - match:
+        team: database
+      receiver: 'slack-infra'
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 24h
+      continue: false
+
+    - match:
+        team: backend
+      receiver: 'slack-infra'
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 24h
+      continue: false
+
+    - match:
+        alertname: ServiceDown
+      receiver: 'slack-infra'
+      group_wait: 10s
+      group_interval: 2m
+      repeat_interval: 4h
+      continue: true
+
+    - match:
+        alertname: ServiceDown
+      receiver: 'pagerduty-infra'
+      group_wait: 10s
+      repeat_interval: 4h
+      continue: false
+
+    # Agent alerts go to Slack #alerts-agents
+    - match:
+        team: agents
+      receiver: 'slack-agents'
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 24h
+      continue: false
+
+    # Critical agent alerts also go to PagerDuty
+    - match_re:
+        team: agents
+        severity: critical
+      receiver: 'pagerduty-agents'
+      group_wait: 30s
+      repeat_interval: 4h
+      continue: false
+
+    # All clinical team alerts to Slack #alerts-clinical
+    - match:
+        team: clinical
+      receiver: 'slack-clinical'
+      group_wait: 15s
+      group_interval: 5m
+      repeat_interval: 24h
+      continue: false
+
+receivers:
+  - name: 'default-slack'
+    slack_configs:
+      - api_url: '${SLACK_WEBHOOK_URL}'
+        channel: '#alerts-general'
+        send_resolved: true
+        title: '[{{ .Status | toUpper }}{{ if eq .Status "firing" }}:{{ .Alerts.Firing | len }}{{ end }}] {{ .CommonLabels.alertname }}'
+        text: >-
+          {{ range .Alerts }}
+            *Alert:* {{ .Annotations.summary }}
+            *Severity:* {{ .Labels.severity }}
+            *Description:* {{ .Annotations.description }}
+            *Details:*
+            {{ range .Labels.SortedPairs }} • *{{ .Name }}:* `{{ .Value }}`
+            {{ end }}
+          {{ end }}
+
+  - name: 'pagerduty-critical-clinical'
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_CLINICAL_ROUTING_KEY}'
+        send_resolved: true
+        severity: 'critical'
+        summary: '{{ .CommonAnnotations.summary }}'
+        description: '{{ .CommonAnnotations.description }}'
+        details:
+          alert_name: '{{ .CommonLabels.alertname }}'
+          category: '{{ .CommonLabels.category }}'
+          team: '{{ .CommonLabels.team }}'
+          patient_id: '{{ .CommonLabels.patient_id }}'
+          facility: '{{ .CommonLabels.facility }}'
+        client: 'InHealth Chronic Care Monitoring'
+        client_url: 'https://grafana.inhealth.io/d/clinical-overview'
+
+  - name: 'pagerduty-infra'
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_INFRA_ROUTING_KEY}'
+        send_resolved: true
+        severity: 'critical'
+        summary: '{{ .CommonAnnotations.summary }}'
+        description: '{{ .CommonAnnotations.description }}'
+        details:
+          alert_name: '{{ .CommonLabels.alertname }}'
+          team: '{{ .CommonLabels.team }}'
+          instance: '{{ .CommonLabels.instance }}'
+        client: 'InHealth Chronic Care Monitoring'
+        client_url: 'https://grafana.inhealth.io/d/system-health'
+
+  - name: 'pagerduty-agents'
+    pagerduty_configs:
+      - routing_key: '${PAGERDUTY_AGENTS_ROUTING_KEY}'
+        send_resolved: true
+        severity: 'critical'
+        summary: '{{ .CommonAnnotations.summary }}'
+        description: '{{ .CommonAnnotations.description }}'
+        details:
+          alert_name: '{{ .CommonLabels.alertname }}'
+          agent_name: '{{ .CommonLabels.agent_name }}'
+        client: 'InHealth Chronic Care Monitoring'
+        client_url: 'https://grafana.inhealth.io/d/agent-operations'
+
+  - name: 'slack-infra'
+    slack_configs:
+      - api_url: '${SLACK_INFRA_WEBHOOK_URL}'
+        channel: '#alerts-infra'
+        send_resolved: true
+        icon_emoji: ':warning:'
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        title_link: 'https://grafana.inhealth.io/d/system-health'
+        text: >-
+          {{ range .Alerts }}
+            *Alert:* {{ .Annotations.summary }}
+            *Severity:* `{{ .Labels.severity }}`
+            *Service:* `{{ .Labels.job }}`
+            *Instance:* `{{ .Labels.instance }}`
+            *Description:* {{ .Annotations.description }}
+            <{{ .Annotations.runbook }}|Runbook>
+          {{ end }}
+        actions:
+          - type: button
+            text: 'View in Grafana'
+            url: 'https://grafana.inhealth.io/d/system-health'
+          - type: button
+            text: 'Acknowledge'
+            url: 'https://alertmanager.inhealth.io/#/alerts'
+
+  - name: 'slack-agents'
+    slack_configs:
+      - api_url: '${SLACK_AGENTS_WEBHOOK_URL}'
+        channel: '#alerts-agents'
+        send_resolved: true
+        icon_emoji: ':robot_face:'
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        title_link: 'https://grafana.inhealth.io/d/agent-operations'
+        text: >-
+          {{ range .Alerts }}
+            *Alert:* {{ .Annotations.summary }}
+            *Severity:* `{{ .Labels.severity }}`
+            *Agent:* `{{ .Labels.agent_name }}`
+            *Pipeline:* `{{ .Labels.pipeline_name }}`
+            *Description:* {{ .Annotations.description }}
+            <{{ .Annotations.runbook }}|Runbook>
+          {{ end }}
+
+  - name: 'slack-clinical'
+    slack_configs:
+      - api_url: '${SLACK_CLINICAL_WEBHOOK_URL}'
+        channel: '#alerts-clinical'
+        send_resolved: true
+        icon_emoji: ':hospital:'
+        title: '[{{ .Status | toUpper }}] {{ .CommonLabels.alertname }}'
+        title_link: 'https://grafana.inhealth.io/d/clinical-overview'
+        text: >-
+          {{ range .Alerts }}
+            *Alert:* {{ .Annotations.summary }}
+            *Severity:* `{{ .Labels.severity }}`
+            *Category:* `{{ .Labels.category }}`
+            *Description:* {{ .Annotations.description }}
+            <{{ .Annotations.runbook }}|Runbook>
+          {{ end }}
+
+inhibit_rules:
+  # If ServiceDown fires, inhibit lower severity alerts from the same service
+  - source_match:
+      alertname: 'ServiceDown'
+      severity: 'critical'
+    target_match_re:
+      severity: 'warning|info'
+    equal: ['job', 'instance']
+
+  # If DatabaseConnectionPoolExhausted fires, inhibit Django high error rate
+  - source_match:
+      alertname: 'DatabaseConnectionPoolExhausted'
+    target_match:
+      alertname: 'DjangoHighErrorRate'
+    equal: []
+
+  # If AgentOrchestrationFailed fires, inhibit AgentHighLatency for same pipeline
+  - source_match:
+      alertname: 'AgentOrchestrationFailed'
+      severity: 'critical'
+    target_match:
+      alertname: 'AgentHighLatency'
+    equal: ['pipeline_name']
+
+  # If CriticalAlertUnacknowledged fires, inhibit duplicate agent alerts
+  - source_match:
+      alertname: 'CriticalAlertUnacknowledged'
+      severity: 'critical'
+    target_match:
+      alertname: 'AgentDown'
+    equal: ['patient_id']
+
+  # If HighCPUUsage fires, inhibit AgentHighLatency (CPU is likely the cause)
+  - source_match:
+      alertname: 'HighCPUUsage'
+      severity: 'warning'
+    target_match:
+      alertname: 'AgentHighLatency'
+    equal: ['instance']
+
+  # If DiskSpaceLow fires at critical level, inhibit warning level disk alerts
+  - source_match:
+      alertname: 'DiskSpaceLow'
+      severity: 'critical'
+    target_match:
+      alertname: 'DiskSpaceLow'
+      severity: 'warning'
+    equal: ['instance', 'mountpoint']

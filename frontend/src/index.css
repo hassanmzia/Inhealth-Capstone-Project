@@ -1,0 +1,182 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --background: 210 40% 98%;
+    --foreground: 222 47% 11%;
+    --card: 0 0% 100%;
+    --card-foreground: 222 47% 11%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 222 47% 11%;
+    --primary: 213 80% 48%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 142 71% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 210 40% 96%;
+    --muted-foreground: 215 16% 47%;
+    --accent: 210 40% 94%;
+    --accent-foreground: 222 47% 11%;
+    --destructive: 347 77% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 214 32% 91%;
+    --input: 214 32% 91%;
+    --ring: 213 80% 48%;
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 222 47% 7%;
+    --foreground: 210 40% 98%;
+    --card: 222 47% 10%;
+    --card-foreground: 210 40% 98%;
+    --popover: 222 47% 10%;
+    --popover-foreground: 210 40% 98%;
+    --primary: 213 80% 55%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 142 71% 45%;
+    --secondary-foreground: 0 0% 100%;
+    --muted: 217 33% 17%;
+    --muted-foreground: 215 20% 65%;
+    --accent: 217 33% 17%;
+    --accent-foreground: 210 40% 98%;
+    --destructive: 347 77% 50%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 217 33% 20%;
+    --input: 217 33% 20%;
+    --ring: 213 80% 55%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+  }
+
+  /* Clinical scrollbar */
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  ::-webkit-scrollbar-track {
+    @apply bg-transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    @apply bg-clinical-300 dark:bg-clinical-600 rounded-full;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    @apply bg-clinical-400 dark:bg-clinical-500;
+  }
+}
+
+@layer components {
+  /* Clinical card base */
+  .clinical-card {
+    @apply bg-card rounded-lg border border-border shadow-card p-4;
+  }
+
+  /* Status indicator dots */
+  .status-dot {
+    @apply w-2.5 h-2.5 rounded-full flex-shrink-0;
+  }
+
+  .status-dot-active {
+    @apply status-dot bg-secondary-500 animate-vitals-pulse;
+  }
+
+  .status-dot-idle {
+    @apply status-dot bg-clinical-400;
+  }
+
+  .status-dot-running {
+    @apply status-dot bg-primary-500 animate-vitals-pulse;
+  }
+
+  .status-dot-error {
+    @apply status-dot bg-danger-500 animate-critical-pulse;
+  }
+
+  /* Vital value display */
+  .vital-value {
+    @apply font-mono text-2xl font-bold tabular-nums;
+  }
+
+  .vital-label {
+    @apply text-xs font-medium text-muted-foreground uppercase tracking-wider;
+  }
+
+  /* Risk badge */
+  .risk-badge-critical {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400;
+  }
+
+  .risk-badge-high {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400;
+  }
+
+  .risk-badge-medium {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400;
+  }
+
+  .risk-badge-low {
+    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400;
+  }
+
+  /* Agent tier badge */
+  .tier-badge {
+    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+  }
+
+  /* Shimmer loading skeleton */
+  .skeleton {
+    @apply animate-pulse bg-clinical-200 dark:bg-clinical-700 rounded;
+  }
+
+  /* Gradient text for hero sections */
+  .gradient-text {
+    @apply bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent;
+  }
+}
+
+@layer utilities {
+  .text-balance {
+    text-wrap: balance;
+  }
+
+  /* Tabular numbers for clinical data */
+  .tabular {
+    @apply font-mono tabular-nums;
+  }
+
+  /* Smooth transition for theme switching */
+  .theme-transition {
+    @apply transition-colors duration-200;
+  }
+}
+
+/* React Flow custom styles */
+.react-flow__node {
+  @apply rounded-lg border-2 border-border bg-card text-foreground shadow-card text-xs font-medium;
+}
+
+.react-flow__edge-path {
+  stroke: theme('colors.primary.400');
+  stroke-width: 2;
+}
+
+.react-flow__controls {
+  @apply bg-card border border-border rounded-lg shadow-card;
+}
+
+/* Custom recharts tooltip */
+.recharts-tooltip-wrapper .recharts-default-tooltip {
+  @apply bg-card border border-border rounded-lg shadow-card text-xs !important;
+}

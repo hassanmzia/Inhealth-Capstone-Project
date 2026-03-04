@@ -1,0 +1,73 @@
+groups:
+  - name: clinical_alerts
+    rules:
+
+      - alert: CriticalGlucoseDetected
+        expr: |
+          (
+            clinical_observation_value{observation_code="59408-5", unit="mg/dL"} < 50
+              OR
+            clinical_observation_value{observation_code="59408-5", unit="mg/dL"} > 400
+          )
+        for: 0m
+        labels:
+          severity: critical
+          team: clinical
+          category: glucose
+        annotations:
+          summary: "Critical glucose value detected for patient {{ $labels.patient_id }}"
+          description: "Patient {{ $labels.patient_id }} has a critical glucose reading of {{ $value }} mg/dL (normal range: 70-180 mg/dL). Immediate clinical intervention required."
+          runbook: "https://wiki.inhealth.io/runbooks/critical-glucose"
+
+      - alert: HypertensiveCrisisDetected
+        expr: |
+          clinical_observation_value{observation_code="8480-6", unit="mmHg"} > 180
+        for: 0m
+        labels:
+          severity: critical
+          team: clinical
+          category: blood_pressure
+        annotations:
+          summary: "Hypertensive crisis detected for patient {{ $labels.patient_id }}"
+          description: "Patient {{ $labels.patient_id }} has a systolic blood pressure of {{ $value }} mmHg, indicating a hypertensive crisis (threshold: >180 mmHg). Immediate evaluation required."
+          runbook: "https://wiki.inhealth.io/runbooks/hypertensive-crisis"
+
+      - alert: LowSpO2Detected
+        expr: |
+          clinical_observation_value{observation_code="2708-6", unit="%"} < 85
+        for: 0m
+        labels:
+          severity: critical
+          team: clinical
+          category: oxygen_saturation
+        annotations:
+          summary: "Critically low SpO2 detected for patient {{ $labels.patient_id }}"
+          description: "Patient {{ $labels.patient_id }} has an oxygen saturation of {{ $value }}%, which is critically low (threshold: <85%). Immediate respiratory intervention required."
+          runbook: "https://wiki.inhealth.io/runbooks/low-spo2"
+
+      - alert: CriticalLabValue
+        expr: |
+          clinical_lab_interpretation_total{interpretation="critical"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: clinical
+          category: lab_values
+        annotations:
+          summary: "Critical lab value recorded for patient {{ $labels.patient_id }}"
+          description: "A critical lab value for {{ $labels.lab_code }} has been recorded for patient {{ $labels.patient_id }}. Value: {{ $value }}. Immediate clinician review required."
+          runbook: "https://wiki.inhealth.io/runbooks/critical-lab-value"
+
+      - alert: STEMIProtocolTriggered
+        expr: |
+          emergency_protocol_activations_total{protocol="STEMI"} > 0
+        for: 0m
+        labels:
+          severity: critical
+          team: clinical
+          category: emergency
+          pagerduty: "true"
+        annotations:
+          summary: "STEMI emergency protocol activated for patient {{ $labels.patient_id }}"
+          description: "STEMI emergency protocol has been triggered for patient {{ $labels.patient_id }} at {{ $labels.facility }}. Cardiac catheterization lab activation and cardiology team notification required immediately."
+          runbook: "https://wiki.inhealth.io/runbooks/stemi-protocol"

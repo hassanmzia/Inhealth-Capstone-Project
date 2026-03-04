@@ -1,0 +1,82 @@
+groups:
+  - name: agent_alerts
+    rules:
+
+      - alert: AgentDown
+        expr: |
+          (
+            rate(agent_execution_errors_total[5m]) > 0
+          ) and (
+            rate(agent_execution_total[5m]) == 0
+              OR
+            rate(agent_execution_errors_total[5m]) / rate(agent_execution_total[5m]) >= 1
+          )
+        for: 5m
+        labels:
+          severity: critical
+          team: agents
+        annotations:
+          summary: "Agent {{ $labels.agent_name }} is down"
+          description: "Agent {{ $labels.agent_name }} has been returning errors for more than 5 minutes. Error rate: {{ $value | humanizePercentage }}"
+          runbook: "https://wiki.inhealth.io/runbooks/agent-down"
+
+      - alert: AgentHighLatency
+        expr: |
+          histogram_quantile(0.95, sum(rate(agent_execution_duration_seconds_bucket[5m])) by (le, agent_name)) > 30
+        for: 2m
+        labels:
+          severity: warning
+          team: agents
+        annotations:
+          summary: "Agent {{ $labels.agent_name }} p95 latency exceeds 30 seconds"
+          description: "Agent {{ $labels.agent_name }} 95th percentile latency is {{ $value | humanizeDuration }}, which exceeds the 30 second threshold."
+          runbook: "https://wiki.inhealth.io/runbooks/agent-high-latency"
+
+      - alert: AgentQueueDepth
+        expr: |
+          celery_queue_length > 100
+        for: 5m
+        labels:
+          severity: warning
+          team: agents
+        annotations:
+          summary: "Celery queue {{ $labels.queue_name }} depth exceeds 100"
+          description: "Celery queue {{ $labels.queue_name }} currently has {{ $value }} tasks waiting. This may indicate a processing bottleneck."
+          runbook: "https://wiki.inhealth.io/runbooks/celery-queue-depth"
+
+      - alert: A2AMessageFailures
+        expr: |
+          rate(a2a_message_failures_total[1m]) > 10
+        for: 2m
+        labels:
+          severity: warning
+          team: agents
+        annotations:
+          summary: "A2A message failure rate exceeds 10/minute on channel {{ $labels.channel }}"
+          description: "A2A gateway is experiencing {{ $value | humanize }} message failures per minute on channel {{ $labels.channel }}. Check agent connectivity and message broker health."
+          runbook: "https://wiki.inhealth.io/runbooks/a2a-message-failures"
+
+      - alert: CriticalAlertUnacknowledged
+        expr: |
+          (time() - clinical_alert_fired_timestamp{severity="critical"}) > 300
+          and clinical_alert_acknowledged == 0
+        for: 0m
+        labels:
+          severity: critical
+          team: clinical
+        annotations:
+          summary: "Critical clinical alert not acknowledged within 5 minutes"
+          description: "Critical alert {{ $labels.alert_id }} of type {{ $labels.alert_type }} for patient {{ $labels.patient_id }} has not been acknowledged. Alert has been active for {{ $value | humanizeDuration }}."
+          runbook: "https://wiki.inhealth.io/runbooks/critical-alert-unacknowledged"
+
+      - alert: AgentOrchestrationFailed
+        expr: |
+          rate(langgraph_pipeline_failures_total[5m]) > 0
+        for: 1m
+        labels:
+          severity: critical
+          team: agents
+        annotations:
+          summary: "LangGraph orchestration pipeline failure detected"
+          description: "LangGraph pipeline {{ $labels.pipeline_name }} has experienced {{ $value | humanize }} failures per second in the last 5 minutes. Patient care workflows may be interrupted."
+          runbook: "https://wiki.inhealth.io/runbooks/langgraph-orchestration-failed"
