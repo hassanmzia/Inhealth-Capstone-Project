@@ -27,8 +27,6 @@ volumes:
     name: inhealth-qdrant-data
   redis-data:
     name: inhealth-redis-data
-  ollama-data:
-    name: inhealth-ollama-data
   prometheus-data:
     name: inhealth-prometheus-data
   grafana-data:
@@ -203,41 +201,6 @@ services:
     mem_reservation: 128m
 
   # ---------------------------------------------------------------------------
-  # INFRASTRUCTURE: Ollama (Local LLM serving)
-  # ---------------------------------------------------------------------------
-  ollama:
-    image: ollama/ollama:latest
-    container_name: inhealth-ollama
-    restart: unless-stopped
-    environment:
-      OLLAMA_HOST: 0.0.0.0
-      OLLAMA_ORIGINS: "*"
-      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
-      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-2}
-      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-2}
-    ports:
-      - "${OLLAMA_HOST_PORT:-11788}:11434"
-    volumes:
-      - ollama-data:/root/.ollama
-    networks:
-      - inhealth-network
-    healthcheck:
-      test: ["CMD-SHELL", "ollama list || exit 1"]
-      interval: 30s
-      timeout: 15s
-      retries: 5
-      start_period: 60s
-    mem_limit: 8g
-    mem_reservation: 2g
-    deploy:
-      resources:
-        reservations:
-          devices:
-            - driver: nvidia
-              count: all
-              capabilities: [gpu]
-
-  # ---------------------------------------------------------------------------
   # INFRASTRUCTURE: MinIO (Object Storage - HIPAA-compliant S3-compatible)
   # ---------------------------------------------------------------------------
   minio:
@@ -314,7 +277,7 @@ services:
       # LLM APIs
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://172.168.1.95:12434}
       # Langfuse
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
@@ -402,7 +365,7 @@ services:
       AWS_S3_ENDPOINT_URL: http://minio:9000
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://172.168.1.95:12434}
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
       LANGFUSE_HOST: http://langfuse-web:3000
@@ -488,9 +451,10 @@ services:
       # LLM providers
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OLLAMA_BASE_URL: http://ollama:11434
-      DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-openai}
-      DEFAULT_LLM_MODEL: ${DEFAULT_LLM_MODEL:-gpt-4o}
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://172.168.1.95:12434}
+      DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-ollama}
+      DEFAULT_LLM_MODEL: ${DEFAULT_LLM_MODEL:-deepseek-r1:7b}
+      OLLAMA_CHAT_MODEL: ${OLLAMA_CHAT_MODEL:-deepseek-r1:7b}
       # Langfuse observability
       LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
       LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
@@ -558,7 +522,7 @@ services:
       # LLM
       OPENAI_API_KEY: ${OPENAI_API_KEY:-}
       ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
-      OLLAMA_BASE_URL: http://ollama:11434
+      OLLAMA_BASE_URL: ${OLLAMA_BASE_URL:-http://172.168.1.95:12434}
       # MCP config
       MCP_TRANSPORT: ${MCP_TRANSPORT:-http}
       MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
