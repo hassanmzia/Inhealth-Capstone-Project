@@ -1,0 +1,914 @@
+# =============================================================================
+# InHealth Chronic Care Platform - Docker Compose (Production)
+# =============================================================================
+# All services for the chronic disease management platform.
+# Port mappings: host:container (see README for full port reference)
+# =============================================================================
+
+version: "3.9"
+
+networks:
+  inhealth-network:
+    driver: bridge
+    name: inhealth-network
+
+volumes:
+  postgres-data:
+    name: inhealth-postgres-data
+  neo4j-data:
+    name: inhealth-neo4j-data
+  neo4j-logs:
+    name: inhealth-neo4j-logs
+  neo4j-plugins:
+    name: inhealth-neo4j-plugins
+  neo4j-import:
+    name: inhealth-neo4j-import
+  qdrant-data:
+    name: inhealth-qdrant-data
+  redis-data:
+    name: inhealth-redis-data
+  ollama-data:
+    name: inhealth-ollama-data
+  prometheus-data:
+    name: inhealth-prometheus-data
+  grafana-data:
+    name: inhealth-grafana-data
+  alertmanager-data:
+    name: inhealth-alertmanager-data
+  langfuse-postgres-data:
+    name: inhealth-langfuse-postgres-data
+  minio-data:
+    name: inhealth-minio-data
+  django-static:
+    name: inhealth-django-static
+  django-media:
+    name: inhealth-django-media
+  nginx-logs:
+    name: inhealth-nginx-logs
+
+# =============================================================================
+# SERVICES
+# =============================================================================
+services:
+
+  # ---------------------------------------------------------------------------
+  # INFRASTRUCTURE: PostgreSQL 16 (with pgvector + PostGIS)
+  # ---------------------------------------------------------------------------
+  postgres:
+    image: pgvector/pgvector:pg16
+    container_name: inhealth-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${POSTGRES_DB:-inhealth}
+      POSTGRES_USER: ${POSTGRES_USER:-inhealth}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-inhealth_secure_password}
+      POSTGRES_INITDB_ARGS: "--encoding=UTF-8 --lc-collate=C --lc-ctype=C"
+      PGDATA: /var/lib/postgresql/data/pgdata
+    ports:
+      - "${POSTGRES_HOST_PORT:-5588}:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+      - ./scripts/postgres/init.sql:/docker-entrypoint-initdb.d/01-init.sql:ro
+      - ./scripts/postgres/extensions.sql:/docker-entrypoint-initdb.d/02-extensions.sql:ro
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-inhealth} -d ${POSTGRES_DB:-inhealth}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: 2g
+    mem_reservation: 512m
+    command: >
+      postgres
+      -c max_connections=200
+      -c shared_buffers=256MB
+      -c effective_cache_size=768MB
+      -c maintenance_work_mem=64MB
+      -c checkpoint_completion_target=0.9
+      -c wal_buffers=16MB
+      -c default_statistics_target=100
+      -c random_page_cost=1.1
+      -c effective_io_concurrency=200
+      -c work_mem=4MB
+      -c min_wal_size=1GB
+      -c max_wal_size=4GB
+      -c log_min_duration_statement=1000
+      -c log_checkpoints=on
+      -c log_connections=on
+
+  # ---------------------------------------------------------------------------
+  # INFRASTRUCTURE: Neo4j 5.12 (Graph DB with APOC + GDS)
+  # ---------------------------------------------------------------------------
+  neo4j:
+    image: neo4j:5.12-enterprise
+    container_name: inhealth-neo4j
+    restart: unless-stopped
+    environment:
+      NEO4J_AUTH: ${NEO4J_USER:-neo4j}/${NEO4J_PASSWORD:-neo4j_secure_password}
+      NEO4J_ACCEPT_LICENSE_AGREEMENT: "yes"
+      NEO4J_server_memory_heap_initial__size: 512m
+      NEO4J_server_memory_heap_max__size: 1G
+      NEO4J_server_memory_pagecache__size: 512m
+      NEO4J_dbms_security_procedures_unrestricted: "apoc.*,gds.*"
+      NEO4J_dbms_security_procedures_allowlist: "apoc.*,gds.*"
+      NEO4J_PLUGINS: '["apoc", "graph-data-science"]'
+      NEO4J_apoc_export_file_enabled: "true"
+      NEO4J_apoc_import_file_enabled: "true"
+      NEO4J_apoc_import_file_use__neo4j__config: "true"
+      NEO4J_dbms_connector_bolt_advertised__address: "localhost:7688"
+      NEO4J_dbms_logs_query_enabled: "INFO"
+      NEO4J_dbms_logs_query_threshold: 1000ms
+    ports:
+      - "${NEO4J_HTTP_HOST_PORT:-7588}:7474"
+      - "${NEO4J_BOLT_HOST_PORT:-7688}:7687"
+    volumes:
+      - neo4j-data:/data
+      - neo4j-logs:/logs
+      - neo4j-plugins:/plugins
+      - neo4j-import:/var/lib/neo4j/import
+      - ./scripts/neo4j/constraints.cypher:/var/lib/neo4j/import/constraints.cypher:ro
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:7474/browser/ || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
+    mem_limit: 2g
+    mem_reservation: 512m
+
+  # ---------------------------------------------------------------------------
+  # INFRASTRUCTURE: Qdrant (Vector Store)
+  # ---------------------------------------------------------------------------
+  qdrant:
+    image: qdrant/qdrant:latest
+    container_name: inhealth-qdrant
+    restart: unless-stopped
+    environment:
+      QDRANT__SERVICE__HTTP_PORT: 6333
+      QDRANT__SERVICE__GRPC_PORT: 6334
+      QDRANT__LOG_LEVEL: ${QDRANT_LOG_LEVEL:-INFO}
+      QDRANT__STORAGE__STORAGE_PATH: /qdrant/storage
+      QDRANT__SERVICE__API_KEY: ${QDRANT_API_KEY:-}
+    ports:
+      - "${QDRANT_HOST_PORT:-6388}:6333"
+    volumes:
+      - qdrant-data:/qdrant/storage
+      - ./config/qdrant/config.yaml:/qdrant/config/production.yaml:ro
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:6333/healthz || exit 1"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    mem_limit: 1g
+    mem_reservation: 256m
+
+  # ---------------------------------------------------------------------------
+  # INFRASTRUCTURE: Redis 7 (Cache + Celery Broker + WebSocket Channel Layer)
+  # ---------------------------------------------------------------------------
+  redis:
+    image: redis:7-alpine
+    container_name: inhealth-redis
+    restart: unless-stopped
+    command: >
+      redis-server
+      --requirepass ${REDIS_PASSWORD:-redis_secure_password}
+      --maxmemory ${REDIS_MAX_MEMORY:-512mb}
+      --maxmemory-policy allkeys-lru
+      --appendonly yes
+      --appendfsync everysec
+      --save 900 1
+      --save 300 10
+      --save 60 10000
+      --loglevel notice
+    ports:
+      - "${REDIS_HOST_PORT:-6489}:6379"
+    volumes:
+      - redis-data:/data
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD", "redis-cli", "-a", "${REDIS_PASSWORD:-redis_secure_password}", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 10s
+    mem_limit: 768m
+    mem_reservation: 128m
+
+  # ---------------------------------------------------------------------------
+  # INFRASTRUCTURE: Ollama (Local LLM serving)
+  # ---------------------------------------------------------------------------
+  ollama:
+    image: ollama/ollama:latest
+    container_name: inhealth-ollama
+    restart: unless-stopped
+    environment:
+      OLLAMA_HOST: 0.0.0.0
+      OLLAMA_ORIGINS: "*"
+      OLLAMA_KEEP_ALIVE: ${OLLAMA_KEEP_ALIVE:-5m}
+      OLLAMA_NUM_PARALLEL: ${OLLAMA_NUM_PARALLEL:-2}
+      OLLAMA_MAX_LOADED_MODELS: ${OLLAMA_MAX_LOADED_MODELS:-2}
+    ports:
+      - "${OLLAMA_HOST_PORT:-11788}:11434"
+    volumes:
+      - ollama-data:/root/.ollama
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "ollama list || exit 1"]
+      interval: 30s
+      timeout: 15s
+      retries: 5
+      start_period: 60s
+    mem_limit: 8g
+    mem_reservation: 2g
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: all
+              capabilities: [gpu]
+
+  # ---------------------------------------------------------------------------
+  # INFRASTRUCTURE: MinIO (Object Storage - HIPAA-compliant S3-compatible)
+  # ---------------------------------------------------------------------------
+  minio:
+    image: minio/minio:latest
+    container_name: inhealth-minio
+    restart: unless-stopped
+    command: server /data --console-address ":9001" --address ":9000"
+    environment:
+      MINIO_ROOT_USER: ${MINIO_ROOT_USER:-minioadmin}
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:-minio_secure_password}
+      MINIO_VOLUMES: /data
+      MINIO_SITE_NAME: inhealth-storage
+      MINIO_REGION: ${MINIO_REGION:-us-east-1}
+      MINIO_BROWSER: "on"
+      MINIO_PROMETHEUS_AUTH_TYPE: public
+    ports:
+      - "${MINIO_API_HOST_PORT:-9588}:9000"
+      - "${MINIO_CONSOLE_HOST_PORT:-9589}:9001"
+    volumes:
+      - minio-data:/data
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:9000/minio/health/live || exit 1"]
+      interval: 15s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    mem_limit: 1g
+    mem_reservation: 256m
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: Django 5 (REST API + ASGI via Daphne)
+  # ---------------------------------------------------------------------------
+  django:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    image: inhealth/django:${APP_VERSION:-latest}
+    container_name: inhealth-django
+    restart: unless-stopped
+    environment:
+      # Django Core
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.production}
+      SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DEBUG: ${DEBUG:-False}
+      ALLOWED_HOSTS: ${ALLOWED_HOSTS:-localhost,127.0.0.1}
+      ALLOWED_CIDR_NETS: ${ALLOWED_CIDR_NETS:-10.0.0.0/8,172.16.0.0/12,192.168.0.0/16}
+      # Database
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inhealth}:${POSTGRES_PASSWORD:-inhealth_secure_password}@postgres:5432/${POSTGRES_DB:-inhealth}
+      # Redis
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/2
+      # Channel layers
+      CHANNEL_LAYERS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/3
+      # Neo4j
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_secure_password}
+      # Qdrant
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      # MinIO / S3
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio_secure_password}
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-inhealth-media}
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      AWS_S3_REGION_NAME: ${MINIO_REGION:-us-east-1}
+      # LLM APIs
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: http://ollama:11434
+      # Langfuse
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: http://langfuse-web:3000
+      # Email
+      EMAIL_BACKEND: ${EMAIL_BACKEND:-django.core.mail.backends.smtp.EmailBackend}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.sendgrid.net}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-apikey}
+      EMAIL_HOST_PASSWORD: ${SENDGRID_API_KEY:-}
+      DEFAULT_FROM_EMAIL: ${DEFAULT_FROM_EMAIL:-noreply@inhealth.local}
+      # Twilio
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      # JWT
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      JWT_ACCESS_TOKEN_LIFETIME_MINUTES: ${JWT_ACCESS_TOKEN_LIFETIME_MINUTES:-60}
+      JWT_REFRESH_TOKEN_LIFETIME_DAYS: ${JWT_REFRESH_TOKEN_LIFETIME_DAYS:-7}
+      # App
+      TENANT_DOMAIN: ${TENANT_DOMAIN:-inhealth.local}
+      HIPAA_AUDIT_LOG: ${HIPAA_AUDIT_LOG:-True}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      AGENTS_API_URL: http://agents-api:8001
+      MCP_SERVER_URL: http://mcp-server:3001
+      A2A_GATEWAY_URL: http://a2a-gateway:3002
+    volumes:
+      - django-static:/app/staticfiles
+      - django-media:/app/media
+    networks:
+      - inhealth-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8000/api/health/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    mem_limit: 2g
+    mem_reservation: 512m
+    expose:
+      - "8000"
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: Celery Worker
+  # ---------------------------------------------------------------------------
+  celery-worker:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    image: inhealth/django:${APP_VERSION:-latest}
+    container_name: inhealth-celery-worker
+    restart: unless-stopped
+    command: celery -A config.celery_app worker --loglevel=${CELERY_LOG_LEVEL:-info} --concurrency=${CELERY_WORKER_CONCURRENCY:-4} -Q default,high_priority,medical_alerts,notifications,reports
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.production}
+      SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DEBUG: "False"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inhealth}:${POSTGRES_PASSWORD:-inhealth_secure_password}@postgres:5432/${POSTGRES_DB:-inhealth}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/2
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_secure_password}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      AWS_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      AWS_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio_secure_password}
+      AWS_STORAGE_BUCKET_NAME: ${AWS_STORAGE_BUCKET_NAME:-inhealth-media}
+      AWS_S3_ENDPOINT_URL: http://minio:9000
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: http://ollama:11434
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: http://langfuse-web:3000
+      TWILIO_ACCOUNT_SID: ${TWILIO_ACCOUNT_SID:-}
+      TWILIO_AUTH_TOKEN: ${TWILIO_AUTH_TOKEN:-}
+      TWILIO_FROM_NUMBER: ${TWILIO_FROM_NUMBER:-}
+      EMAIL_HOST: ${EMAIL_HOST:-smtp.sendgrid.net}
+      EMAIL_PORT: ${EMAIL_PORT:-587}
+      EMAIL_HOST_USER: ${EMAIL_HOST_USER:-apikey}
+      EMAIL_HOST_PASSWORD: ${SENDGRID_API_KEY:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      HIPAA_AUDIT_LOG: ${HIPAA_AUDIT_LOG:-True}
+    volumes:
+      - django-media:/app/media
+    networks:
+      - inhealth-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 1g
+    mem_reservation: 256m
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: Celery Beat (Scheduler)
+  # ---------------------------------------------------------------------------
+  celery-beat:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    image: inhealth/django:${APP_VERSION:-latest}
+    container_name: inhealth-celery-beat
+    restart: unless-stopped
+    command: celery -A config.celery_app beat --loglevel=${CELERY_LOG_LEVEL:-info} --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    environment:
+      DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.production}
+      SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
+      DEBUG: "False"
+      DATABASE_URL: postgresql://${POSTGRES_USER:-inhealth}:${POSTGRES_PASSWORD:-inhealth_secure_password}@postgres:5432/${POSTGRES_DB:-inhealth}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/0
+      CELERY_BROKER_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/1
+      CELERY_RESULT_BACKEND: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/2
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+    networks:
+      - inhealth-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    mem_limit: 512m
+    mem_reservation: 128m
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: Agents API (FastAPI + LangGraph)
+  # ---------------------------------------------------------------------------
+  agents-api:
+    build:
+      context: ./agents
+      dockerfile: Dockerfile
+      target: production
+      args:
+        PYTHON_VERSION: ${PYTHON_VERSION:-3.12}
+    image: inhealth/agents-api:${APP_VERSION:-latest}
+    container_name: inhealth-agents-api
+    restart: unless-stopped
+    environment:
+      ENVIRONMENT: ${ENVIRONMENT:-production}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      # Database connections
+      DATABASE_URL: postgresql+asyncpg://${POSTGRES_USER:-inhealth}:${POSTGRES_PASSWORD:-inhealth_secure_password}@postgres:5432/${POSTGRES_DB:-inhealth}
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_secure_password}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/4
+      # LLM providers
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: http://ollama:11434
+      DEFAULT_LLM_PROVIDER: ${DEFAULT_LLM_PROVIDER:-openai}
+      DEFAULT_LLM_MODEL: ${DEFAULT_LLM_MODEL:-gpt-4o}
+      # Langfuse observability
+      LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_HOST: http://langfuse-web:3000
+      # MCP / A2A
+      MCP_SERVER_URL: http://mcp-server:3001
+      A2A_GATEWAY_URL: http://a2a-gateway:3002
+      DJANGO_API_URL: http://django:8000
+      DJANGO_API_KEY: ${DJANGO_INTERNAL_API_KEY:-}
+      # Security
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+      ENCRYPTION_KEY: ${ENCRYPTION_KEY:?ENCRYPTION_KEY is required}
+      # Agent config
+      MAX_AGENT_ITERATIONS: ${MAX_AGENT_ITERATIONS:-10}
+      AGENT_TIMEOUT_SECONDS: ${AGENT_TIMEOUT_SECONDS:-120}
+      ENABLE_HUMAN_IN_LOOP: ${ENABLE_HUMAN_IN_LOOP:-True}
+    networks:
+      - inhealth-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      neo4j:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 45s
+    mem_limit: 2g
+    mem_reservation: 512m
+    expose:
+      - "8001"
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: MCP Server (Node.js Model Context Protocol)
+  # ---------------------------------------------------------------------------
+  mcp-server:
+    build:
+      context: ./mcp-server
+      dockerfile: Dockerfile
+      target: production
+    image: inhealth/mcp-server:${APP_VERSION:-latest}
+    container_name: inhealth-mcp-server
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3001
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Backend connections
+      DJANGO_API_URL: http://django:8000
+      DJANGO_API_KEY: ${DJANGO_INTERNAL_API_KEY:-}
+      AGENTS_API_URL: http://agents-api:8001
+      NEO4J_URI: bolt://neo4j:7687
+      NEO4J_USER: ${NEO4J_USER:-neo4j}
+      NEO4J_PASSWORD: ${NEO4J_PASSWORD:-neo4j_secure_password}
+      QDRANT_HOST: qdrant
+      QDRANT_PORT: 6333
+      QDRANT_API_KEY: ${QDRANT_API_KEY:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/5
+      # LLM
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-}
+      ANTHROPIC_API_KEY: ${ANTHROPIC_API_KEY:-}
+      OLLAMA_BASE_URL: http://ollama:11434
+      # MCP config
+      MCP_TRANSPORT: ${MCP_TRANSPORT:-http}
+      MCP_AUTH_TOKEN: ${MCP_AUTH_TOKEN:-}
+      MCP_MAX_TOOLS: ${MCP_MAX_TOOLS:-50}
+      # Security
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+    networks:
+      - inhealth-network
+    depends_on:
+      django:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3001/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    mem_limit: 1g
+    mem_reservation: 256m
+    expose:
+      - "3001"
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: A2A Gateway (Node.js Agent-to-Agent communication)
+  # ---------------------------------------------------------------------------
+  a2a-gateway:
+    build:
+      context: ./a2a-gateway
+      dockerfile: Dockerfile
+      target: production
+    image: inhealth/a2a-gateway:${APP_VERSION:-latest}
+    container_name: inhealth-a2a-gateway
+    restart: unless-stopped
+    environment:
+      NODE_ENV: ${NODE_ENV:-production}
+      PORT: 3002
+      LOG_LEVEL: ${LOG_LEVEL:-info}
+      # Service registry
+      AGENTS_API_URL: http://agents-api:8001
+      MCP_SERVER_URL: http://mcp-server:3001
+      DJANGO_API_URL: http://django:8000
+      DJANGO_API_KEY: ${DJANGO_INTERNAL_API_KEY:-}
+      REDIS_URL: redis://:${REDIS_PASSWORD:-redis_secure_password}@redis:6379/6
+      # A2A config
+      A2A_AUTH_TOKEN: ${A2A_AUTH_TOKEN:-}
+      A2A_MESSAGE_TIMEOUT_MS: ${A2A_MESSAGE_TIMEOUT_MS:-30000}
+      A2A_MAX_RETRIES: ${A2A_MAX_RETRIES:-3}
+      A2A_AGENT_CARD_PATH: ${A2A_AGENT_CARD_PATH:-./.well-known/agent.json}
+      # Security
+      JWT_SECRET_KEY: ${JWT_SECRET_KEY:-}
+    networks:
+      - inhealth-network
+    depends_on:
+      redis:
+        condition: service_healthy
+      agents-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3002/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 30s
+    mem_limit: 512m
+    mem_reservation: 128m
+    expose:
+      - "3002"
+
+  # ---------------------------------------------------------------------------
+  # APPLICATION: Frontend (React/Vite - served via Nginx in production)
+  # ---------------------------------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+      target: production
+      args:
+        NODE_ENV: production
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-/ws}
+        VITE_AGENTS_BASE_URL: ${VITE_AGENTS_BASE_URL:-/agents}
+        VITE_APP_NAME: ${VITE_APP_NAME:-InHealth Chronic Care}
+        VITE_APP_VERSION: ${APP_VERSION:-1.0.0}
+        VITE_LANGFUSE_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+        VITE_SENTRY_DSN: ${SENTRY_DSN:-}
+    image: inhealth/frontend:${APP_VERSION:-latest}
+    container_name: inhealth-frontend
+    restart: unless-stopped
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/ || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 20s
+    mem_limit: 256m
+    mem_reservation: 64m
+    expose:
+      - "3000"
+
+  # ---------------------------------------------------------------------------
+  # GATEWAY: Nginx (Reverse Proxy + Static File Serving)
+  # ---------------------------------------------------------------------------
+  nginx:
+    image: nginx:1.25-alpine
+    container_name: inhealth-nginx
+    restart: unless-stopped
+    ports:
+      - "${NGINX_HOST_PORT:-8788}:80"
+    volumes:
+      - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/conf.d:/etc/nginx/conf.d:ro
+      - django-static:/var/www/static:ro
+      - django-media:/var/www/media:ro
+      - nginx-logs:/var/log/nginx
+    networks:
+      - inhealth-network
+    depends_on:
+      django:
+        condition: service_healthy
+      agents-api:
+        condition: service_healthy
+      mcp-server:
+        condition: service_healthy
+      a2a-gateway:
+        condition: service_healthy
+      frontend:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost/health || nginx -t 2>&1 | grep -q 'ok'"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    mem_limit: 256m
+    mem_reservation: 64m
+
+  # ---------------------------------------------------------------------------
+  # OBSERVABILITY: Prometheus
+  # ---------------------------------------------------------------------------
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: inhealth-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--storage.tsdb.retention.time=${PROMETHEUS_RETENTION:-30d}'
+      - '--storage.tsdb.retention.size=${PROMETHEUS_RETENTION_SIZE:-10GB}'
+      - '--web.console.libraries=/usr/share/prometheus/console_libraries'
+      - '--web.console.templates=/usr/share/prometheus/consoles'
+      - '--web.enable-lifecycle'
+      - '--web.enable-admin-api'
+    ports:
+      - "${PROMETHEUS_HOST_PORT:-9390}:9090"
+    volumes:
+      - ./config/prometheus/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - ./config/prometheus/rules:/etc/prometheus/rules:ro
+      - prometheus-data:/prometheus
+    networks:
+      - inhealth-network
+    depends_on:
+      - django
+      - agents-api
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9090/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    mem_limit: 1g
+    mem_reservation: 256m
+
+  # ---------------------------------------------------------------------------
+  # OBSERVABILITY: Grafana
+  # ---------------------------------------------------------------------------
+  grafana:
+    image: grafana/grafana:latest
+    container_name: inhealth-grafana
+    restart: unless-stopped
+    environment:
+      GF_SERVER_HTTP_PORT: 4000
+      GF_SECURITY_ADMIN_USER: ${GRAFANA_ADMIN_USER:-admin}
+      GF_SECURITY_ADMIN_PASSWORD: ${GRAFANA_ADMIN_PASSWORD:-grafana_secure_password}
+      GF_SECURITY_SECRET_KEY: ${GRAFANA_SECRET_KEY:-}
+      GF_USERS_ALLOW_SIGN_UP: "false"
+      GF_USERS_ALLOW_ORG_CREATE: "false"
+      GF_AUTH_ANONYMOUS_ENABLED: "false"
+      GF_INSTALL_PLUGINS: ${GRAFANA_PLUGINS:-grafana-clock-panel,grafana-simple-json-datasource,redis-datasource}
+      GF_PATHS_PROVISIONING: /etc/grafana/provisioning
+      GF_DATABASE_TYPE: postgres
+      GF_DATABASE_HOST: postgres:5432
+      GF_DATABASE_NAME: ${GRAFANA_DB:-grafana}
+      GF_DATABASE_USER: ${POSTGRES_USER:-inhealth}
+      GF_DATABASE_PASSWORD: ${POSTGRES_PASSWORD:-inhealth_secure_password}
+      GF_SMTP_ENABLED: ${GF_SMTP_ENABLED:-false}
+      GF_SMTP_HOST: ${EMAIL_HOST:-smtp.sendgrid.net}:${EMAIL_PORT:-587}
+      GF_SMTP_USER: ${EMAIL_HOST_USER:-apikey}
+      GF_SMTP_PASSWORD: ${SENDGRID_API_KEY:-}
+      GF_SMTP_FROM_ADDRESS: ${DEFAULT_FROM_EMAIL:-noreply@inhealth.local}
+      GF_FEATURE_TOGGLES_ENABLE: ${GF_FEATURE_TOGGLES:-publicDashboards}
+    ports:
+      - "${GRAFANA_HOST_PORT:-9391}:4000"
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./config/grafana/provisioning:/etc/grafana/provisioning:ro
+      - ./config/grafana/dashboards:/var/lib/grafana/dashboards:ro
+    networks:
+      - inhealth-network
+    depends_on:
+      postgres:
+        condition: service_healthy
+      prometheus:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:4000/api/health || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    mem_limit: 512m
+    mem_reservation: 128m
+
+  # ---------------------------------------------------------------------------
+  # OBSERVABILITY: Alertmanager
+  # ---------------------------------------------------------------------------
+  alertmanager:
+    image: prom/alertmanager:latest
+    container_name: inhealth-alertmanager
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/alertmanager/alertmanager.yml'
+      - '--storage.path=/alertmanager'
+      - '--web.external-url=http://localhost:${ALERTMANAGER_HOST_PORT:-9393}'
+    ports:
+      - "${ALERTMANAGER_HOST_PORT:-9393}:9093"
+    volumes:
+      - ./config/alertmanager/alertmanager.yml:/etc/alertmanager/alertmanager.yml:ro
+      - alertmanager-data:/alertmanager
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:9093/-/healthy || exit 1"]
+      interval: 15s
+      timeout: 5s
+      retries: 3
+      start_period: 15s
+    mem_limit: 256m
+    mem_reservation: 64m
+
+  # ---------------------------------------------------------------------------
+  # OBSERVABILITY: Langfuse Postgres (separate DB for Langfuse)
+  # ---------------------------------------------------------------------------
+  langfuse-postgres:
+    image: postgres:16-alpine
+    container_name: inhealth-langfuse-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: ${LANGFUSE_DB_NAME:-langfuse}
+      POSTGRES_USER: ${LANGFUSE_DB_USER:-langfuse}
+      POSTGRES_PASSWORD: ${LANGFUSE_DB_PASSWORD:-langfuse_secure_password}
+      PGDATA: /var/lib/postgresql/data/pgdata
+    volumes:
+      - langfuse-postgres-data:/var/lib/postgresql/data
+    networks:
+      - inhealth-network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${LANGFUSE_DB_USER:-langfuse} -d ${LANGFUSE_DB_NAME:-langfuse}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 20s
+    mem_limit: 512m
+    mem_reservation: 128m
+
+  # ---------------------------------------------------------------------------
+  # OBSERVABILITY: Langfuse Web (LLM Observability UI)
+  # ---------------------------------------------------------------------------
+  langfuse-web:
+    image: langfuse/langfuse:latest
+    container_name: inhealth-langfuse-web
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse_secure_password}@langfuse-postgres:5432/${LANGFUSE_DB_NAME:-langfuse}
+      NEXTAUTH_URL: ${LANGFUSE_NEXTAUTH_URL:-http://localhost:3488}
+      NEXTAUTH_SECRET: ${LANGFUSE_NEXTAUTH_SECRET:?LANGFUSE_NEXTAUTH_SECRET is required}
+      SALT: ${LANGFUSE_SALT:?LANGFUSE_SALT is required}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?LANGFUSE_ENCRYPTION_KEY is required}
+      LANGFUSE_INIT_ORG_ID: ${LANGFUSE_INIT_ORG_ID:-inhealth-org}
+      LANGFUSE_INIT_ORG_NAME: ${LANGFUSE_INIT_ORG_NAME:-InHealth}
+      LANGFUSE_INIT_PROJECT_ID: ${LANGFUSE_INIT_PROJECT_ID:-inhealth-project}
+      LANGFUSE_INIT_PROJECT_NAME: ${LANGFUSE_INIT_PROJECT_NAME:-InHealth Chronic Care}
+      LANGFUSE_INIT_PROJECT_PUBLIC_KEY: ${LANGFUSE_PUBLIC_KEY:-}
+      LANGFUSE_INIT_PROJECT_SECRET_KEY: ${LANGFUSE_SECRET_KEY:-}
+      LANGFUSE_INIT_USER_EMAIL: ${LANGFUSE_INIT_USER_EMAIL:-admin@inhealth.local}
+      LANGFUSE_INIT_USER_NAME: ${LANGFUSE_INIT_USER_NAME:-Admin}
+      LANGFUSE_INIT_USER_PASSWORD: ${LANGFUSE_INIT_USER_PASSWORD:-}
+      TELEMETRY_ENABLED: ${LANGFUSE_TELEMETRY:-false}
+      LANGFUSE_ENABLE_EXPERIMENTAL_FEATURES: ${LANGFUSE_EXPERIMENTAL:-false}
+      PORT: 3000
+    ports:
+      - "${LANGFUSE_HOST_PORT:-3488}:3000"
+    networks:
+      - inhealth-network
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget -q --spider http://localhost:3000/api/public/health || exit 1"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+      start_period: 60s
+    mem_limit: 1g
+    mem_reservation: 256m
+
+  # ---------------------------------------------------------------------------
+  # OBSERVABILITY: Langfuse Worker (Background processing)
+  # ---------------------------------------------------------------------------
+  langfuse-worker:
+    image: langfuse/langfuse-worker:latest
+    container_name: inhealth-langfuse-worker
+    restart: unless-stopped
+    environment:
+      NODE_ENV: production
+      DATABASE_URL: postgresql://${LANGFUSE_DB_USER:-langfuse}:${LANGFUSE_DB_PASSWORD:-langfuse_secure_password}@langfuse-postgres:5432/${LANGFUSE_DB_NAME:-langfuse}
+      SALT: ${LANGFUSE_SALT:?LANGFUSE_SALT is required}
+      ENCRYPTION_KEY: ${LANGFUSE_ENCRYPTION_KEY:?LANGFUSE_ENCRYPTION_KEY is required}
+      REDIS_HOST: redis
+      REDIS_PORT: 6379
+      REDIS_AUTH: ${REDIS_PASSWORD:-redis_secure_password}
+      REDIS_TLS_ENABLED: "false"
+      LANGFUSE_S3_MEDIA_UPLOAD_BUCKET: ${LANGFUSE_S3_BUCKET:-langfuse-media}
+      S3_ENDPOINT: http://minio:9000
+      S3_ACCESS_KEY_ID: ${MINIO_ROOT_USER:-minioadmin}
+      S3_SECRET_ACCESS_KEY: ${MINIO_ROOT_PASSWORD:-minio_secure_password}
+      S3_REGION: ${MINIO_REGION:-us-east-1}
+      S3_FORCE_PATH_STYLE: "true"
+    networks:
+      - inhealth-network
+    depends_on:
+      langfuse-postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_healthy
+    mem_limit: 1g
+    mem_reservation: 256m
