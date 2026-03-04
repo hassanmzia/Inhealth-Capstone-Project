@@ -33,7 +33,7 @@ POSTGRES_CONTAINER  := inhealth-postgres
 NEO4J_CONTAINER     := inhealth-neo4j
 QDRANT_CONTAINER    := inhealth-qdrant
 REDIS_CONTAINER     := inhealth-redis
-OLLAMA_CONTAINER    := inhealth-ollama
+OLLAMA_BASE_URL     := http://172.168.1.95:12434
 AGENTS_CONTAINER    := inhealth-agents-api
 FRONTEND_CONTAINER  := inhealth-frontend
 
@@ -121,8 +121,9 @@ help:
 	@echo "  $(CYAN)make lint-frontend$(RESET)        Run JS/TS linters (eslint, tsc)"
 	@echo ""
 	@echo "$(BOLD)Ollama (Local LLM):$(RESET)"
-	@echo "  $(CYAN)make pull-ollama$(RESET)          Pull default LLM model (llama3.2)"
-	@echo "  $(CYAN)make list-ollama$(RESET)          List available Ollama models"
+	@echo "  $(CYAN)make check-ollama$(RESET)         Verify external Ollama is reachable"
+	@echo "  $(CYAN)make pull-ollama$(RESET)          Pull deepseek-r1:7b on external Ollama"
+	@echo "  $(CYAN)make list-ollama$(RESET)          List models on external Ollama"
 	@echo ""
 	@echo "$(BOLD)Cleanup:$(RESET)"
 	@echo "  $(CYAN)make clean$(RESET)               Remove containers and orphans (keep volumes)"
@@ -149,7 +150,7 @@ setup: check-dirs
 	@echo "  3. Run $(BOLD)make up$(RESET)"
 	@echo "  4. Run $(BOLD)make migrate$(RESET)"
 	@echo "  5. Run $(BOLD)make seed$(RESET)"
-	@echo "  6. Run $(BOLD)make pull-ollama$(RESET)"
+	@echo "  6. Verify external Ollama: $(BOLD)make check-ollama$(RESET)"
 	@echo "  7. Run $(BOLD)make createsuperuser$(RESET)"
 
 check-dirs:
@@ -484,29 +485,30 @@ lint-frontend:
 	@echo "$(GREEN)Frontend linting complete.$(RESET)"
 
 # =============================================================================
-# OLLAMA (Local LLM)
+# OLLAMA (External LLM — running on host at 172.168.1.95:12434)
 # =============================================================================
+check-ollama:
+	@echo "$(BLUE)Checking external Ollama at $(OLLAMA_BASE_URL)...$(RESET)"
+	curl -sf $(OLLAMA_BASE_URL)/api/tags | python3 -m json.tool || \
+		(echo "$(RED)ERROR: Cannot reach Ollama at $(OLLAMA_BASE_URL)$(RESET)"; exit 1)
+	@echo "$(GREEN)Ollama is reachable.$(RESET)"
+
 pull-ollama:
-	@echo "$(BLUE)Pulling default Ollama models...$(RESET)"
-	@echo "Pulling llama3.2 (primary chat model)..."
-	docker exec $(OLLAMA_CONTAINER) ollama pull llama3.2
-	@echo "Pulling mxbai-embed-large (embeddings)..."
-	docker exec $(OLLAMA_CONTAINER) ollama pull mxbai-embed-large
-	@echo "Pulling llama3.2:1b (lightweight tasks)..."
-	docker exec $(OLLAMA_CONTAINER) ollama pull llama3.2:1b
-	@echo "$(GREEN)Ollama models pulled.$(RESET)"
+	@echo "$(BLUE)Pulling deepseek-r1:7b on external Ollama...$(RESET)"
+	curl -sf $(OLLAMA_BASE_URL)/api/pull -d '{"name":"deepseek-r1:7b"}' | cat
+	@echo "$(GREEN)Model pull requested.$(RESET)"
 
 pull-ollama-model:
 	@if [ -z "$(MODEL)" ]; then \
-		echo "$(RED)ERROR: Specify model with: make pull-ollama-model MODEL=llama3.2$(RESET)"; \
+		echo "$(RED)ERROR: Specify model with: make pull-ollama-model MODEL=deepseek-r1:7b$(RESET)"; \
 		exit 1; \
 	fi
 	@echo "$(BLUE)Pulling Ollama model: $(MODEL)...$(RESET)"
-	docker exec $(OLLAMA_CONTAINER) ollama pull $(MODEL)
+	curl -sf $(OLLAMA_BASE_URL)/api/pull -d "{\"name\":\"$(MODEL)\"}" | cat
 
 list-ollama:
-	@echo "$(BLUE)Available Ollama models:$(RESET)"
-	docker exec $(OLLAMA_CONTAINER) ollama list
+	@echo "$(BLUE)Available Ollama models on $(OLLAMA_BASE_URL):$(RESET)"
+	curl -sf $(OLLAMA_BASE_URL)/api/tags | python3 -c "import sys,json; [print(' -', m['name']) for m in json.load(sys.stdin).get('models',[])]"
 
 # =============================================================================
 # DEVELOPMENT HELPERS
@@ -518,7 +520,7 @@ dev:
 
 dev-backend:
 	@echo "$(BLUE)Starting backend services only...$(RESET)"
-	$(COMPOSE_CMD) up -d postgres redis neo4j qdrant minio ollama
+	$(COMPOSE_CMD) up -d postgres redis neo4j qdrant minio
 	@echo "$(GREEN)Backend infrastructure started.$(RESET)"
 
 dev-frontend:
