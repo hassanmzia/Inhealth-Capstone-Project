@@ -1,0 +1,29 @@
+{
+  "name": "inhealth-a2a-gateway",
+  "version": "1.0.0",
+  "description": "A2A Protocol Gateway for InHealth agents",
+  "main": "dist/index.js",
+  "scripts": {
+    "build": "tsc",
+    "start": "node dist/index.js",
+    "dev": "ts-node-dev --respawn --transpile-only src/index.ts"
+  },
+  "dependencies": {
+    "express": "^4.18.0",
+    "redis": "^4.6.0",
+    "ws": "^8.16.0",
+    "uuid": "^9.0.0",
+    "zod": "^3.22.0",
+    "winston": "^3.11.0",
+    "prom-client": "^15.1.0",
+    "jsonwebtoken": "^9.0.0"
+  },
+  "devDependencies": {
+    "@types/express": "^4.17.0",
+    "@types/ws": "^8.5.0",
+    "@types/uuid": "^9.0.0",
+    "@types/jsonwebtoken": "^9.0.0",
+    "typescript": "^5.3.0",
+    "ts-node-dev": "^2.0.0"
+  }
+}

@@ -1,0 +1,5 @@
+-r base.txt
+
+# Production extras
+django-redis==5.4.0
+hiredis==2.3.2

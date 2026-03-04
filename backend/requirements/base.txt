@@ -1,0 +1,124 @@
+# Core Django
+django==5.2
+djangorestframework==3.15.2
+djangorestframework-simplejwt==5.3.1
+django-cors-headers==4.3.1
+django-filter==24.1
+django-environ==0.11.2
+django-extensions==3.2.3
+
+# Multi-tenancy
+django-tenants==3.6.1
+
+# Object-level RBAC
+django-guardian==2.4.0
+
+# WebSocket / ASGI / Channels
+channels==4.1.0
+channels-redis==4.2.0
+daphne==4.1.2
+
+# Async Tasks
+celery==5.3.6
+django-celery-beat==2.6.0
+celery[redis]==5.3.6
+
+# Redis
+redis==5.0.1
+
+# Database
+psycopg2-binary==2.9.9
+psycopg[binary]==3.1.18
+
+# Neo4j
+neo4j==5.15.0
+
+# Vector DB
+qdrant-client==1.7.3
+
+# LLM / AI orchestration
+langchain==0.2.6
+langchain-community==0.2.6
+langchain-openai==0.1.13
+langfuse==2.27.1
+anthropic==0.25.9
+openai==1.12.0
+
+# Embeddings / ML
+sentence-transformers==2.7.0
+numpy==1.26.4
+pandas==2.1.4
+scikit-learn==1.4.2
+xgboost==2.0.3
+
+# Deep Learning (CPU build for production Docker; GPU on dev)
+torch==2.2.2
+torchvision==0.17.2
+
+# WSGI/ASGI servers
+gunicorn==21.2.0
+uvicorn[standard]==0.29.0
+whitenoise==6.6.0
+
+# Storage
+django-storages[s3]==1.14.2
+boto3==1.34.69
+
+# Image processing
+Pillow==10.2.0
+
+# Configuration
+python-dotenv==1.0.1
+pydantic==2.6.4
+pydantic-settings==2.2.1
+
+# HTTP client
+httpx==0.27.0
+aiohttp==3.9.3
+requests==2.31.0
+
+# Privacy / PHI protection
+presidio-analyzer==2.2.354
+presidio-anonymizer==2.2.354
+spacy==3.7.4
+
+# Geospatial
+geopy==2.4.1
+shapely==2.0.3
+
+# FHIR
+fhir.resources==7.1.0
+
+# HL7
+hl7apy==1.3.4
+
+# API Documentation
+drf-spectacular==0.27.2
+
+# Monitoring / Observability
+sentry-sdk[django]==1.44.1
+structlog==24.1.0
+python-json-logger==2.0.7
+prometheus-client==0.20.0
+django-prometheus==2.3.1
+
+# Encryption
+cryptography==42.0.5
+django-encrypted-model-fields==0.6.5
+
+# Communication adapters
+twilio==8.13.0
+sendgrid==6.11.0
+
+# Utilities
+python-dateutil==2.9.0.post0
+pytz==2024.1
+shortuuid==1.0.13
+ulid-py==1.1.0
+
+# Testing
+pytest==8.1.1
+pytest-django==4.8.0
+pytest-asyncio==0.23.6
+factory-boy==3.3.0
+faker==24.4.0
