@@ -1,31 +1,85 @@
 """
 Custom tenant middleware for InHealth.
 
-Extends TenantMainMiddleware to fall back to the public schema when a
-request arrives from a domain that is not registered as a tenant (e.g.
-internal health-check probes from Docker / Kubernetes, or Prometheus
-scraping via the container hostname).  Without this, every such request
-receives a bare 404 before URL routing even runs, which prevents the
-Docker health check from ever succeeding.
+Extends TenantMainMiddleware with two fallback strategies:
+
+1. JWT-based tenant resolution: when the HTTP domain is not registered as a
+   tenant (common in local dev / Docker environments where requests arrive via
+   localhost, 127.0.0.1, or a container IP), the middleware decodes the Bearer
+   token from the Authorization header and reads the ``tenantId`` claim that is
+   embedded at login time.  This allows every authenticated API request to be
+   served from the correct tenant schema even when no domain row exists.
+
+2. Public-schema fallback: unauthenticated requests (health-checks, login,
+   token-refresh, etc.) that arrive without a valid JWT still fall back to the
+   public schema so that shared-app endpoints continue to work.
 """
+
+import logging
 
 from django.db import connection
 from django_tenants.middleware.main import TenantMainMiddleware
 from django_tenants.utils import get_public_schema_name
+
+logger = logging.getLogger("apps.tenants")
 
 
 class PublicFallbackTenantMiddleware(TenantMainMiddleware):
     """
     Drop-in replacement for TenantMainMiddleware.
 
-    Behaviour is identical for recognised tenant domains.  For any domain
-    that has no matching row in tenants_domain, the request is served from
-    the public schema instead of raising Http404.  Authentication and
-    permission checks still apply to all views.
+    Resolution order for requests whose HTTP domain is not in tenants_domain:
+      1. Bearer token  →  tenantId claim  →  Organization.schema_name
+      2. Public schema (unauthenticated / no valid token)
     """
 
     def process_request(self, request):
         try:
             super().process_request(request)
         except self.TENANT_NOT_FOUND_EXCEPTION:
+            if self._set_schema_from_jwt(request):
+                return
             connection.set_schema(get_public_schema_name())
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+
+    def _set_schema_from_jwt(self, request) -> bool:
+        """
+        Decode the Bearer token and switch the DB connection to the tenant
+        schema indicated by the ``tenantId`` claim.
+
+        Returns True on success, False on any failure.
+        """
+        try:
+            auth_header = request.META.get("HTTP_AUTHORIZATION", "")
+            if not auth_header.startswith("Bearer "):
+                return False
+
+            raw_token = auth_header.split(" ", 1)[1]
+
+            # Use simplejwt's UntypedToken so we don't need to import the
+            # concrete token class (avoids circular-import risks).
+            from rest_framework_simplejwt.tokens import UntypedToken
+
+            validated = UntypedToken(raw_token)
+            tenant_id = validated.get("tenantId")
+            if not tenant_id:
+                return False
+
+            from apps.tenants.models import Organization
+
+            org = Organization.objects.get(pk=tenant_id)
+            connection.set_schema(org.schema_name)
+            request.tenant = org
+            logger.debug(
+                "Tenant schema set from JWT: schema=%s (tenant_id=%s)",
+                org.schema_name,
+                tenant_id,
+            )
+            return True
+
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("JWT-based tenant resolution failed: %s", exc)
+            return False
