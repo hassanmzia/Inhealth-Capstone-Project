@@ -19,6 +19,11 @@ class AlertConsumer(AsyncWebsocketConsumer):
 
     async def connect(self):
         user = self.scope.get("user")
+
+        # Accept FIRST — calling close() before accept() drops the TCP
+        # connection without a proper WS close frame, producing code 1006.
+        await self.accept()
+
         if not user or not user.is_authenticated:
             await self.close(code=4001)
             return
@@ -27,14 +32,16 @@ class AlertConsumer(AsyncWebsocketConsumer):
         self.tenant_id = str(user.tenant_id) if user.tenant_id else "global"
         self.room_group_name = f"alerts_user_{self.user_id}"
 
-        # Join user-specific group
-        await self.channel_layer.group_add(self.room_group_name, self.channel_name)
+        try:
+            # Join user-specific group
+            await self.channel_layer.group_add(self.room_group_name, self.channel_name)
 
-        # Also join tenant-wide group (for broadcast alerts)
-        self.tenant_group = f"alerts_tenant_{self.tenant_id}"
-        await self.channel_layer.group_add(self.tenant_group, self.channel_name)
+            # Also join tenant-wide group (for broadcast alerts)
+            self.tenant_group = f"alerts_tenant_{self.tenant_id}"
+            await self.channel_layer.group_add(self.tenant_group, self.channel_name)
+        except Exception:
+            logger.warning("Channel layer unavailable; connected without group membership")
 
-        await self.accept()
         logger.info(f"Alert WebSocket connected: user={self.user_id}")
 
         # Send pending unacknowledged notifications
