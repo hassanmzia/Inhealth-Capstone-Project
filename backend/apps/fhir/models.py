@@ -34,8 +34,10 @@ class FHIRBase(models.Model):
         if not self.fhir_id:
             self.fhir_id = str(uuid.uuid4())
         self.meta_last_updated = timezone.now()
-        # Increment version
-        if self.pk:
+        # Increment version only on UPDATE (not on initial CREATE).
+        # Use _state.adding because UUID PKs are pre-populated, making
+        # `if self.pk` always True even for brand-new unsaved instances.
+        if not self._state.adding:
             try:
                 current = self.__class__.objects.get(pk=self.pk)
                 self.meta_version_id = str(int(current.meta_version_id) + 1)

@@ -1,11 +1,14 @@
 #!/bin/bash
 # =============================================================================
 # InHealth Django Entrypoint
-# Runs migrate_schemas before starting the server so tenant schema tables
-# are always up-to-date on every container start / redeploy.
+# 1. makemigrations  – auto-creates missing migration files for all apps
+# 2. migrate_schemas – applies migrations to public + all tenant schemas
 # =============================================================================
 
 set -e
+
+echo "[entrypoint] Creating missing migrations..."
+python manage.py makemigrations --no-input
 
 echo "[entrypoint] Running migrate_schemas..."
 python manage.py migrate_schemas --verbosity 1
