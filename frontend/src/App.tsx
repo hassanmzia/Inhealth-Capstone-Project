@@ -19,6 +19,8 @@ const AlertsPage = React.lazy(() => import('@/pages/alerts/AlertsPage'))
 const TenantAdminPage = React.lazy(() => import('@/pages/admin/TenantAdminPage'))
 const SettingsPage = React.lazy(() => import('@/pages/settings/SettingsPage'))
 const VerifyEmailPage = React.lazy(() => import('@/pages/auth/VerifyEmailPage'))
+const TelemedicinePage = React.lazy(() => import('@/pages/telemedicine/TelemedicinePage'))
+const ClinicalWorkspacePage = React.lazy(() => import('@/pages/clinical/ClinicalWorkspacePage'))
 
 // Page transition variants
 const pageVariants = {
@@ -327,6 +329,34 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <ResearchPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Telemedicine */}
+            <Route
+              path="telemedicine"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'nurse', 'patient']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <TelemedicinePage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Clinical Workspace */}
+            <Route
+              path="clinical-workspace"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <ClinicalWorkspacePage />
                     </AnimatedPage>
                   </Suspense>
                 </ProtectedRoute>

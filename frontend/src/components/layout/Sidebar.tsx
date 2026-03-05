@@ -63,7 +63,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
     },
     {
       label: 'Clinical Workspace',
-      href: '/patients',
+      href: '/clinical-workspace',
       icon: Stethoscope,
       roles: ['physician', 'nurse', 'admin', 'org_admin'],
     },
