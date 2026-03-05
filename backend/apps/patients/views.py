@@ -57,6 +57,22 @@ class PatientViewSet(ModelViewSet):
         if self.request.query_params.get("pcp"):
             qs = qs.filter(primary_care_provider_id=self.request.query_params["pcp"])
 
+        # Filter by risk level via latest valid RiskScore
+        risk_level_param = self.request.query_params.get("risk_level")
+        if risk_level_param:
+            try:
+                from django.utils import timezone
+                from apps.analytics.models import RiskScore
+                levels = [r.strip() for r in risk_level_param.split(",")]
+                patient_ids = RiskScore.objects.filter(
+                    tenant=self.request.user.tenant,
+                    risk_level__in=levels,
+                    valid_until__gt=timezone.now(),
+                ).values_list("patient_id", flat=True).distinct()
+                qs = qs.filter(id__in=patient_ids)
+            except Exception:
+                pass  # DB not ready — return unfiltered list
+
         return qs
 
     @action(detail=True, methods=["get"])
@@ -198,6 +214,9 @@ class PatientHealthSummaryView(generics.GenericAPIView):
             )
         except FHIRPatient.DoesNotExist:
             # User account exists but no patient record yet – return safe defaults
+            return Response(self._empty_summary())
+        except Exception:
+            # DB not ready, table missing, multiple objects, etc.
             return Response(self._empty_summary())
 
         engagement, _ = PatientEngagement.objects.get_or_create(patient=patient)
