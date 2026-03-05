@@ -1,5 +1,5 @@
 import axios from "axios";
-import neo4j, { Driver, Session } from "neo4j-driver";
+import neo4j, { Driver, Session, Integer } from "neo4j-driver";
 import { logger } from "../utils/logger";
 import {
   MCPTool,
@@ -111,6 +111,7 @@ export const TOOL_REGISTRY: ToolRegistry = {
     },
     execute: async (params: Record<string, unknown>) => {
       const { patient_id, resource_type, filters = {}, limit = 20 } = params;
+      const typedFilters = filters as Record<string, unknown>;
 
       logger.debug("query_fhir_database: executing", { patient_id, resource_type });
 
@@ -119,7 +120,7 @@ export const TOOL_REGISTRY: ToolRegistry = {
           patient_id,
           resource_type,
           limit,
-          ...filters,
+          ...typedFilters,
         },
       });
 
@@ -191,7 +192,7 @@ export const TOOL_REGISTRY: ToolRegistry = {
               const nodeProps = (value as { properties: Record<string, unknown> }).properties;
               const converted: Record<string, unknown> = {};
               for (const [k, v] of Object.entries(nodeProps)) {
-                converted[k] = neo4j.isInt(v) ? (v as neo4j.Integer).toNumber() : v;
+                converted[k] = neo4j.isInt(v) ? (v as Integer).toNumber() : v;
               }
               obj[key as string] = converted;
             } else {
