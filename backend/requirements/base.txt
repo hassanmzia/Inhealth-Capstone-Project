@@ -106,6 +106,9 @@ django-prometheus==2.3.1
 cryptography==42.0.5
 django-encrypted-model-fields==0.6.5
 
+# OTP / MFA
+pyotp==2.9.0
+
 # Communication adapters
 twilio==8.13.0
 sendgrid==6.11.0
