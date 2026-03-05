@@ -30,8 +30,10 @@ api_v1_patterns = [
     path("auth/", include("apps.accounts.urls", namespace="accounts")),
     # FHIR R4 REST API
     path("fhir/", include("apps.fhir.urls", namespace="fhir")),
-    # Patient management
+    # Patient management (clinician-facing)
     path("patients/", include("apps.patients.urls", namespace="patients")),
+    # Patient self-service (authenticated patient acting on own data)
+    path("patient/", include("apps.patients.patient_urls")),
     # Clinical workflows
     path("clinical/", include("apps.clinical.urls", namespace="clinical")),
     # AI Agent control plane
