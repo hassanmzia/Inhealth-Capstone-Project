@@ -186,6 +186,7 @@ services:
     build:
       target: development
     # Vite dev server instead of static nginx
+    # Use polling watcher to avoid EMFILE (too many inotify watches) on Linux
     command: npm run dev -- --host 0.0.0.0 --port 3000
     environment:
       NODE_ENV: development
@@ -193,10 +194,11 @@ services:
       VITE_WS_BASE_URL: /ws
       VITE_AGENTS_BASE_URL: /agents
       VITE_APP_NAME: "InHealth Chronic Care [DEV]"
-      # Enable Vite source maps
       VITE_SOURCEMAP: "true"
-      # React devtools / strict mode
       VITE_REACT_STRICT_MODE: "true"
+      # Use polling instead of inotify to avoid EMFILE on resource-constrained hosts
+      CHOKIDAR_USEPOLLING: "true"
+      CHOKIDAR_INTERVAL: "2000"
     volumes:
       # Mount entire frontend source for HMR
       - ./frontend:/app:cached
