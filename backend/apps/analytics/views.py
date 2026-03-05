@@ -140,18 +140,18 @@ class PopulationHealthView(APIView):
             )
             condition_counts = (
                 FHIRCondition.objects.filter(tenant=tenant)
-                .values("code_display")
+                .values("display")
                 .annotate(count=Count("id"))
                 .order_by("-count")[:8]
             )
             disease_prevalence = [
                 {
-                    "condition": row["code_display"] or "Unknown",
+                    "condition": row["display"] or "Unknown",
                     "count": row["count"],
                     "percentage": round(row["count"] / total_patients * 100, 1),
                 }
                 for row in condition_counts
-                if row["code_display"]
+                if row["display"]
             ]
         except Exception:
             disease_prevalence = []
