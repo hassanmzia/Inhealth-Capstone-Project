@@ -301,6 +301,12 @@ services:
       GF_AUTH_ANONYMOUS_ORG_ROLE: "Admin"
       GF_AUTH_DISABLE_LOGIN_FORM: "false"
       GF_LOG_LEVEL: debug
+      # Use SQLite in dev to avoid needing a separate 'grafana' postgres DB
+      GF_DATABASE_TYPE: sqlite3
+      GF_DATABASE_HOST: ""
+      GF_DATABASE_NAME: ""
+      GF_DATABASE_USER: ""
+      GF_DATABASE_PASSWORD: ""
 
   # ---------------------------------------------------------------------------
   # ALERTMANAGER — Expose for direct access
@@ -310,11 +316,19 @@ services:
       - "9393:9093"
 
   # ---------------------------------------------------------------------------
-  # LANGFUSE WEB — Expose for direct access
+  # LANGFUSE — Disabled in dev (requires ClickHouse + S3, not provisioned)
+  # To enable: docker compose --profile observability up
   # ---------------------------------------------------------------------------
   langfuse-web:
+    profiles: [observability]
     ports:
       - "3488:3000"
     environment:
       NODE_ENV: development
       TELEMETRY_ENABLED: "false"
+
+  langfuse-worker:
+    profiles: [observability]
+
+  langfuse-postgres:
+    profiles: [observability]
