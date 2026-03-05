@@ -49,13 +49,16 @@ class RiskScoreViewSet(ReadOnlyModelViewSet):
     ordering = ["-calculated_at"]
 
     def get_queryset(self):
-        qs = RiskScore.objects.filter(
-            tenant=self.request.user.tenant,
-            valid_until__gt=timezone.now(),
-        ).select_related("patient")
-        if self.request.query_params.get("patient"):
-            qs = qs.filter(patient_id=self.request.query_params["patient"])
-        return qs
+        try:
+            qs = RiskScore.objects.filter(
+                tenant=self.request.user.tenant,
+                valid_until__gt=timezone.now(),
+            ).select_related("patient")
+            if self.request.query_params.get("patient"):
+                qs = qs.filter(patient_id=self.request.query_params["patient"])
+            return qs
+        except Exception:
+            return RiskScore.objects.none()
 
     @action(detail=False, methods=["get"])
     def high_risk_patients(self, request):
@@ -91,10 +94,13 @@ class ClinicalKPIViewSet(ReadOnlyModelViewSet):
     ordering = ["-metric_date"]
 
     def get_queryset(self):
-        qs = ClinicalKPI.objects.filter(tenant=self.request.user.tenant)
-        days = self.request.query_params.get("days", 30)
-        cutoff = timezone.now().date() - timedelta(days=int(days))
-        return qs.filter(metric_date__gte=cutoff)
+        try:
+            qs = ClinicalKPI.objects.filter(tenant=self.request.user.tenant)
+            days = self.request.query_params.get("days", 30)
+            cutoff = timezone.now().date() - timedelta(days=int(days))
+            return qs.filter(metric_date__gte=cutoff)
+        except Exception:
+            return ClinicalKPI.objects.none()
 
     @action(detail=False, methods=["get"])
     def summary(self, request):
@@ -114,21 +120,32 @@ class PopulationHealthView(APIView):
 
     permission_classes = [CanAccessPHI]
 
+    _EMPTY_RESPONSE = {
+        "riskDistribution": {"critical": 0, "high": 0, "medium": 0, "low": 0, "total": 0},
+        "diseasePrevalence": [],
+        "careGapRates": [],
+        "adherenceTrend": [],
+        "qualityMeasures": [],
+    }
+
     def get(self, request):
         tenant = request.user.tenant
         now = timezone.now()
 
         # --- Risk distribution from RiskScore ---
-        risk_counts = (
-            RiskScore.objects.filter(tenant=tenant, valid_until__gt=now)
-            .values("risk_level")
-            .annotate(count=Count("id"))
-        )
-        risk_dist = {"critical": 0, "high": 0, "medium": 0, "low": 0}
-        for row in risk_counts:
-            if row["risk_level"] in risk_dist:
-                risk_dist[row["risk_level"]] = row["count"]
-        risk_dist["total"] = sum(risk_dist.values())
+        try:
+            risk_counts = (
+                RiskScore.objects.filter(tenant=tenant, valid_until__gt=now)
+                .values("risk_level")
+                .annotate(count=Count("id"))
+            )
+            risk_dist = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+            for row in risk_counts:
+                if row["risk_level"] in risk_dist:
+                    risk_dist[row["risk_level"]] = row["count"]
+            risk_dist["total"] = sum(risk_dist.values())
+        except Exception:
+            return Response(self._EMPTY_RESPONSE)
 
         # --- Disease prevalence from FHIRCondition ---
         try:
@@ -157,66 +174,75 @@ class PopulationHealthView(APIView):
             disease_prevalence = []
 
         # --- Adherence trend: last 6 months of medication_adherence_rate KPI ---
-        six_months_ago = (now - timedelta(days=180)).date()
-        adherence_rows = (
-            ClinicalKPI.objects.filter(
-                tenant=tenant,
-                metric_name=ClinicalKPI.MetricName.MEDICATION_ADHERENCE_RATE,
-                metric_date__gte=six_months_ago,
+        try:
+            six_months_ago = (now - timedelta(days=180)).date()
+            adherence_rows = (
+                ClinicalKPI.objects.filter(
+                    tenant=tenant,
+                    metric_name=ClinicalKPI.MetricName.MEDICATION_ADHERENCE_RATE,
+                    metric_date__gte=six_months_ago,
+                )
+                .order_by("metric_date")
+                .values("metric_date", "metric_value")
             )
-            .order_by("metric_date")
-            .values("metric_date", "metric_value")
-        )
-        adherence_trend = [
-            {
-                "month": row["metric_date"].strftime("%b"),
-                "adherence": round(row["metric_value"], 1),
-            }
-            for row in adherence_rows
-        ]
+            adherence_trend = [
+                {
+                    "month": row["metric_date"].strftime("%b"),
+                    "adherence": round(row["metric_value"], 1),
+                }
+                for row in adherence_rows
+            ]
+        except Exception:
+            adherence_trend = []
 
         # --- Care gap closure rates from ClinicalKPI ---
-        care_gap_row = (
-            ClinicalKPI.objects.filter(
-                tenant=tenant,
-                metric_name=ClinicalKPI.MetricName.CARE_GAP_CLOSURE_RATE,
+        try:
+            care_gap_row = (
+                ClinicalKPI.objects.filter(
+                    tenant=tenant,
+                    metric_name=ClinicalKPI.MetricName.CARE_GAP_CLOSURE_RATE,
+                )
+                .order_by("-metric_date")
+                .first()
             )
-            .order_by("-metric_date")
-            .first()
-        )
-        care_gap_rates = []
-        if care_gap_row and isinstance(care_gap_row.metadata, dict):
-            for category, values in care_gap_row.metadata.get("breakdown", {}).items():
-                care_gap_rates.append({
-                    "category": category,
-                    "openGaps": values.get("open_gaps", 0),
-                    "closureRate": values.get("closure_rate", 0),
-                })
+            care_gap_rates = []
+            if care_gap_row and isinstance(care_gap_row.metadata, dict):
+                for category, values in care_gap_row.metadata.get("breakdown", {}).items():
+                    care_gap_rates.append({
+                        "category": category,
+                        "openGaps": values.get("open_gaps", 0),
+                        "closureRate": values.get("closure_rate", 0),
+                    })
+        except Exception:
+            care_gap_rates = []
 
         # --- Quality measures from ClinicalKPI ---
-        quality_metric_map = {
-            ClinicalKPI.MetricName.PCT_A1C_CONTROLLED: ("HbA1c Control (<8%)", 72),
-            ClinicalKPI.MetricName.PCT_BP_CONTROLLED: ("BP Control (<140/90)", 68),
-            ClinicalKPI.MetricName.MEDICATION_ADHERENCE_RATE: ("Medication Adherence", 80),
-            ClinicalKPI.MetricName.CARE_GAP_CLOSURE_RATE: ("Care Gap Closure", 70),
-        }
-        latest_kpis = (
-            ClinicalKPI.objects.filter(
-                tenant=tenant,
-                metric_name__in=list(quality_metric_map.keys()),
-            )
-            .order_by("metric_name", "-metric_date")
-            .distinct("metric_name")
-        )
-        quality_measures = [
-            {
-                "measure": quality_metric_map[kpi.metric_name][0],
-                "rate": round(kpi.metric_value, 1),
-                "benchmark": quality_metric_map[kpi.metric_name][1],
+        try:
+            quality_metric_map = {
+                ClinicalKPI.MetricName.PCT_A1C_CONTROLLED: ("HbA1c Control (<8%)", 72),
+                ClinicalKPI.MetricName.PCT_BP_CONTROLLED: ("BP Control (<140/90)", 68),
+                ClinicalKPI.MetricName.MEDICATION_ADHERENCE_RATE: ("Medication Adherence", 80),
+                ClinicalKPI.MetricName.CARE_GAP_CLOSURE_RATE: ("Care Gap Closure", 70),
             }
-            for kpi in latest_kpis
-            if kpi.metric_name in quality_metric_map
-        ]
+            latest_kpis = (
+                ClinicalKPI.objects.filter(
+                    tenant=tenant,
+                    metric_name__in=list(quality_metric_map.keys()),
+                )
+                .order_by("metric_name", "-metric_date")
+                .distinct("metric_name")
+            )
+            quality_measures = [
+                {
+                    "measure": quality_metric_map[kpi.metric_name][0],
+                    "rate": round(kpi.metric_value, 1),
+                    "benchmark": quality_metric_map[kpi.metric_name][1],
+                }
+                for kpi in latest_kpis
+                if kpi.metric_name in quality_metric_map
+            ]
+        except Exception:
+            quality_measures = []
 
         return Response({
             "riskDistribution": risk_dist,
