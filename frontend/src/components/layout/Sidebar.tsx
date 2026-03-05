@@ -42,10 +42,17 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
   const { unreadCount, criticalCount } = useAlertStore()
   const location = useLocation()
 
+  const dashboardHref =
+    user?.role === 'patient'
+      ? '/dashboard/patient'
+      : user?.role === 'researcher'
+      ? '/dashboard/researcher'
+      : '/dashboard'
+
   const navItems: NavItem[] = [
     {
       label: 'Dashboard',
-      href: user?.role === 'patient' ? '/dashboard/patient' : '/dashboard',
+      href: dashboardHref,
       icon: LayoutDashboard,
     },
     {
@@ -64,7 +71,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       label: 'AI Agents',
       href: '/agents',
       icon: BrainCircuit,
-      roles: ['physician', 'admin', 'org_admin'],
+      roles: ['physician', 'nurse', 'admin', 'org_admin'],
       badge: () => (activeAgents > 0 ? activeAgents : null),
       badgeColor: 'bg-secondary-500',
     },
@@ -72,13 +79,13 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       label: 'Analytics',
       href: '/analytics',
       icon: BarChart3,
-      roles: ['physician', 'admin', 'org_admin'],
+      roles: ['physician', 'admin', 'org_admin', 'researcher'],
     },
     {
       label: 'Research (AI)',
       href: '/research',
       icon: FlaskConical,
-      roles: ['physician', 'admin', 'org_admin'],
+      roles: ['physician', 'admin', 'org_admin', 'researcher'],
     },
     {
       label: 'Telemedicine',
@@ -227,7 +234,7 @@ function NavItem({ item, collapsed, currentPath }: NavItemProps) {
   const Icon = item.icon
   const badgeCount = item.badge?.()
   const isActive =
-    item.href === '/dashboard' || item.href === '/dashboard/patient'
+    item.href === '/dashboard' || item.href === '/dashboard/patient' || item.href === '/dashboard/researcher'
       ? currentPath === item.href
       : currentPath.startsWith(item.href)
 

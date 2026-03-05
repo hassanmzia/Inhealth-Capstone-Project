@@ -30,6 +30,10 @@ api_v1_patterns = [
     path("auth/", include("apps.accounts.urls", namespace="accounts")),
     # FHIR R4 REST API
     path("fhir/", include("apps.fhir.urls", namespace="fhir")),
+    # Dashboard aggregate endpoints (stats, appointments, role dashboards)
+    path("dashboard/", include("apps.dashboard.urls")),
+    # Appointments list used by clinician dashboard widget
+    path("appointments/", include("apps.dashboard.urls_appointments")),
     # Patient management (clinician-facing)
     path("patients/", include("apps.patients.urls", namespace="patients")),
     # Patient self-service (authenticated patient acting on own data)
