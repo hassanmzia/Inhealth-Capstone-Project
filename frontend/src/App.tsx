@@ -9,6 +9,7 @@ const LoginPage = React.lazy(() => import('@/pages/auth/LoginPage'))
 const RegisterPage = React.lazy(() => import('@/pages/auth/RegisterPage'))
 const ClinicianDashboard = React.lazy(() => import('@/pages/dashboard/ClinicianDashboard'))
 const PatientDashboard = React.lazy(() => import('@/pages/dashboard/PatientDashboard'))
+const ResearcherDashboard = React.lazy(() => import('@/pages/dashboard/ResearcherDashboard'))
 const PatientListPage = React.lazy(() => import('@/pages/patients/PatientListPage'))
 const PatientDetailPage = React.lazy(() => import('@/pages/patients/PatientDetailPage'))
 const AgentControlPage = React.lazy(() => import('@/pages/agents/AgentControlPage'))
@@ -209,7 +210,13 @@ export default function App() {
               index
               element={
                 <Navigate
-                  to={user?.role === 'patient' ? '/dashboard/patient' : '/dashboard'}
+                  to={
+                    user?.role === 'patient'
+                      ? '/dashboard/patient'
+                      : user?.role === 'researcher'
+                      ? '/dashboard/researcher'
+                      : '/dashboard'
+                  }
                   replace
                 />
               }
@@ -237,6 +244,20 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <PatientDashboard />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Researcher dashboard */}
+            <Route
+              path="dashboard/researcher"
+              element={
+                <ProtectedRoute requiredRoles={['researcher']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <ResearcherDashboard />
                     </AnimatedPage>
                   </Suspense>
                 </ProtectedRoute>
@@ -288,7 +309,7 @@ export default function App() {
             <Route
               path="analytics"
               element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin']}>
+                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <AnalyticsPage />
@@ -302,7 +323,7 @@ export default function App() {
             <Route
               path="research"
               element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin']}>
+                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <ResearchPage />

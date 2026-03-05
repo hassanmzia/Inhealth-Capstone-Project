@@ -3,7 +3,9 @@ Patient management views.
 """
 
 import logging
+from datetime import timedelta
 
+from django.utils import timezone
 from django.db.models import Count, Q
 from rest_framework import generics, permissions, status
 from rest_framework.decorators import action
@@ -162,3 +164,163 @@ class DeviceRegistrationViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(patient_id=self.kwargs["patient_pk"])
+
+
+class PatientHealthSummaryView(generics.GenericAPIView):
+    """
+    GET /api/v1/patient/health-summary/
+
+    Patient-facing self-service summary.  Resolves the logged-in user to
+    their FHIRPatient record by email and returns the data shape expected
+    by PatientDashboard.tsx.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    # LOINC codes used to fetch today's vitals
+    LOINC_HEART_RATE = "8867-4"
+    LOINC_BP_SYSTOLIC = "8480-6"
+    LOINC_BP_DIASTOLIC = "8462-4"
+    LOINC_GLUCOSE = "2339-0"
+    LOINC_WEIGHT = "29463-7"
+
+    def get(self, request):
+        from apps.fhir.models import FHIRObservation
+
+        user = request.user
+        since_24h = timezone.now() - timedelta(hours=24)
+
+        # ── Resolve FHIRPatient ──────────────────────────────────────────────
+        try:
+            patient = FHIRPatient.objects.select_related("engagement").get(
+                email=user.email,
+                tenant=user.tenant,
+            )
+        except FHIRPatient.DoesNotExist:
+            # User account exists but no patient record yet – return safe defaults
+            return Response(self._empty_summary())
+
+        engagement, _ = PatientEngagement.objects.get_or_create(patient=patient)
+
+        # ── Next upcoming appointment ────────────────────────────────────────
+        next_appt = (
+            FHIRAppointment.objects.filter(
+                patient=patient,
+                status__in=["booked", "pending"],
+                start__gt=timezone.now(),
+            )
+            .order_by("start")
+            .first()
+        )
+
+        # ── Today's vitals (last 24 h) ───────────────────────────────────────
+        def latest_obs(code):
+            return (
+                FHIRObservation.objects.filter(
+                    patient=patient,
+                    code=code,
+                    effective_datetime__gte=since_24h,
+                )
+                .order_by("-effective_datetime")
+                .first()
+            )
+
+        hr_obs = latest_obs(self.LOINC_HEART_RATE)
+        sys_obs = latest_obs(self.LOINC_BP_SYSTOLIC)
+        dia_obs = latest_obs(self.LOINC_BP_DIASTOLIC)
+        glucose_obs = latest_obs(self.LOINC_GLUCOSE)
+        weight_obs = latest_obs(self.LOINC_WEIGHT)
+
+        today_vitals = {}
+        if sys_obs and dia_obs:
+            today_vitals["bloodPressure"] = (
+                f"{int(sys_obs.value_quantity or 0)}/{int(dia_obs.value_quantity or 0)}"
+            )
+        if hr_obs and hr_obs.value_quantity is not None:
+            today_vitals["heartRate"] = round(hr_obs.value_quantity)
+        if glucose_obs and glucose_obs.value_quantity is not None:
+            today_vitals["glucose"] = round(glucose_obs.value_quantity)
+        if weight_obs and weight_obs.value_quantity is not None:
+            today_vitals["weight"] = round(weight_obs.value_quantity, 1)
+
+        # ── Goals ────────────────────────────────────────────────────────────
+        goals = [
+            {
+                "title": g.get("goal") or g.get("title", ""),
+                "progress": int(g.get("progress", 0)),
+                "unit": g.get("unit", ""),
+                "current": g.get("current", 0),
+                "target": g.get("target", 0),
+                "category": g.get("category", "other"),
+            }
+            for g in (engagement.health_goals or [])
+        ]
+
+        # ── Badges ───────────────────────────────────────────────────────────
+        badges = [
+            a.get("badge") or a.get("title", "")
+            for a in (engagement.achievements or [])
+            if a.get("badge") or a.get("title")
+        ]
+
+        # ── Adherence calendar (last 30 days, placeholder True until real
+        #    dispense records are tracked) ────────────────────────────────────
+        adherence_calendar = [
+            {
+                "date": (timezone.now() - timedelta(days=29 - i)).date().isoformat(),
+                "taken": True,
+            }
+            for i in range(30)
+        ]
+
+        # ── Tips based on available vitals ───────────────────────────────────
+        tips = []
+        if sys_obs and sys_obs.value_quantity and sys_obs.value_quantity > 130:
+            tips.append({
+                "icon": "heart",
+                "text": "Your blood pressure is elevated. Reducing sodium and a short walk can help.",
+            })
+        if hr_obs and hr_obs.value_quantity and hr_obs.value_quantity > 100:
+            tips.append({
+                "icon": "activity",
+                "text": "Your heart rate is elevated. Consider rest or a breathing exercise.",
+            })
+        active_meds = FHIRMedicationRequest.objects.filter(patient=patient, status="active").count()
+        if active_meds:
+            tips.append({
+                "icon": "pill",
+                "text": f"You have {active_meds} active medication(s). Remember to take them as prescribed.",
+            })
+        if not tips:
+            tips.append({
+                "icon": "heart",
+                "text": "Stay hydrated and aim for a 10-minute walk today!",
+            })
+
+        return Response({
+            "healthScore": round(engagement.engagement_score),
+            "streakDays": engagement.streak_days,
+            "medicationAdherence": round(engagement.engagement_score),
+            "nextAppointment": next_appt.start.isoformat() if next_appt else None,
+            "goals": goals,
+            "badges": badges,
+            "todayVitals": today_vitals,
+            "tips": tips,
+            "adherenceCalendar": adherence_calendar,
+            "messages": [],
+        })
+
+    @staticmethod
+    def _empty_summary():
+        return {
+            "healthScore": 50,
+            "streakDays": 0,
+            "medicationAdherence": 0,
+            "nextAppointment": None,
+            "goals": [],
+            "badges": [],
+            "todayVitals": {},
+            "tips": [{"icon": "heart", "text": "Welcome! Your care team will set up your health profile shortly."}],
+            "adherenceCalendar": [],
+            "messages": [],
+        }
