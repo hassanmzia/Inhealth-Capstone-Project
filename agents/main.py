@@ -467,22 +467,84 @@ async def agents_root():
 
 @app.get("/agents/status", tags=["Agents"])
 async def get_agent_statuses():
-    """Return health / status of all registered agents."""
+    """Return status of all registered agents as an array."""
     try:
         from orchestrator.supervisor import AGENT_REGISTRY
 
-        statuses = {}
-        for name, cls in AGENT_REGISTRY.items():
-            statuses[name] = {
-                "agent_name": name,
+        return [
+            {
+                "agentId": name,
                 "status": "available",
-                "last_run": None,
-                "run_count": len(execution_history.get(name, [])),
+                "lastRun": None,
+                "runCount": len(execution_history.get(name, [])),
             }
-        return {"agents": statuses, "total": len(statuses)}
+            for name in AGENT_REGISTRY
+        ]
     except Exception as exc:
         logger.error("Failed to retrieve agent statuses: %s", exc)
-        return {"agents": {}, "total": 0, "error": str(exc)}
+        return []
+
+
+@app.get("/agents/executions", tags=["Agents"])
+async def list_executions(
+    agent_id: Optional[str] = None,
+    status: Optional[str] = None,
+    page: int = 1,
+    page_size: int = 50,
+):
+    """Return paginated agent execution history."""
+    all_execs: List[Dict[str, Any]] = []
+    for agent_name, runs in execution_history.items():
+        if agent_id and agent_name != agent_id:
+            continue
+        for run in runs:
+            if status and run.get("status") != status:
+                continue
+            all_execs.append(run)
+    all_execs.sort(key=lambda x: x.get("triggered_at", ""), reverse=True)
+    start = (page - 1) * page_size
+    return {
+        "count": len(all_execs),
+        "next": None,
+        "previous": None,
+        "results": all_execs[start : start + page_size],
+    }
+
+
+@app.get("/agents/hitl", tags=["Agents"])
+async def list_hitl(agent_id: Optional[str] = None, status: Optional[str] = None):
+    """Return pending human-in-the-loop requests (stub — no HITL queue yet)."""
+    return []
+
+
+@app.get("/agents/metrics", tags=["Agents"])
+async def list_metrics():
+    """Return agent performance metrics (stub)."""
+    return []
+
+
+@app.get("/agents/pipelines", tags=["Agents"])
+async def list_pipelines():
+    """Return active pipelines (stub)."""
+    return []
+
+
+@app.get("/agents/traces", tags=["Agents"])
+async def list_traces():
+    """Return Langfuse traces (stub)."""
+    return []
+
+
+@app.get("/agents/messages", tags=["Agents"])
+async def list_messages():
+    """Return A2A messages (stub)."""
+    return []
+
+
+@app.get("/agents/recommendations", tags=["Agents"])
+async def list_recommendations():
+    """Return AI recommendations (stub)."""
+    return []
 
 
 @app.get("/agents/{agent_id}/history", tags=["Agents"])
