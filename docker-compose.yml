@@ -601,7 +601,7 @@ services:
       target: production
       args:
         NODE_ENV: production
-        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api}
+        VITE_API_BASE_URL: ${VITE_API_BASE_URL:-/api/v1}
         VITE_WS_BASE_URL: ${VITE_WS_BASE_URL:-/ws}
         VITE_AGENTS_BASE_URL: ${VITE_AGENTS_BASE_URL:-/agents}
         VITE_APP_NAME: ${VITE_APP_NAME:-InHealth Chronic Care}

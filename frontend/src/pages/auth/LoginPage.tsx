@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate, useLocation } from 'react-router-dom'
+import { useNavigate, useLocation, Link } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { z } from 'zod'
@@ -193,7 +193,10 @@ export default function LoginPage() {
           <div className="mb-8">
             <h2 className="text-2xl font-bold text-foreground">Sign in to your account</h2>
             <p className="text-muted-foreground mt-1 text-sm">
-              Enter your credentials to access the platform
+              Enter your credentials to access the platform, or{' '}
+              <Link to="/register" className="text-primary-600 dark:text-primary-400 hover:underline font-medium">
+                create an account
+              </Link>
             </p>
           </div>
 
