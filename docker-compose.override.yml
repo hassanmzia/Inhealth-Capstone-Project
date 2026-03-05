@@ -42,8 +42,6 @@ services:
       INTERNAL_IPS: "127.0.0.1,10.0.0.0/8,172.16.0.0/12,192.168.0.0/16"
       # Disable caching in dev
       CACHE_BACKEND: django.core.cache.backends.dummy.DummyCache
-      # Email backend: print to console in dev
-      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
       # Show full SQL in dev logs
       DJANGO_DB_LOGGING: "True"
       # Allow any CORS origin in dev
@@ -82,7 +80,6 @@ services:
       DJANGO_SETTINGS_MODULE: config.settings.development
       DEBUG: "True"
       CELERY_LOG_LEVEL: debug
-      EMAIL_BACKEND: django.core.mail.backends.console.EmailBackend
     volumes:
       - ./backend:/app:cached
       - /app/.venv

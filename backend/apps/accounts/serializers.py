@@ -46,6 +46,8 @@ class UserRegistrationSerializer(serializers.ModelSerializer):
         return attrs
 
     def create(self, validated_data):
+        # Account is inactive until email is verified
+        validated_data["is_active"] = False
         user = User.objects.create_user(**validated_data)
         return user
 

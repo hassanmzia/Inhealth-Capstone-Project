@@ -101,6 +101,10 @@ class User(AbstractBaseUser, PermissionsMixin):
     failed_login_attempts = models.PositiveSmallIntegerField(default=0)
     locked_until = models.DateTimeField(null=True, blank=True)
 
+    # Email verification
+    email_verified = models.BooleanField(default=False)
+    email_verification_token = models.UUIDField(default=uuid.uuid4, unique=True, null=True, blank=True)
+
     # Status
     is_active = models.BooleanField(default=True)
     is_staff = models.BooleanField(default=False)

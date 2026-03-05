@@ -30,7 +30,7 @@ from .serializers import (
     UserProfileSerializer,
     UserRegistrationSerializer,
 )
-from .tasks import send_welcome_email
+from .tasks import send_verification_email, send_welcome_email
 
 logger = logging.getLogger("apps.accounts")
 
@@ -52,9 +52,7 @@ class RegisterView(generics.CreateAPIView):
 
     def perform_create(self, serializer):
         user = serializer.save()
-        # Send welcome email async
-        send_welcome_email.delay(str(user.id))
-        # Log the creation
+        send_verification_email.delay(str(user.id))
         logger.info(f"New user registered: {user.email} with role {user.role}")
 
     def create(self, request, *args, **kwargs):
@@ -233,6 +231,39 @@ class MFASetupView(APIView):
         request.user.mfa_secret = ""
         request.user.save(update_fields=["is_mfa_enabled", "mfa_secret"])
         return Response({"message": "MFA has been disabled."}, status=status.HTTP_200_OK)
+
+
+class VerifyEmailView(APIView):
+    """
+    POST /api/v1/auth/verify-email/
+    Verifies the email address using the token sent during registration.
+    Activates the account and sends a welcome email.
+    """
+
+    permission_classes = [permissions.AllowAny]
+
+    def post(self, request):
+        token = request.data.get("token")
+        if not token:
+            return Response({"error": "Verification token is required."}, status=status.HTTP_400_BAD_REQUEST)
+
+        try:
+            user = User.objects.get(email_verification_token=token)
+        except (User.DoesNotExist, Exception):
+            return Response({"error": "Invalid or expired verification token."}, status=status.HTTP_400_BAD_REQUEST)
+
+        if user.email_verified:
+            return Response({"message": "Email already verified. You can log in."}, status=status.HTTP_200_OK)
+
+        user.email_verified = True
+        user.is_active = True
+        user.email_verification_token = None
+        user.save(update_fields=["email_verified", "is_active", "email_verification_token"])
+
+        send_welcome_email.delay(str(user.id))
+        logger.info(f"Email verified for user: {user.email}")
+
+        return Response({"message": "Email verified successfully. You can now log in."}, status=status.HTTP_200_OK)
 
 
 class AuditLogView(generics.ListAPIView):
