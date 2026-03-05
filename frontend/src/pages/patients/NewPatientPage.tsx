@@ -1,9 +1,11 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
 import { ArrowLeft, UserPlus, Save } from 'lucide-react'
 import api from '@/services/api'
+
+const DRAFT_KEY = 'newPatientDraft'
 
 interface PatientFormData {
   first_name: string
@@ -22,6 +24,14 @@ interface PatientFormData {
   country?: string
 }
 
+function loadDraft(): Partial<PatientFormData> {
+  try {
+    return JSON.parse(sessionStorage.getItem(DRAFT_KEY) || '{}')
+  } catch {
+    return {}
+  }
+}
+
 export default function NewPatientPage() {
   const navigate = useNavigate()
   const [serverError, setServerError] = useState<string | null>(null)
@@ -29,14 +39,23 @@ export default function NewPatientPage() {
   const {
     register,
     handleSubmit,
+    watch,
     formState: { errors, isSubmitting },
   } = useForm<PatientFormData>({
-    defaultValues: { gender: 'unknown', country: 'US' },
+    defaultValues: { gender: 'unknown', country: 'US', ...loadDraft() },
   })
+
+  // Persist form data to sessionStorage on every change so a page reload
+  // (Vite HMR, nginx restart, etc.) doesn't lose the user's work.
+  const watchedValues = watch()
+  useEffect(() => {
+    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(watchedValues))
+  }, [watchedValues])
 
   const createMutation = useMutation({
     mutationFn: (data: PatientFormData) => api.post('/patients/', data).then((r) => r.data),
     onSuccess: (patient) => {
+      sessionStorage.removeItem(DRAFT_KEY)
       navigate(`/patients/${patient.id}`)
     },
     onError: (err: any) => {
@@ -79,6 +98,20 @@ export default function NewPatientPage() {
         {serverError && (
           <div className="p-4 rounded-lg bg-danger-50 dark:bg-danger-900/20 border border-danger-200 dark:border-danger-800 text-danger-700 dark:text-danger-400 text-sm">
             {serverError}
+          </div>
+        )}
+
+        {/* Draft restored banner */}
+        {Object.keys(loadDraft()).length > 0 && (
+          <div className="flex items-center justify-between p-3 rounded-lg bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 text-warning-700 dark:text-warning-400 text-sm">
+            <span>Draft restored after page reload.</span>
+            <button
+              type="button"
+              onClick={() => { sessionStorage.removeItem(DRAFT_KEY); window.location.reload() }}
+              className="underline text-xs ml-4 hover:opacity-75"
+            >
+              Clear draft
+            </button>
           </div>
         )}
 
