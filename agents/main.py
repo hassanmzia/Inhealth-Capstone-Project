@@ -457,6 +457,14 @@ async def run_pipeline(request: PipelineRunRequest):
         )
 
 
+@app.get("/agents", tags=["Agents"], include_in_schema=False)
+@app.get("/agents/", tags=["Agents"], include_in_schema=False)
+async def agents_root():
+    """Redirect root agents path to status endpoint."""
+    from fastapi.responses import RedirectResponse
+    return RedirectResponse(url="/agents/status", status_code=307)
+
+
 @app.get("/agents/status", tags=["Agents"])
 async def get_agent_statuses():
     """Return health / status of all registered agents."""
