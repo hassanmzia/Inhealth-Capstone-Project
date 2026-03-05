@@ -57,7 +57,7 @@ services:
       - django-media:/app/media
     ports:
       # Expose Django directly for debugging/DRF browsable API
-      - "8000:8000"
+      - "8020:8000"
     # Relaxed resource limits for development
     mem_limit: 4g
     mem_reservation: 512m
