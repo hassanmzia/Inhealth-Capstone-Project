@@ -294,37 +294,49 @@ class Migration(migrations.Migration):
             model_name="user",
             index=models.Index(
                 fields=["tenant", "role"],
-                name="accounts_user_tenant_id_role_2f62a0_idx",
+                name="accounts_user_tenant_role_idx",
             ),
         ),
         migrations.AddIndex(
             model_name="user",
             index=models.Index(
                 fields=["email", "is_active"],
-                name="accounts_user_email_is_active_186ac1_idx",
+                name="accounts_user_email_active_idx",
             ),
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(fields=["user", "timestamp"]),
+            index=models.Index(
+                fields=["user", "timestamp"],
+                name="accounts_al_user_ts_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(fields=["resource_type", "resource_id"]),
+            index=models.Index(
+                fields=["resource_type", "resource_id"],
+                name="accounts_al_res_type_id_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(fields=["phi_accessed", "timestamp"]),
+            index=models.Index(
+                fields=["phi_accessed", "timestamp"],
+                name="accounts_al_phi_ts_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(fields=["tenant_id", "timestamp"]),
+            index=models.Index(
+                fields=["tenant_id", "timestamp"],
+                name="accounts_al_tenant_ts_idx",
+            ),
         ),
         migrations.AddIndex(
             model_name="refreshtokenblacklist",
             index=models.Index(
                 fields=["user", "blacklisted_at"],
-                name="accounts_refresht_user_id_blacklisted_at_bf2d2f_idx",
+                name="accounts_rtbl_user_bl_idx",
             ),
         ),
     ]
