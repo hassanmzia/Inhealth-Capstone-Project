@@ -39,6 +39,8 @@ class PublicFallbackTenantMiddleware(TenantMainMiddleware):
         except self.TENANT_NOT_FOUND_EXCEPTION:
             if self._set_schema_from_jwt(request):
                 return
+            if self._set_schema_from_primary_domain(request):
+                return
             connection.set_schema(get_public_schema_name())
 
     # ------------------------------------------------------------------
@@ -82,4 +84,41 @@ class PublicFallbackTenantMiddleware(TenantMainMiddleware):
 
         except Exception as exc:  # noqa: BLE001
             logger.debug("JWT-based tenant resolution failed: %s", exc)
+            return False
+
+    def _set_schema_from_primary_domain(self, request) -> bool:
+        """
+        Last-resort fallback: use the primary domain's tenant.
+
+        Handles the case where an admin user (tenant_id=None) accesses the API
+        via a non-registered hostname (e.g. the server's LAN IP in dev).
+        Only activates when exactly one active organization exists, to avoid
+        silently routing requests to the wrong tenant in multi-tenant setups.
+        """
+        try:
+            from apps.tenants.models import Domain, Organization
+
+            active_orgs = Organization.objects.filter(is_active=True)
+            # Safety: only fall back automatically in single-tenant deployments
+            if active_orgs.count() != 1:
+                return False
+
+            primary = (
+                Domain.objects.filter(is_primary=True)
+                .select_related("tenant")
+                .first()
+            )
+            if primary is None:
+                return False
+
+            connection.set_schema(primary.tenant.schema_name)
+            request.tenant = primary.tenant
+            logger.debug(
+                "Tenant schema set from primary-domain fallback: schema=%s",
+                primary.tenant.schema_name,
+            )
+            return True
+
+        except Exception as exc:  # noqa: BLE001
+            logger.debug("Primary-domain fallback failed: %s", exc)
             return False
