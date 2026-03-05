@@ -16,6 +16,7 @@ class PatientCreateSerializer(serializers.ModelSerializer):
     class Meta:
         model = FHIRPatient
         fields = [
+            "id",
             "mrn", "first_name", "last_name", "middle_name",
             "birth_date", "gender", "phone", "email",
             "address_line1", "address_line2", "city", "state",
@@ -23,6 +24,7 @@ class PatientCreateSerializer(serializers.ModelSerializer):
             "primary_care_provider",
         ]
         extra_kwargs = {
+            "id":         {"read_only": True},
             "mrn":        {"required": True},
             "first_name": {"required": True},
             "last_name":  {"required": True},
