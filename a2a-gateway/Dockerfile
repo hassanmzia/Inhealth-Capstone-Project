@@ -4,7 +4,7 @@ FROM node:20-alpine AS development
 WORKDIR /app
 
 COPY package.json package-lock.json* ./
-RUN npm install
+RUN npm install && npm install -g nodemon ts-node typescript
 
 COPY . .
 
