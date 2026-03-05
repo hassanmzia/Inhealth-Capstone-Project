@@ -120,8 +120,8 @@ class User(AbstractBaseUser, PermissionsMixin):
         verbose_name = _("user")
         verbose_name_plural = _("users")
         indexes = [
-            models.Index(fields=["tenant", "role"]),
-            models.Index(fields=["email", "is_active"]),
+            models.Index(fields=["tenant", "role"], name="accounts_user_tenant_role_idx"),
+            models.Index(fields=["email", "is_active"], name="accounts_user_email_active_idx"),
         ]
 
     def __str__(self):
@@ -199,10 +199,10 @@ class AuditLog(models.Model):
     class Meta:
         ordering = ["-timestamp"]
         indexes = [
-            models.Index(fields=["user", "timestamp"]),
-            models.Index(fields=["resource_type", "resource_id"]),
-            models.Index(fields=["phi_accessed", "timestamp"]),
-            models.Index(fields=["tenant_id", "timestamp"]),
+            models.Index(fields=["user", "timestamp"], name="accounts_al_user_ts_idx"),
+            models.Index(fields=["resource_type", "resource_id"], name="accounts_al_res_type_id_idx"),
+            models.Index(fields=["phi_accessed", "timestamp"], name="accounts_al_phi_ts_idx"),
+            models.Index(fields=["tenant_id", "timestamp"], name="accounts_al_tenant_ts_idx"),
         ]
         # Audit logs should never be modified
         default_permissions = ("add", "view")
@@ -254,7 +254,7 @@ class RefreshTokenBlacklist(models.Model):
     class Meta:
         ordering = ["-blacklisted_at"]
         indexes = [
-            models.Index(fields=["user", "blacklisted_at"]),
+            models.Index(fields=["user", "blacklisted_at"], name="accounts_rtbl_user_bl_idx"),
         ]
 
     def __str__(self):
