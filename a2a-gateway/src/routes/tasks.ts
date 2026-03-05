@@ -29,7 +29,7 @@ const TaskSubmitSchema = z.object({
     .default("NORMAL"),
   to_agent_id: z.number().int().positive().optional(),
   to_agent_type: z
-    .enum(["monitoring", "diagnostic", "risk", "intervention", "action", "research"])
+    .enum(["monitoring", "diagnostic", "risk", "intervention", "action", "research", "orchestration"])
     .optional(),
   correlation_id: z.string().optional(),
 });
@@ -109,7 +109,7 @@ router.post("/a2a/tasks", async (req: Request, res: Response): Promise<void> => 
 
     const task = await delegateTask({
       from_agent: fromAgent,
-      to_agent_type: targetAgentType,
+      to_agent_type: targetAgentType!,
       task_type,
       patient_id,
       payload,

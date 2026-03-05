@@ -8,6 +8,7 @@ import {
   Medication,
   Vital,
   Allergy,
+  AllergyReaction,
   RiskScore,
   ClinicalConstraints,
   VectorSearchResult,
@@ -366,7 +367,7 @@ function parseAllergies(data: { entry?: FHIRAllergyEntry[] }): Allergy[] {
         reactions: resource.reaction?.map((r) => ({
           substance: r.substance?.coding?.[0]?.display,
           manifestation: r.manifestation?.[0]?.coding?.[0]?.display || "Unknown reaction",
-          severity: r.severity as Allergy["reactions"] extends Array<infer T> ? T["severity"] : never,
+          severity: r.severity as AllergyReaction["severity"],
           description: r.description,
         })),
         onset_date: resource.onsetDateTime,
