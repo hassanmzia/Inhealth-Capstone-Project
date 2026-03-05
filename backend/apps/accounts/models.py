@@ -199,10 +199,10 @@ class AuditLog(models.Model):
     class Meta:
         ordering = ["-timestamp"]
         indexes = [
-            models.Index(fields=["user", "timestamp"], name="accounts_auditlog_user_id_timestamp_047d90_idx"),
-            models.Index(fields=["resource_type", "resource_id"], name="accounts_auditlog_resource_type_resource_id_67233a_idx"),
-            models.Index(fields=["phi_accessed", "timestamp"], name="accounts_auditlog_phi_accessed_timestamp_e605dc_idx"),
-            models.Index(fields=["tenant_id", "timestamp"], name="accounts_auditlog_tenant_id_timestamp_233320_idx"),
+            models.Index(fields=["user", "timestamp"]),
+            models.Index(fields=["resource_type", "resource_id"]),
+            models.Index(fields=["phi_accessed", "timestamp"]),
+            models.Index(fields=["tenant_id", "timestamp"]),
         ]
         # Audit logs should never be modified
         default_permissions = ("add", "view")
