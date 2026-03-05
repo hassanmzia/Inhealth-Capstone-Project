@@ -137,9 +137,13 @@ class PatientViewSet(ModelViewSet):
         }
 
     def get_queryset(self):
-        qs = FHIRPatient.objects.filter(
-            tenant=self.request.user.tenant
-        ).select_related("primary_care_provider")
+        try:
+            qs = FHIRPatient.objects.filter(
+                tenant=self.request.user.tenant
+            ).select_related("primary_care_provider")
+        except Exception:
+            # DB schema not ready (e.g. no tenant schema migrated yet)
+            return FHIRPatient.objects.none()
 
         # Search by DOB
         if self.request.query_params.get("birthdate"):
