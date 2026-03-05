@@ -95,26 +95,15 @@ export const useAuthStore = create<AuthState>()(
       requires2FA: false,
       tempToken: null,
 
-      // Derived computed booleans
-      get isAuthenticated() {
-        return !!(get().token && get().user)
-      },
-      get isPhysician() {
-        return get().user?.role === 'physician'
-      },
-      get isPatient() {
-        return get().user?.role === 'patient'
-      },
-      get isAdmin() {
-        return get().user?.role === 'admin'
-      },
-      get isOrgAdmin() {
-        return get().user?.role === 'org_admin'
-      },
-      get isClinician() {
-        const role = get().user?.role
-        return role === 'physician' || role === 'nurse' || role === 'admin' || role === 'org_admin'
-      },
+      // Derived booleans — kept as plain fields updated explicitly in every
+      // set() call that changes user/token.  JavaScript getters don't survive
+      // Zustand's Object.assign state merge and always return the stale value.
+      isAuthenticated: false,
+      isPhysician: false,
+      isPatient: false,
+      isAdmin: false,
+      isOrgAdmin: false,
+      isClinician: false,
 
       // ── Actions ─────────────────────────────────────────────────────────────
 
@@ -133,6 +122,7 @@ export const useAuthStore = create<AuthState>()(
             return data
           }
 
+          const role = data.user.role
           set({
             user: data.user,
             token: data.access,
@@ -140,6 +130,12 @@ export const useAuthStore = create<AuthState>()(
             isLoading: false,
             requires2FA: false,
             tempToken: null,
+            isAuthenticated: true,
+            isPhysician: role === 'physician',
+            isPatient: role === 'patient',
+            isAdmin: role === 'admin',
+            isOrgAdmin: role === 'org_admin',
+            isClinician: role === 'physician' || role === 'nurse' || role === 'admin' || role === 'org_admin',
           })
 
           return data
@@ -171,6 +167,12 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           requires2FA: false,
           tempToken: null,
+          isAuthenticated: false,
+          isPhysician: false,
+          isPatient: false,
+          isAdmin: false,
+          isOrgAdmin: false,
+          isClinician: false,
         })
       },
 
@@ -217,6 +219,12 @@ export const useAuthStore = create<AuthState>()(
           refreshToken: null,
           requires2FA: false,
           tempToken: null,
+          isAuthenticated: false,
+          isPhysician: false,
+          isPatient: false,
+          isAdmin: false,
+          isOrgAdmin: false,
+          isClinician: false,
         })
       },
     }),
@@ -227,6 +235,12 @@ export const useAuthStore = create<AuthState>()(
         user: state.user,
         token: state.token,
         refreshToken: state.refreshToken,
+        isAuthenticated: state.isAuthenticated,
+        isPhysician: state.isPhysician,
+        isPatient: state.isPatient,
+        isAdmin: state.isAdmin,
+        isOrgAdmin: state.isOrgAdmin,
+        isClinician: state.isClinician,
       }),
     },
   ),
