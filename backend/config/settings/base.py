@@ -342,7 +342,7 @@ SIMPLE_JWT = {
 # ---------------------------------------------------------------------------
 CORS_ALLOWED_ORIGINS = env.list("CORS_ALLOWED_ORIGINS", default=[
     "http://localhost:3000",
-    "http://localhost:3001",
+    "http://localhost:3003",
     "http://localhost:5173",
 ])
 CORS_ALLOW_CREDENTIALS = True

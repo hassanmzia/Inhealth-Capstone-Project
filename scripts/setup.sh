@@ -142,7 +142,7 @@ A2A_GATEWAY_PORT=3002
 A2A_SECRET_KEY=change-me-a2a-secret
 
 # MCP Server
-MCP_SERVER_PORT=3001
+MCP_SERVER_PORT=3003
 ENVEOF
         echo -e "  ${GREEN}Created minimal .env file${NC}"
         echo -e "  ${RED}IMPORTANT: Update all 'change-me' values in .env before starting services!${NC}"
@@ -273,7 +273,7 @@ echo "Access URLs (after starting services):"
 echo "  ${BLUE}Django API:        http://localhost:8000${NC}"
 echo "  ${BLUE}Django Admin:      http://localhost:8000/admin${NC}"
 echo "  ${BLUE}Agents API:        http://localhost:8001${NC}"
-echo "  ${BLUE}MCP Server:        http://localhost:3001${NC}"
+echo "  ${BLUE}MCP Server:        http://localhost:3003${NC}"
 echo "  ${BLUE}A2A Gateway:       http://localhost:3002${NC}"
 echo "  ${BLUE}Grafana:           http://localhost:3000${NC}"
 echo "  ${BLUE}Prometheus:        http://localhost:9090${NC}"

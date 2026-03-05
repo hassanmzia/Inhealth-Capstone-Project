@@ -8,7 +8,7 @@ import healthRouter from "./routes/health";
 import contextRouter from "./routes/context";
 import toolsRouter from "./routes/tools";
 
-const PORT = parseInt(process.env.PORT || "3001", 10);
+const PORT = parseInt(process.env.PORT || "3003", 10);
 const HOST = process.env.HOST || "0.0.0.0";
 
 const app = express();

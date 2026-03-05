@@ -146,7 +146,7 @@ services:
       - /app/node_modules
     ports:
       # Expose MCP server directly for testing
-      - "3001:3001"
+      - "3003:3003"
     mem_limit: 1g
 
   # ---------------------------------------------------------------------------
