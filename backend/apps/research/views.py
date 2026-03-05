@@ -26,7 +26,7 @@ class ResearchQueryViewSet(ModelViewSet):
 
     def get_queryset(self):
         return ResearchQuery.objects.filter(
-            tenant=self.request.user.tenant
+            tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).select_related("requested_by", "patient")
 
     def create(self, request, *args, **kwargs):
@@ -52,7 +52,7 @@ class ResearchQueryViewSet(ModelViewSet):
             return Response({"error": "patient_id required"}, status=status.HTTP_400_BAD_REQUEST)
 
         query = ResearchQuery.objects.create(
-            tenant=request.user.tenant,
+            tenant=(getattr(request, 'tenant', None) or request.user.tenant),
             patient_id=patient_id,
             query_text=f"Find clinical trials for patient {patient_id}",
             query_type=ResearchQuery.QueryType.TRIAL_MATCHING,

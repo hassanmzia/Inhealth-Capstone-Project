@@ -50,7 +50,7 @@ class FHIRBaseViewSet(GenericViewSet):
     resource_type = None  # Override in subclasses
 
     def get_tenant(self):
-        return self.request.user.tenant
+        return (getattr(self.request, 'tenant', None) or self.request.user.tenant)
 
     def get_fhir_service(self):
         return FHIRService(self.get_tenant())

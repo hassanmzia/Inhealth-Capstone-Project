@@ -25,7 +25,7 @@ class SDOHAssessmentViewSet(ModelViewSet):
 
     def get_queryset(self):
         return SDOHAssessment.objects.filter(
-            tenant=self.request.user.tenant
+            tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).select_related("patient", "assessed_by")
 
     @action(detail=False, methods=["get"])
@@ -33,7 +33,7 @@ class SDOHAssessmentViewSet(ModelViewSet):
         """Return patients with high SDOH risk."""
         from apps.fhir.serializers import FHIRPatientSerializer
         high_risk = SDOHAssessment.objects.filter(
-            tenant=request.user.tenant,
+            tenant=(getattr(request, 'tenant', None) or request.user.tenant),
             overall_sdoh_risk=SDOHAssessment.RiskLevel.HIGH,
         ).select_related("patient").order_by("-total_score")[:50]
 

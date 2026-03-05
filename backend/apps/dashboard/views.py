@@ -34,7 +34,7 @@ class ClinicalDashboardStatsView(APIView):
     permission_classes = [CanAccessPHI]
 
     def get(self, request):
-        tenant = request.user.tenant
+        tenant = (getattr(request, 'tenant', None) or request.user.tenant)
         now = timezone.now()
         thirty_days_ago = now - timedelta(days=30)
 
@@ -132,7 +132,7 @@ class AppointmentsListView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        tenant = request.user.tenant
+        tenant = (getattr(request, 'tenant', None) or request.user.tenant)
         now = timezone.now()
 
         status_param = request.query_params.get("status", "booked,pending")
@@ -186,7 +186,7 @@ class ResearcherDashboardView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        tenant = request.user.tenant
+        tenant = (getattr(request, 'tenant', None) or request.user.tenant)
         user = request.user
         now = timezone.now()
         thirty_days_ago = now - timedelta(days=30)
@@ -255,7 +255,7 @@ class NurseDashboardStatsView(APIView):
     permission_classes = [CanAccessPHI]
 
     def get(self, request):
-        tenant = request.user.tenant
+        tenant = (getattr(request, 'tenant', None) or request.user.tenant)
         now = timezone.now()
         today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
         today_end = today_start + timedelta(days=1)

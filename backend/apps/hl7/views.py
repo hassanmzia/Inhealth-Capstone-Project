@@ -57,7 +57,7 @@ class HL7IngestView(APIView):
             logger.warning(f"Could not detect HL7 message type: {e}")
 
         hl7_record = HL7Message.objects.create(
-            tenant=request.user.tenant,
+            tenant=(getattr(request, 'tenant', None) or request.user.tenant),
             message_type=msg_type.replace("^", "_") if "^" in msg_type else msg_type,
             raw_message=raw,
             status="received",
@@ -89,6 +89,6 @@ class HL7MessageListView(APIView):
 
     def get(self, request):
         messages = HL7Message.objects.filter(
-            tenant=request.user.tenant
+            tenant=(getattr(request, 'tenant', None) or request.user.tenant)
         ).values("id", "message_type", "status", "created_at", "processed_at")[:100]
         return Response(list(messages))

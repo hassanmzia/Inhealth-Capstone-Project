@@ -25,7 +25,7 @@ class ClaimViewSet(ModelViewSet):
 
     def get_queryset(self):
         return Claim.objects.filter(
-            tenant=self.request.user.tenant
+            tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).select_related("patient", "encounter")
 
     @action(detail=True, methods=["post"])
@@ -62,7 +62,7 @@ class RPMEpisodeViewSet(ModelViewSet):
 
     def get_queryset(self):
         return RPMEpisode.objects.filter(
-            tenant=self.request.user.tenant
+            tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).select_related("patient")
 
     @action(detail=True, methods=["post"])
