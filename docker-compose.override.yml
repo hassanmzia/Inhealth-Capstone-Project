@@ -127,7 +127,7 @@ services:
       - /app/.venv
     ports:
       # Expose agents API directly for Swagger UI access
-      - "8001:8001"
+      - "8021:8001"
     mem_limit: 4g
 
   # ---------------------------------------------------------------------------
