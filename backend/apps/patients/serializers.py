@@ -4,9 +4,37 @@ Serializers for the patients app.
 
 from rest_framework import serializers
 
+from apps.fhir.models import FHIRPatient
 from apps.fhir.serializers import FHIRPatientSerializer
 
 from .models import DeviceRegistration, PatientDemographics, PatientEngagement
+
+
+class PatientCreateSerializer(serializers.ModelSerializer):
+    """Write serializer used for patient creation and updates."""
+
+    class Meta:
+        model = FHIRPatient
+        fields = [
+            "mrn", "first_name", "last_name", "middle_name",
+            "birth_date", "gender", "phone", "email",
+            "address_line1", "address_line2", "city", "state",
+            "postal_code", "country", "active",
+            "primary_care_provider",
+        ]
+        extra_kwargs = {
+            "mrn":        {"required": True},
+            "first_name": {"required": True},
+            "last_name":  {"required": True},
+            "birth_date": {"required": True},
+            "middle_name":    {"required": False, "default": ""},
+            "address_line1":  {"required": False, "default": ""},
+            "address_line2":  {"required": False, "default": ""},
+            "city":           {"required": False, "default": ""},
+            "state":          {"required": False, "default": ""},
+            "postal_code":    {"required": False, "default": ""},
+            "country":        {"required": False, "default": "US"},
+        }
 
 
 class PatientDemographicsSerializer(serializers.ModelSerializer):

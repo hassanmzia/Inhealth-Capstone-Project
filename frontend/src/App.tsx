@@ -12,6 +12,7 @@ const PatientDashboard = React.lazy(() => import('@/pages/dashboard/PatientDashb
 const ResearcherDashboard = React.lazy(() => import('@/pages/dashboard/ResearcherDashboard'))
 const PatientListPage = React.lazy(() => import('@/pages/patients/PatientListPage'))
 const PatientDetailPage = React.lazy(() => import('@/pages/patients/PatientDetailPage'))
+const NewPatientPage = React.lazy(() => import('@/pages/patients/NewPatientPage'))
 const AgentControlPage = React.lazy(() => import('@/pages/agents/AgentControlPage'))
 const AnalyticsPage = React.lazy(() => import('@/pages/analytics/AnalyticsPage'))
 const ResearchPage = React.lazy(() => import('@/pages/research/ResearchPage'))
@@ -267,6 +268,19 @@ export default function App() {
             />
 
             {/* Patient management */}
+            <Route
+              path="patients/new"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <NewPatientPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
             <Route
               path="patients"
               element={
