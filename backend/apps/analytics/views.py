@@ -8,6 +8,7 @@ from django.utils import timezone
 from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet, ReadOnlyModelViewSet
 
 from apps.accounts.permissions import CanAccessPHI, IsOrgAdmin
@@ -106,3 +107,121 @@ class ClinicalKPIViewSet(ReadOnlyModelViewSet):
         ).distinct("metric_name")
 
         return Response(ClinicalKPISerializer(latest, many=True).data)
+
+
+class PopulationHealthView(APIView):
+    """Aggregated population health metrics for the analytics dashboard."""
+
+    permission_classes = [CanAccessPHI]
+
+    def get(self, request):
+        tenant = request.user.tenant
+        now = timezone.now()
+
+        # --- Risk distribution from RiskScore ---
+        risk_counts = (
+            RiskScore.objects.filter(tenant=tenant, valid_until__gt=now)
+            .values("risk_level")
+            .annotate(count=Count("id"))
+        )
+        risk_dist = {"critical": 0, "high": 0, "medium": 0, "low": 0}
+        for row in risk_counts:
+            if row["risk_level"] in risk_dist:
+                risk_dist[row["risk_level"]] = row["count"]
+        risk_dist["total"] = sum(risk_dist.values())
+
+        # --- Disease prevalence from FHIRCondition ---
+        try:
+            from apps.fhir.models import FHIRCondition
+            from django.db.models import F
+            total_patients = (
+                RiskScore.objects.filter(tenant=tenant, valid_until__gt=now)
+                .values("patient").distinct().count() or 1
+            )
+            condition_counts = (
+                FHIRCondition.objects.filter(tenant=tenant)
+                .values("code_display")
+                .annotate(count=Count("id"))
+                .order_by("-count")[:8]
+            )
+            disease_prevalence = [
+                {
+                    "condition": row["code_display"] or "Unknown",
+                    "count": row["count"],
+                    "percentage": round(row["count"] / total_patients * 100, 1),
+                }
+                for row in condition_counts
+                if row["code_display"]
+            ]
+        except Exception:
+            disease_prevalence = []
+
+        # --- Adherence trend: last 6 months of medication_adherence_rate KPI ---
+        six_months_ago = (now - timedelta(days=180)).date()
+        adherence_rows = (
+            ClinicalKPI.objects.filter(
+                tenant=tenant,
+                metric_name=ClinicalKPI.MetricName.MEDICATION_ADHERENCE_RATE,
+                metric_date__gte=six_months_ago,
+            )
+            .order_by("metric_date")
+            .values("metric_date", "metric_value")
+        )
+        adherence_trend = [
+            {
+                "month": row["metric_date"].strftime("%b"),
+                "adherence": round(row["metric_value"], 1),
+            }
+            for row in adherence_rows
+        ]
+
+        # --- Care gap closure rates from ClinicalKPI ---
+        care_gap_row = (
+            ClinicalKPI.objects.filter(
+                tenant=tenant,
+                metric_name=ClinicalKPI.MetricName.CARE_GAP_CLOSURE_RATE,
+            )
+            .order_by("-metric_date")
+            .first()
+        )
+        care_gap_rates = []
+        if care_gap_row and isinstance(care_gap_row.metadata, dict):
+            for category, values in care_gap_row.metadata.get("breakdown", {}).items():
+                care_gap_rates.append({
+                    "category": category,
+                    "openGaps": values.get("open_gaps", 0),
+                    "closureRate": values.get("closure_rate", 0),
+                })
+
+        # --- Quality measures from ClinicalKPI ---
+        quality_metric_map = {
+            ClinicalKPI.MetricName.PCT_A1C_CONTROLLED: ("HbA1c Control (<8%)", 72),
+            ClinicalKPI.MetricName.PCT_BP_CONTROLLED: ("BP Control (<140/90)", 68),
+            ClinicalKPI.MetricName.MEDICATION_ADHERENCE_RATE: ("Medication Adherence", 80),
+            ClinicalKPI.MetricName.CARE_GAP_CLOSURE_RATE: ("Care Gap Closure", 70),
+        }
+        latest_kpis = (
+            ClinicalKPI.objects.filter(
+                tenant=tenant,
+                metric_name__in=list(quality_metric_map.keys()),
+            )
+            .order_by("metric_name", "-metric_date")
+            .distinct("metric_name")
+        )
+        quality_measures = [
+            {
+                "measure": quality_metric_map[kpi.metric_name][0],
+                "rate": round(kpi.metric_value, 1),
+                "benchmark": quality_metric_map[kpi.metric_name][1],
+            }
+            for kpi in latest_kpis
+            if kpi.metric_name in quality_metric_map
+        ]
+
+        return Response({
+            "riskDistribution": risk_dist,
+            "diseasePrevalence": disease_prevalence,
+            "careGapRates": care_gap_rates,
+            "adherenceTrend": adherence_trend,
+            "qualityMeasures": quality_measures,
+        })
