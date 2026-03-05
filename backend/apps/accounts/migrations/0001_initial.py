@@ -97,6 +97,12 @@ class Migration(migrations.Migration):
                 ("npi_number", models.CharField(blank=True, default="", max_length=10)),
                 ("is_mfa_enabled", models.BooleanField(default=False)),
                 ("mfa_secret", models.CharField(blank=True, default="", max_length=255)),
+                # Email verification
+                ("email_verified", models.BooleanField(default=False)),
+                (
+                    "email_verification_token",
+                    models.UUIDField(blank=True, default=uuid.uuid4, null=True, unique=True),
+                ),
                 (
                     "health_literacy_level",
                     models.IntegerField(
