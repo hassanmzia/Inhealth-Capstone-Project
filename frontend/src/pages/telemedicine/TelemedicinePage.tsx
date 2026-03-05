@@ -162,12 +162,25 @@ export default function TelemedicinePage() {
 
   const handleTestConnection = async () => {
     setConnectionTestResult('Testing…')
+    if (!window.isSecureContext || !navigator.mediaDevices) {
+      setConnectionTestResult(
+        'Media access requires HTTPS. Open the app via https:// to test camera and microphone.',
+      )
+      return
+    }
     try {
       const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
       stream.getTracks().forEach((t) => t.stop())
       setConnectionTestResult('Camera and microphone are working.')
-    } catch {
-      setConnectionTestResult('Could not access camera/microphone. Check browser permissions.')
+    } catch (err) {
+      const msg = err instanceof Error ? err.name : 'Unknown'
+      if (msg === 'NotAllowedError' || msg === 'PermissionDeniedError') {
+        setConnectionTestResult('Permission denied — allow camera and microphone access in your browser settings.')
+      } else if (msg === 'NotFoundError') {
+        setConnectionTestResult('No camera or microphone found. Connect a device and try again.')
+      } else {
+        setConnectionTestResult(`Device error (${msg}). Check that no other app is using the camera.`)
+      }
     }
   }
 

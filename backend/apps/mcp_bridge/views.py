@@ -27,7 +27,7 @@ class AgentRecommendationsView(APIView):
     permission_classes = [permissions.IsAuthenticated]
 
     def get(self, request):
-        tenant = request.user.tenant
+        tenant = (getattr(request, 'tenant', None) or request.user.tenant)
         patient_id = request.query_params.get("patient_id")
         status_filter = request.query_params.get("status", "pending")
         try:
@@ -106,7 +106,7 @@ class AgentRecommendationActionView(APIView):
             from django.utils import timezone as tz
             log = AgentActionLog.objects.get(
                 pk=pk,
-                tenant=request.user.tenant,
+                tenant=(getattr(request, 'tenant', None) or request.user.tenant),
                 action_type=AgentActionLog.ActionType.RECOMMENDATION,
             )
             log.reviewed_by_id = request.user.id
@@ -154,7 +154,7 @@ class AgentStatusView(APIView):
                 avg_runtime = 0.0
                 try:
                     qs = AgentActionLog.objects.filter(
-                        tenant=request.user.tenant,
+                        tenant=(getattr(request, 'tenant', None) or request.user.tenant),
                         agent_type=agent_id,
                     )
                     last_log = qs.order_by("-created_at").first()
@@ -197,7 +197,7 @@ class AgentExecutionsView(APIView):
         total = 0
         try:
             from apps.fhir.models import AgentActionLog
-            qs = AgentActionLog.objects.filter(tenant=request.user.tenant).order_by("-created_at")
+            qs = AgentActionLog.objects.filter(tenant=(getattr(request, 'tenant', None) or request.user.tenant)).order_by("-created_at")
 
             # Optional filters
             agent_id_param = request.query_params.get("agent_id")
@@ -264,7 +264,7 @@ class AgentHITLView(APIView):
         try:
             from apps.fhir.models import AgentActionLog
             qs = AgentActionLog.objects.filter(
-                tenant=request.user.tenant,
+                tenant=(getattr(request, 'tenant', None) or request.user.tenant),
                 action_type=AgentActionLog.ActionType.RECOMMENDATION,
             ).select_related("patient").order_by("-created_at")
 
@@ -327,7 +327,7 @@ class AgentHITLDecideView(APIView):
         try:
             from apps.fhir.models import AgentActionLog
             from django.utils import timezone as tz
-            log = AgentActionLog.objects.get(pk=pk, tenant=request.user.tenant)
+            log = AgentActionLog.objects.get(pk=pk, tenant=(getattr(request, 'tenant', None) or request.user.tenant))
             log.reviewed_by_id = request.user.id
             log.was_accepted = decision in ("approved", "modified")
             log.reviewed_at = tz.now()
@@ -350,7 +350,7 @@ class MCPContextView(APIView):
         patient_id = request.query_params.get("patient_id")
         cohort_id = request.query_params.get("cohort_id")
 
-        builder = MCPContextBuilder(tenant=request.user.tenant)
+        builder = MCPContextBuilder(tenant=(getattr(request, 'tenant', None) or request.user.tenant))
 
         if patient_id:
             context = builder.build_patient_context(patient_id)
@@ -374,7 +374,7 @@ class MCPToolsView(APIView):
     permission_classes = [CanAccessPHI]
 
     def get(self, request):
-        builder = MCPContextBuilder(tenant=request.user.tenant)
+        builder = MCPContextBuilder(tenant=(getattr(request, 'tenant', None) or request.user.tenant))
         return Response({"tools": builder.build_tool_list()})
 
     def post(self, request):
@@ -387,7 +387,7 @@ class MCPToolsView(APIView):
                 status=status.HTTP_400_BAD_REQUEST,
             )
 
-        executor = MCPToolExecutor(tenant=request.user.tenant, user=request.user)
+        executor = MCPToolExecutor(tenant=(getattr(request, 'tenant', None) or request.user.tenant), user=request.user)
         result = executor.execute(tool_name, parameters)
 
         if result.get("status") == "error":

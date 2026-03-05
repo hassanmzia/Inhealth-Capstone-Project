@@ -37,7 +37,7 @@ class CurrentOrganizationView(generics.RetrieveUpdateAPIView):
     permission_classes = [IsOrgAdmin]
 
     def get_object(self):
-        return self.request.user.tenant
+        return (getattr(self.request, 'tenant', None) or self.request.user.tenant)
 
 
 class TenantConfigView(generics.RetrieveUpdateAPIView):
@@ -48,7 +48,7 @@ class TenantConfigView(generics.RetrieveUpdateAPIView):
 
     def get_object(self):
         config, _ = TenantConfig.objects.get_or_create(
-            organization=self.request.user.tenant
+            organization=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         )
         return config
 
@@ -66,12 +66,12 @@ class APIKeyViewSet(ModelViewSet):
 
     def get_queryset(self):
         return APIKey.objects.filter(
-            organization=self.request.user.tenant
+            organization=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).order_by("-created_at")
 
     def perform_create(self, serializer):
         serializer.save(
-            organization=self.request.user.tenant,
+            organization=(getattr(self.request, 'tenant', None) or self.request.user.tenant),
             created_by=self.request.user,
         )
 

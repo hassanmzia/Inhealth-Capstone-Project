@@ -20,12 +20,18 @@ export default defineConfig({
         secure: false,
       },
       '/ws': {
-        target: 'ws://django:8000',
+        target: 'ws://django:8001',
         ws: true,
         changeOrigin: true,
       },
       '/fhir': {
         target: 'http://django:8000',
+        changeOrigin: true,
+        secure: false,
+      },
+      // Agents FastAPI service — HTTP + WebSocket
+      '/agents': {
+        target: 'http://agents-api:8001',
         changeOrigin: true,
         secure: false,
       },

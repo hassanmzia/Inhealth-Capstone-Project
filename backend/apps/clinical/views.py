@@ -26,7 +26,7 @@ class EncounterViewSet(ModelViewSet):
 
     def get_queryset(self):
         qs = Encounter.objects.filter(
-            tenant=self.request.user.tenant
+            tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).select_related("patient", "provider")
         if self.request.query_params.get("patient"):
             qs = qs.filter(patient_id=self.request.query_params["patient"])
@@ -36,7 +36,7 @@ class EncounterViewSet(ModelViewSet):
 
     def perform_create(self, serializer):
         serializer.save(
-            tenant=self.request.user.tenant,
+            tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant),
             provider=self.request.user,
         )
 
@@ -51,11 +51,11 @@ class CareGapViewSet(ModelViewSet):
 
     def get_queryset(self):
         return CareGap.objects.filter(
-            tenant=self.request.user.tenant
+            tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).select_related("patient")
 
     def perform_create(self, serializer):
-        serializer.save(tenant=self.request.user.tenant)
+        serializer.save(tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant))
 
     @action(detail=True, methods=["post"])
     def close(self, request, pk=None):
@@ -89,7 +89,7 @@ class SmartOrderSetViewSet(ModelViewSet):
     filterset_fields = ["condition", "evidence_level", "created_by_ai"]
 
     def get_queryset(self):
-        tenant = self.request.user.tenant
+        tenant = (getattr(self.request, 'tenant', None) or self.request.user.tenant)
         # Return global order sets + tenant-specific ones
         from django.db.models import Q
         return SmartOrderSet.objects.filter(
