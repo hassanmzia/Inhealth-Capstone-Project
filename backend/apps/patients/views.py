@@ -50,8 +50,12 @@ class PatientViewSet(ModelViewSet):
             return PatientCreateSerializer
         return FHIRPatientSerializer
 
+    def _tenant(self):
+        """Return the effective tenant: middleware-activated or user's FK."""
+        return getattr(self.request, 'tenant', None) or self.request.user.tenant
+
     def perform_create(self, serializer):
-        serializer.save(tenant=self.request.user.tenant)
+        serializer.save(tenant=self._tenant())
 
     def list(self, request, *args, **kwargs):
         """Return PatientSummary shape expected by the frontend."""
@@ -142,8 +146,9 @@ class PatientViewSet(ModelViewSet):
 
     def get_queryset(self):
         try:
+            tenant = self._tenant()
             qs = FHIRPatient.objects.filter(
-                tenant=self.request.user.tenant
+                tenant=tenant
             ).select_related("primary_care_provider")
         except Exception:
             # DB schema not ready (e.g. no tenant schema migrated yet)
@@ -165,7 +170,7 @@ class PatientViewSet(ModelViewSet):
                 from apps.analytics.models import RiskScore
                 levels = [r.strip() for r in risk_level_param.split(",")]
                 patient_ids = RiskScore.objects.filter(
-                    tenant=self.request.user.tenant,
+                    tenant=tenant,
                     risk_level__in=levels,
                     valid_until__gt=timezone.now(),
                 ).values_list("patient_id", flat=True).distinct()
@@ -179,7 +184,7 @@ class PatientViewSet(ModelViewSet):
     def summary(self, request, pk=None):
         """Full patient summary for the clinical dashboard."""
         try:
-            patient = FHIRPatient.objects.get(pk=pk, tenant=request.user.tenant)
+            patient = FHIRPatient.objects.get(pk=pk, tenant=self._tenant())
         except FHIRPatient.DoesNotExist:
             return Response(status=status.HTTP_404_NOT_FOUND)
 
@@ -226,7 +231,7 @@ class PatientViewSet(ModelViewSet):
         from django.utils import timezone
 
         high_risk = FHIRPatient.objects.filter(
-            tenant=request.user.tenant,
+            tenant=self._tenant(),
             active=True,
         ).filter(
             analytics_risk_scores__risk_level__in=["high", "critical"],
@@ -274,7 +279,7 @@ class DeviceRegistrationViewSet(ModelViewSet):
 
     def get_queryset(self):
         return DeviceRegistration.objects.filter(
-            patient__tenant=self.request.user.tenant,
+            patient__tenant=getattr(self.request, 'tenant', None) or self.request.user.tenant,
             patient_id=self.kwargs.get("patient_pk"),
         )
 

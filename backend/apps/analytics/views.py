@@ -27,12 +27,12 @@ class PopulationCohortViewSet(ModelViewSet):
 
     def get_queryset(self):
         try:
-            return PopulationCohort.objects.filter(tenant=self.request.user.tenant)
+            return PopulationCohort.objects.filter(tenant=getattr(self.request, 'tenant', None) or self.request.user.tenant)
         except Exception:
             return PopulationCohort.objects.none()
 
     def perform_create(self, serializer):
-        serializer.save(tenant=self.request.user.tenant, created_by=self.request.user)
+        serializer.save(tenant=getattr(self.request, 'tenant', None) or self.request.user.tenant, created_by=self.request.user)
 
     @action(detail=True, methods=["post"])
     def refresh(self, request, pk=None):
@@ -54,7 +54,7 @@ class RiskScoreViewSet(ReadOnlyModelViewSet):
     def get_queryset(self):
         try:
             qs = RiskScore.objects.filter(
-                tenant=self.request.user.tenant,
+                tenant=getattr(self.request, 'tenant', None) or self.request.user.tenant,
                 valid_until__gt=timezone.now(),
             ).select_related("patient")
             if self.request.query_params.get("patient"):
@@ -70,7 +70,7 @@ class RiskScoreViewSet(ReadOnlyModelViewSet):
             from apps.fhir.serializers import FHIRPatientSerializer
             high_risk_scores = list(
                 RiskScore.objects.filter(
-                    tenant=request.user.tenant,
+                    tenant=getattr(request, 'tenant', None) or request.user.tenant,
                     risk_level__in=["high", "critical"],
                     valid_until__gt=timezone.now(),
                 ).select_related("patient").order_by("-score")[:50]
@@ -102,7 +102,7 @@ class ClinicalKPIViewSet(ReadOnlyModelViewSet):
 
     def get_queryset(self):
         try:
-            qs = ClinicalKPI.objects.filter(tenant=self.request.user.tenant)
+            qs = ClinicalKPI.objects.filter(tenant=getattr(self.request, 'tenant', None) or self.request.user.tenant)
             days = self.request.query_params.get("days", 30)
             cutoff = timezone.now().date() - timedelta(days=int(days))
             return qs.filter(metric_date__gte=cutoff)
@@ -113,7 +113,7 @@ class ClinicalKPIViewSet(ReadOnlyModelViewSet):
     def summary(self, request):
         """Return latest values for all KPIs."""
         try:
-            tenant = request.user.tenant
+            tenant = getattr(request, 'tenant', None) or request.user.tenant
             latest = ClinicalKPI.objects.filter(tenant=tenant).order_by(
                 "metric_name", "-metric_date"
             ).distinct("metric_name")
@@ -136,7 +136,7 @@ class PopulationHealthView(APIView):
     }
 
     def get(self, request):
-        tenant = request.user.tenant
+        tenant = getattr(request, 'tenant', None) or request.user.tenant
         now = timezone.now()
 
         # --- Risk distribution from RiskScore ---
