@@ -88,37 +88,32 @@ class PublicFallbackTenantMiddleware(TenantMainMiddleware):
 
     def _set_schema_from_primary_domain(self, request) -> bool:
         """
-        Last-resort fallback: use the primary domain's tenant.
+        Last-resort fallback: use the sole active organization's schema.
 
         Handles the case where an admin user (tenant_id=None) accesses the API
-        via a non-registered hostname (e.g. the server's LAN IP in dev).
+        via a non-registered hostname (e.g. the server's LAN IP in dev) and
+        no Domain row exists yet (i.e. before seed_patients.py has been run).
         Only activates when exactly one active organization exists, to avoid
         silently routing requests to the wrong tenant in multi-tenant setups.
         """
         try:
-            from apps.tenants.models import Domain, Organization
+            from apps.tenants.models import Organization
 
-            active_orgs = Organization.objects.filter(is_active=True)
-            # Safety: only fall back automatically in single-tenant deployments
-            if active_orgs.count() != 1:
+            # Fetch at most 2 so we can check uniqueness without a full COUNT
+            active_orgs = list(Organization.objects.filter(is_active=True).order_by("created_at")[:2])
+            # Safety: only fall back in single-tenant deployments
+            if len(active_orgs) != 1:
                 return False
 
-            primary = (
-                Domain.objects.filter(is_primary=True)
-                .select_related("tenant")
-                .first()
-            )
-            if primary is None:
-                return False
-
-            connection.set_schema(primary.tenant.schema_name)
-            request.tenant = primary.tenant
+            org = active_orgs[0]
+            connection.set_schema(org.schema_name)
+            request.tenant = org
             logger.debug(
-                "Tenant schema set from primary-domain fallback: schema=%s",
-                primary.tenant.schema_name,
+                "Tenant schema set from single-org fallback: schema=%s",
+                org.schema_name,
             )
             return True
 
         except Exception as exc:  # noqa: BLE001
-            logger.debug("Primary-domain fallback failed: %s", exc)
+            logger.debug("Single-org fallback failed: %s", exc)
             return False

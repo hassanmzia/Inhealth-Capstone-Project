@@ -207,13 +207,25 @@ org, created = Organization.objects.get_or_create(
 )
 if created:
     print(f"CREATED: Organization '{org.name}' (schema: {org.schema_name})")
-    # Create a domain entry so tenant middleware resolves correctly
-    Domain.objects.get_or_create(
-        domain="localhost",
-        defaults={"tenant": org, "is_primary": True},
-    )
 else:
     print(f"EXISTS:  Organization '{org.name}'")
+
+# Ensure a primary Domain entry exists (used by tenant middleware)
+Domain.objects.get_or_create(
+    domain="localhost",
+    defaults={"tenant": org, "is_primary": True},
+)
+
+# Assign the admin superuser to this org if they currently have no tenant.
+# This ensures request.user.tenant is set when admin logs in via any hostname.
+try:
+    admin_user = User.objects.filter(is_superuser=True, tenant__isnull=True).first()
+    if admin_user:
+        admin_user.tenant = org
+        admin_user.save(update_fields=["tenant"])
+        print(f"UPDATED: Superuser '{admin_user.username}' assigned to '{org.name}'")
+except Exception as _e:
+    print(f"SKIP:    Could not assign superuser tenant ({_e})")
 
 # -----------------------------------------------
 # 2. Ensure a physician user exists in that org
