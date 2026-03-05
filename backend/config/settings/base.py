@@ -70,6 +70,7 @@ SHARED_APPS = [
     "django.contrib.gis",
     # Shared InHealth apps
     "apps.tenants",
+    "apps.accounts",
     # Third-party
     "rest_framework",
     "rest_framework_simplejwt",
@@ -86,7 +87,6 @@ SHARED_APPS = [
 
 TENANT_APPS = [
     # Per-tenant apps
-    "apps.accounts",
     "apps.fhir",
     "apps.hl7",
     "apps.patients",
