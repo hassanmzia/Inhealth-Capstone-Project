@@ -112,6 +112,8 @@ class FHIRPatient(FHIRBase):
 
     @property
     def age(self):
+        if not self.birth_date:
+            return None
         from datetime import date
         today = date.today()
         born = self.birth_date

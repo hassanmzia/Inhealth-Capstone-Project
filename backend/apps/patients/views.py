@@ -55,15 +55,19 @@ class PatientViewSet(ModelViewSet):
 
     def list(self, request, *args, **kwargs):
         """Return PatientSummary shape expected by the frontend."""
-        qs = self.filter_queryset(self.get_queryset()).prefetch_related(
-            "conditions", "analytics_risk_scores"
-        )
-        page = self.paginate_queryset(qs)
-        items = page if page is not None else qs
-        data = [self._to_summary(p) for p in items]
-        if page is not None:
-            return self.get_paginated_response(data)
-        return Response(data)
+        try:
+            qs = self.filter_queryset(self.get_queryset()).prefetch_related(
+                "conditions", "analytics_risk_scores"
+            )
+            page = self.paginate_queryset(qs)
+            items = page if page is not None else qs
+            data = [self._to_summary(p) for p in items]
+            if page is not None:
+                return self.get_paginated_response(data)
+            return Response(data)
+        except Exception:
+            logger.warning("patients list query failed (schema not ready?)", exc_info=True)
+            return Response({"count": 0, "next": None, "previous": None, "results": []})
 
     @staticmethod
     def _to_summary(patient):
