@@ -127,6 +127,18 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
     """Enhanced JWT serializer with role claims and security metadata."""
 
     def validate(self, attrs):
+        # Give a clearer error when the account exists but email is unverified.
+        email = attrs.get(self.username_field, "")
+        try:
+            user = User.objects.get(email=email)
+            if not user.email_verified and not user.is_active:
+                raise serializers.ValidationError(
+                    "Your email address has not been verified. "
+                    "Please check your inbox for the verification link."
+                )
+        except User.DoesNotExist:
+            pass
+
         data = super().validate(attrs)
         user = self.user
 
