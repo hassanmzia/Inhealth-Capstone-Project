@@ -107,7 +107,7 @@ router.post("/context", async (req: AuthenticatedRequest, res: Response): Promis
     });
   } catch (error) {
     const duration = (Date.now() - startTime) / 1000;
-    mcpContextRequestsTotal.labels({ status: "error", agent_id }).inc();
+    mcpContextRequestsTotal.labels({ status: "error", agentId }).inc();
     mcpContextBuildDurationSeconds.observe(duration);
 
     logger.error("context route: error building context", {

@@ -360,8 +360,6 @@ export async function handleTaskResult(
 }
 
 async function storeTask(task: A2ATask): Promise<void> {
-  const _gateway = getA2AGateway();
-  // Access Redis via gateway's internal client by re-using gateway infrastructure
   // Store task as a hash in Redis with a 24-hour TTL
   const taskKey = `task:${task.task_id}`;
   // We use the gateway's publish client indirectly via a new Redis client
