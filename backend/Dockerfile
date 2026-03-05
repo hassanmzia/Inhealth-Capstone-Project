@@ -15,7 +15,7 @@ WORKDIR /app
 
 COPY requirements/ requirements/
 RUN pip install --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -r requirements/base.txt
+    pip install --no-cache-dir -r requirements/development.txt
 
 COPY . .
 
