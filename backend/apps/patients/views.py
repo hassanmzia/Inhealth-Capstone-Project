@@ -24,6 +24,7 @@ from apps.fhir.serializers import FHIRPatientSerializer
 from .models import DeviceRegistration, PatientDemographics, PatientEngagement
 from .serializers import (
     DeviceRegistrationSerializer,
+    PatientCreateSerializer,
     PatientDemographicsSerializer,
     PatientEngagementSerializer,
     PatientSummarySerializer,
@@ -43,6 +44,97 @@ class PatientViewSet(ModelViewSet):
     search_fields = ["first_name", "last_name", "mrn", "email"]
     ordering_fields = ["last_name", "birth_date", "created_at"]
     ordering = ["last_name"]
+
+    def get_serializer_class(self):
+        if self.action in ("create", "update", "partial_update"):
+            return PatientCreateSerializer
+        return FHIRPatientSerializer
+
+    def perform_create(self, serializer):
+        serializer.save(tenant=self.request.user.tenant)
+
+    def list(self, request, *args, **kwargs):
+        """Return PatientSummary shape expected by the frontend."""
+        qs = self.filter_queryset(self.get_queryset()).prefetch_related(
+            "conditions", "analytics_risk_scores"
+        )
+        page = self.paginate_queryset(qs)
+        items = page if page is not None else qs
+        data = [self._to_summary(p) for p in items]
+        if page is not None:
+            return self.get_paginated_response(data)
+        return Response(data)
+
+    @staticmethod
+    def _to_summary(patient):
+        """Build the PatientSummary dict the frontend consumes."""
+        from django.utils import timezone as tz
+        now = tz.now()
+
+        # Active conditions (use prefetched set, filter in Python)
+        active_conditions = []
+        try:
+            active_conditions = [
+                {"code": c.code, "display": c.display}
+                for c in patient.conditions.all()
+                if c.clinical_status == "active"
+            ][:5]
+        except Exception:
+            pass
+
+        # Latest valid risk score
+        risk_score_data = None
+        alert_status = "normal"
+        try:
+            latest_risk = next(
+                (r for r in patient.analytics_risk_scores.all()
+                 if r.valid_until and r.valid_until > now),
+                None
+            )
+            if latest_risk:
+                risk_score_data = {
+                    "score": latest_risk.score,
+                    "level": latest_risk.risk_level,
+                }
+                alert_status = (
+                    "critical" if latest_risk.risk_level in ("critical", "high")
+                    else "warning" if latest_risk.risk_level == "medium"
+                    else "normal"
+                )
+        except Exception:
+            pass
+
+        # Primary provider
+        provider_data = None
+        try:
+            pcp = patient.primary_care_provider
+            if pcp:
+                provider_data = {
+                    "id": str(pcp.id),
+                    "name": f"{pcp.first_name} {pcp.last_name}".strip(),
+                    "specialty": pcp.specialty or "",
+                }
+        except Exception:
+            pass
+
+        return {
+            "id": str(patient.id),
+            "mrn": patient.mrn,
+            "firstName": patient.first_name,
+            "lastName": patient.last_name,
+            "dateOfBirth": patient.birth_date.isoformat() if patient.birth_date else None,
+            "age": patient.age,
+            "gender": patient.gender,
+            "phone": patient.phone,
+            "email": patient.email,
+            "active": patient.active,
+            "primaryProvider": provider_data,
+            "activeConditions": active_conditions,
+            "riskScore": risk_score_data,
+            "openCareGaps": 0,
+            "lastContactDate": None,
+            "alertStatus": alert_status,
+        }
 
     def get_queryset(self):
         qs = FHIRPatient.objects.filter(
