@@ -15,6 +15,7 @@ import api from '@/services/api'
 import PopulationRiskPyramid from '@/components/charts/PopulationRiskPyramid'
 import AgentActivityTimeline from '@/components/charts/AgentActivityTimeline'
 import { useAgentStore } from '@/store/agentStore'
+import { useMemo } from 'react'
 
 const CONTAINER = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } }
 const ITEM = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -22,7 +23,8 @@ const ITEM = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
 const GRAFANA_URL = import.meta.env.VITE_GRAFANA_URL ?? ''
 
 export default function AnalyticsPage() {
-  const { executions } = useAgentStore()
+  const executions = useAgentStore((state) => state.executions)
+  const executionSlice = useMemo(() => executions.slice(0, 200), [executions])
 
   const { data: populationData } = useQuery({
     queryKey: ['population-metrics'],
@@ -212,7 +214,7 @@ export default function AnalyticsPage() {
         {/* Agent performance */}
         <motion.div variants={ITEM} className="clinical-card lg:col-span-2">
           <h2 className="text-sm font-bold text-foreground mb-4">Agent Activity (24h)</h2>
-          <AgentActivityTimeline executions={executions.slice(0, 200)} height={300} />
+          <AgentActivityTimeline executions={executionSlice} height={300} />
         </motion.div>
       </div>
 
