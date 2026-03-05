@@ -306,31 +306,19 @@ class Migration(migrations.Migration):
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(
-                fields=["user", "timestamp"],
-                name="accounts_auditlog_user_id_timestamp_047d90_idx",
-            ),
+            index=models.Index(fields=["user", "timestamp"]),
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(
-                fields=["resource_type", "resource_id"],
-                name="accounts_auditlog_resource_type_resource_id_67233a_idx",
-            ),
+            index=models.Index(fields=["resource_type", "resource_id"]),
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(
-                fields=["phi_accessed", "timestamp"],
-                name="accounts_auditlog_phi_accessed_timestamp_e605dc_idx",
-            ),
+            index=models.Index(fields=["phi_accessed", "timestamp"]),
         ),
         migrations.AddIndex(
             model_name="auditlog",
-            index=models.Index(
-                fields=["tenant_id", "timestamp"],
-                name="accounts_auditlog_tenant_id_timestamp_233320_idx",
-            ),
+            index=models.Index(fields=["tenant_id", "timestamp"]),
         ),
         migrations.AddIndex(
             model_name="refreshtokenblacklist",
