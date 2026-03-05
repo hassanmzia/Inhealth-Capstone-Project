@@ -36,6 +36,16 @@ export interface LoginCredentials {
   totpCode?: string
 }
 
+export interface RegisterCredentials {
+  email: string
+  first_name: string
+  last_name: string
+  password: string
+  password_confirm: string
+  phone_number?: string
+  role?: string
+}
+
 export interface LoginResponse {
   access: string
   refresh: string
@@ -64,6 +74,7 @@ interface AuthState {
 
   // Actions
   login: (credentials: LoginCredentials) => Promise<LoginResponse>
+  register: (credentials: RegisterCredentials) => Promise<void>
   logout: () => void
   refreshTokens: () => Promise<void>
   setToken: (token: string) => void
@@ -135,6 +146,15 @@ export const useAuthStore = create<AuthState>()(
         } catch (error) {
           set({ isLoading: false })
           throw error
+        }
+      },
+
+      register: async (credentials: RegisterCredentials) => {
+        set({ isLoading: true })
+        try {
+          await api.post('/auth/register/', credentials)
+        } finally {
+          set({ isLoading: false })
         }
       },
 

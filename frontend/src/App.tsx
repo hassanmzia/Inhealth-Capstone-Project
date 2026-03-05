@@ -6,6 +6,7 @@ import MainLayout from '@/components/layout/MainLayout'
 
 // Lazy-loaded pages
 const LoginPage = React.lazy(() => import('@/pages/auth/LoginPage'))
+const RegisterPage = React.lazy(() => import('@/pages/auth/RegisterPage'))
 const ClinicianDashboard = React.lazy(() => import('@/pages/dashboard/ClinicianDashboard'))
 const PatientDashboard = React.lazy(() => import('@/pages/dashboard/PatientDashboard'))
 const PatientListPage = React.lazy(() => import('@/pages/patients/PatientListPage'))
@@ -163,6 +164,21 @@ export default function App() {
                 <Suspense fallback={<PageLoader />}>
                   <AnimatedPage>
                     <LoginPage />
+                  </AnimatedPage>
+                </Suspense>
+              )
+            }
+          />
+
+          <Route
+            path="/register"
+            element={
+              isAuthenticated ? (
+                <Navigate to="/dashboard" replace />
+              ) : (
+                <Suspense fallback={<PageLoader />}>
+                  <AnimatedPage>
+                    <RegisterPage />
                   </AnimatedPage>
                 </Suspense>
               )
