@@ -104,5 +104,10 @@ EXPOSE 8000 8001
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
     CMD curl -f http://localhost:${PORT}/api/v1/health/ || exit 1
 
+# Entrypoint: run migrate_schemas before starting the server
+COPY --chown=inhealth:inhealth entrypoint.sh /app/entrypoint.sh
+RUN chmod +x /app/entrypoint.sh
+ENTRYPOINT ["/app/entrypoint.sh"]
+
 # Default command: run Daphne for ASGI (supports both HTTP and WebSocket)
 CMD ["sh", "-c", "daphne -b 0.0.0.0 -p ${ASGI_PORT} config.asgi:application & gunicorn config.wsgi:application --bind 0.0.0.0:${PORT} --workers 4 --threads 2 --worker-class gthread --timeout 120 --keep-alive 5 --max-requests 1000 --max-requests-jitter 100 --access-logfile - --error-logfile - && wait"]
