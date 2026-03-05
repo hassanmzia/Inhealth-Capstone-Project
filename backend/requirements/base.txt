@@ -108,6 +108,7 @@ django-encrypted-model-fields==0.6.5
 
 # OTP / MFA
 pyotp==2.9.0
+qrcode[pil]==7.4.2
 
 # Communication adapters
 twilio==8.13.0
