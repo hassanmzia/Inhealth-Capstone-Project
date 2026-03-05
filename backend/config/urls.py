@@ -61,7 +61,8 @@ api_v1_patterns = [
 urlpatterns = [
     # Django admin (only on public schema)
     path("admin/", admin.site.urls),
-    # Health check
+    # Health check — both /api/health/ (Docker healthcheck) and /api/v1/health/
+    path("api/health/", health_check, name="health-check-bare"),
     path("api/v1/health/", health_check, name="health-check"),
     # API v1
     path("api/v1/", include((api_v1_patterns, "api-v1"))),
