@@ -5,8 +5,6 @@
 # Port mappings: host:container (see README for full port reference)
 # =============================================================================
 
-version: "3.9"
-
 networks:
   inhealth-network:
     driver: bridge
