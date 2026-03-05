@@ -141,10 +141,35 @@ function VideoCallPanel({ appointment, onEnd }: { appointment: Appointment; onEn
   )
 }
 
+const INSTANT_CALL_PLACEHOLDER: Appointment = {
+  id: 'instant',
+  patientName: 'Instant Call',
+  patientId: '',
+  start: new Date().toISOString(),
+  end: new Date().toISOString(),
+  serviceType: 'Instant Telemedicine',
+  appointmentType: 'instant',
+  status: 'booked',
+  isTelehealth: true,
+  location: 'virtual',
+}
+
 export default function TelemedicinePage() {
   const navigate = useNavigate()
   const { user } = useAuthStore()
   const [activeCall, setActiveCall] = useState<Appointment | null>(null)
+  const [connectionTestResult, setConnectionTestResult] = useState<string | null>(null)
+
+  const handleTestConnection = async () => {
+    setConnectionTestResult('Testing…')
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: true })
+      stream.getTracks().forEach((t) => t.stop())
+      setConnectionTestResult('Camera and microphone are working.')
+    } catch {
+      setConnectionTestResult('Could not access camera/microphone. Check browser permissions.')
+    }
+  }
 
   const isPatient = user?.role === 'patient'
 
@@ -183,13 +208,28 @@ export default function TelemedicinePage() {
       {!isPatient && (
         <motion.div variants={ITEM} className="grid grid-cols-3 gap-4">
           {[
-            { label: 'Start Instant Call', icon: Phone, color: 'bg-secondary-600 hover:bg-secondary-700', href: null },
-            { label: 'Schedule Visit', icon: Calendar, color: 'bg-primary-600 hover:bg-primary-700', href: '/patients' },
-            { label: 'Test Connection', icon: Video, color: 'bg-gray-600 hover:bg-gray-700', href: null },
+            {
+              label: 'Start Instant Call',
+              icon: Phone,
+              color: 'bg-secondary-600 hover:bg-secondary-700',
+              onClick: () => setActiveCall(INSTANT_CALL_PLACEHOLDER),
+            },
+            {
+              label: 'Schedule Visit',
+              icon: Calendar,
+              color: 'bg-primary-600 hover:bg-primary-700',
+              onClick: () => navigate('/patients'),
+            },
+            {
+              label: 'Test Connection',
+              icon: Video,
+              color: 'bg-gray-600 hover:bg-gray-700',
+              onClick: handleTestConnection,
+            },
           ].map((action) => (
             <button
               key={action.label}
-              onClick={() => action.href && navigate(action.href)}
+              onClick={action.onClick}
               className={cn(
                 'flex items-center justify-center gap-2 py-3 rounded-lg text-white text-sm font-semibold transition-colors',
                 action.color,
@@ -199,6 +239,9 @@ export default function TelemedicinePage() {
               {action.label}
             </button>
           ))}
+          {connectionTestResult && (
+            <p className="col-span-3 text-center text-xs text-muted-foreground mt-1">{connectionTestResult}</p>
+          )}
         </motion.div>
       )}
 
