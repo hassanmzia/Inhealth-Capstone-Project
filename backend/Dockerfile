@@ -1,4 +1,29 @@
-# Stage 1: Builder
+# Stage 1: development (Django runserver with hot reload)
+FROM python:3.12-slim-bookworm AS development
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    build-essential gcc g++ libpq-dev libffi-dev libssl-dev \
+    libgdal-dev gdal-bin postgresql-client curl git \
+    && rm -rf /var/lib/apt/lists/*
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PYTHONPATH=/app \
+    DJANGO_SETTINGS_MODULE=config.settings.development
+
+WORKDIR /app
+
+COPY requirements/ requirements/
+RUN pip install --upgrade pip setuptools wheel && \
+    pip install --no-cache-dir -r requirements/base.txt
+
+COPY . .
+
+EXPOSE 8000
+
+CMD ["python", "manage.py", "runserver", "0.0.0.0:8000"]
+
+# Stage 2: Builder
 FROM python:3.12-slim-bookworm AS builder
 
 # Install system dependencies
