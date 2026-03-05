@@ -12,6 +12,7 @@ export default defineConfig({
   server: {
     port: 3000,
     host: true,
+    allowedHosts: ['frontend', 'localhost'],
     proxy: {
       '/api': {
         target: 'http://django:8000',
