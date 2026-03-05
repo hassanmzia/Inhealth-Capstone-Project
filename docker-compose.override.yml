@@ -188,9 +188,7 @@ services:
       # Mount entire frontend source for HMR
       - ./frontend:/app:cached
       - /app/node_modules
-    ports:
-      # Expose Vite dev server directly (also accessible via Nginx)
-      - "3000:3000"
+    # No host port published — frontend is accessed via Nginx on port 8788
     mem_limit: 2g
 
   # ---------------------------------------------------------------------------
