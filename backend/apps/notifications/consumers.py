@@ -44,14 +44,20 @@ class AlertConsumer(AsyncWebsocketConsumer):
 
         logger.info(f"Alert WebSocket connected: user={self.user_id}")
 
-        # Send pending unacknowledged notifications
-        await self.send_pending_notifications()
+        # Send pending unacknowledged notifications (best-effort — never crash the connection)
+        try:
+            await self.send_pending_notifications()
+        except Exception:
+            pass
 
     async def disconnect(self, close_code):
-        if hasattr(self, "room_group_name"):
-            await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
-        if hasattr(self, "tenant_group"):
-            await self.channel_layer.group_discard(self.tenant_group, self.channel_name)
+        try:
+            if hasattr(self, "room_group_name"):
+                await self.channel_layer.group_discard(self.room_group_name, self.channel_name)
+            if hasattr(self, "tenant_group"):
+                await self.channel_layer.group_discard(self.tenant_group, self.channel_name)
+        except Exception:
+            pass
         logger.info(f"Alert WebSocket disconnected: user={getattr(self, 'user_id', 'unknown')}")
 
     async def receive(self, text_data):
