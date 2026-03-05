@@ -142,14 +142,15 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         data = super().validate(attrs)
         user = self.user
 
-        # Add custom claims to response
+        # Add custom claims to response — keys match the frontend's LoginResponse type.
         data["user"] = {
             "id": str(user.id),
             "email": user.email,
-            "full_name": user.get_full_name(),
+            "firstName": user.first_name,
+            "lastName": user.last_name,
             "role": user.role,
-            "tenant_id": str(user.tenant_id) if user.tenant_id else None,
-            "is_mfa_enabled": user.is_mfa_enabled,
+            "tenantId": str(user.tenant_id) if user.tenant_id else None,
+            "isMfaEnabled": user.is_mfa_enabled,
         }
         data["token_type"] = "Bearer"
         return data
@@ -159,9 +160,10 @@ class CustomTokenObtainPairSerializer(TokenObtainPairSerializer):
         token = super().get_token(user)
         # Add custom claims
         token["role"] = user.role
-        token["tenant_id"] = str(user.tenant_id) if user.tenant_id else None
+        token["tenantId"] = str(user.tenant_id) if user.tenant_id else None
         token["email"] = user.email
-        token["full_name"] = user.get_full_name()
+        token["firstName"] = user.first_name
+        token["lastName"] = user.last_name
         return token
 
 
