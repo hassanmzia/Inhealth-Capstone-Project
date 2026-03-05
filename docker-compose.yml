@@ -124,7 +124,7 @@ services:
       - neo4j-logs:/logs
       - neo4j-plugins:/plugins
       - neo4j-import:/var/lib/neo4j/import
-      - ./scripts/neo4j/constraints.cypher:/var/lib/neo4j/import/constraints.cypher:ro
+      - ./scripts/neo4j/constraints.cypher:/var/lib/neo4j/import/constraints.cypher
     networks:
       - inhealth-network
     healthcheck:

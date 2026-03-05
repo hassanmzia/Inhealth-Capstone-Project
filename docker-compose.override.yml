@@ -190,7 +190,7 @@ services:
       - /app/node_modules
     ports:
       # Expose Vite dev server directly (also accessible via Nginx)
-      - "3000:3000"
+      - "${FRONTEND_HOST_PORT:-3100}:3000"
     mem_limit: 2g
 
   # ---------------------------------------------------------------------------
