@@ -42,6 +42,14 @@ env = environ.Env(
     SENDGRID_API_KEY=(str, ""),
     DEFAULT_FROM_EMAIL=(str, "noreply@inhealth.care"),
     ENCRYPTION_KEY=(str, ""),
+    EMAIL_BACKEND=(str, "django.core.mail.backends.smtp.EmailBackend"),
+    EMAIL_HOST=(str, "smtp.gmail.com"),
+    EMAIL_PORT=(int, 587),
+    EMAIL_USE_TLS=(bool, True),
+    EMAIL_USE_SSL=(bool, False),
+    EMAIL_HOST_USER=(str, ""),
+    EMAIL_HOST_PASSWORD=(str, ""),
+    FRONTEND_URL=(str, "http://localhost:8788"),
 )
 
 # Load .env file if present
@@ -405,8 +413,16 @@ DEFAULT_AUTO_FIELD = "django.db.models.BigAutoField"
 # ---------------------------------------------------------------------------
 # Email
 # ---------------------------------------------------------------------------
+EMAIL_BACKEND = env("EMAIL_BACKEND")
+EMAIL_HOST = env("EMAIL_HOST")
+EMAIL_PORT = env("EMAIL_PORT")
+EMAIL_USE_TLS = env("EMAIL_USE_TLS")
+EMAIL_USE_SSL = env("EMAIL_USE_SSL")
+EMAIL_HOST_USER = env("EMAIL_HOST_USER")
+EMAIL_HOST_PASSWORD = env("EMAIL_HOST_PASSWORD")
 DEFAULT_FROM_EMAIL = env("DEFAULT_FROM_EMAIL")
 SENDGRID_API_KEY = env("SENDGRID_API_KEY")
+FRONTEND_URL = env("FRONTEND_URL")
 
 # ---------------------------------------------------------------------------
 # External services

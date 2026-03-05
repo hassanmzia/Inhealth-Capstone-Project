@@ -17,6 +17,7 @@ const ResearchPage = React.lazy(() => import('@/pages/research/ResearchPage'))
 const AlertsPage = React.lazy(() => import('@/pages/alerts/AlertsPage'))
 const TenantAdminPage = React.lazy(() => import('@/pages/admin/TenantAdminPage'))
 const SettingsPage = React.lazy(() => import('@/pages/settings/SettingsPage'))
+const VerifyEmailPage = React.lazy(() => import('@/pages/auth/VerifyEmailPage'))
 
 // Page transition variants
 const pageVariants = {
@@ -155,6 +156,15 @@ export default function App() {
       <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           {/* Public routes */}
+          <Route
+            path="/verify-email"
+            element={
+              <Suspense fallback={<PageLoader />}>
+                <VerifyEmailPage />
+              </Suspense>
+            }
+          />
+
           <Route
             path="/login"
             element={

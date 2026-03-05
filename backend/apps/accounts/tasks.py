@@ -12,26 +12,64 @@ logger = logging.getLogger("apps.accounts")
 
 
 @shared_task(bind=True, max_retries=3, default_retry_delay=60)
-def send_welcome_email(self, user_id: str):
-    """Send a welcome email to a newly registered user."""
+def send_verification_email(self, user_id: str):
+    """Send email verification link to a newly registered user."""
     try:
         from .models import User
-        user = User.objects.get(id=user_id)
-
-        # In production, use SendGrid template
         from django.core.mail import send_mail
         from django.conf import settings
+
+        user = User.objects.get(id=user_id)
+        verify_url = f"{settings.FRONTEND_URL}/verify-email?token={user.email_verification_token}"
+
+        send_mail(
+            subject="Verify your InHealth account",
+            message=f"""
+Dear {user.get_full_name()},
+
+Thank you for registering with InHealth Chronic Care!
+
+Please verify your email address by clicking the link below:
+{verify_url}
+
+This link will remain active until you verify your account.
+
+If you did not create this account, please ignore this email.
+
+Best regards,
+The InHealth Team
+            """.strip(),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+            fail_silently=False,
+        )
+        logger.info(f"Verification email sent to {user.email}")
+        return {"status": "sent", "user_id": user_id}
+    except Exception as exc:
+        logger.error(f"Failed to send verification email to user {user_id}: {exc}")
+        raise self.retry(exc=exc)
+
+
+@shared_task(bind=True, max_retries=3, default_retry_delay=60)
+def send_welcome_email(self, user_id: str):
+    """Send a welcome email after email is verified."""
+    try:
+        from .models import User
+        from django.core.mail import send_mail
+        from django.conf import settings
+
+        user = User.objects.get(id=user_id)
 
         send_mail(
             subject="Welcome to InHealth Chronic Care",
             message=f"""
 Dear {user.get_full_name()},
 
-Welcome to InHealth Chronic Care! Your account has been created successfully.
+Your InHealth Chronic Care account is now active.
 
 Your role: {user.get_role_display()}
 
-To get started, please log in at your organization's portal.
+To get started, please log in at: {settings.FRONTEND_URL}/login
 
 If you have any questions, please contact your care coordinator.
 
