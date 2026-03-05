@@ -29,11 +29,17 @@ export default defineConfig({
         changeOrigin: true,
         secure: false,
       },
-      // Agents FastAPI service — HTTP + WebSocket
+      // Agents FastAPI service — API calls only (not browser navigation)
       '/agents': {
         target: 'http://agents-api:8001',
         changeOrigin: true,
         secure: false,
+        bypass(req) {
+          // Browser navigation sends Accept: text/html — serve SPA index instead
+          if (req.headers.accept?.includes('text/html')) {
+            return '/index.html'
+          }
+        },
       },
     },
   },
