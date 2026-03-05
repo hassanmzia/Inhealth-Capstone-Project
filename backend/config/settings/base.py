@@ -109,7 +109,7 @@ TENANT_DOMAIN_MODEL = "tenants.Domain"
 # Middleware
 # ---------------------------------------------------------------------------
 MIDDLEWARE = [
-    "django_tenants.middleware.main.TenantMainMiddleware",
+    "apps.tenants.middleware.PublicFallbackTenantMiddleware",
     "django.middleware.security.SecurityMiddleware",
     "whitenoise.middleware.WhiteNoiseMiddleware",
     "django.contrib.sessions.middleware.SessionMiddleware",
