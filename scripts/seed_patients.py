@@ -169,11 +169,22 @@ os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'config.settings')
 import django
 django.setup()
 
+from django.core.management import call_command
 from django.utils import timezone
 from django_tenants.utils import schema_context
 
 from apps.tenants.models import Organization, Domain
 from apps.accounts.models import User
+
+# -----------------------------------------------
+# 0. Ensure all schemas are migrated
+# -----------------------------------------------
+print("INFO:    Running migrate_schemas to ensure all tenant tables exist...")
+try:
+    call_command("migrate_schemas", verbosity=0)
+    print("INFO:    migrate_schemas complete")
+except Exception as _me:
+    print(f"WARN:    migrate_schemas failed ({_me}) — continuing anyway")
 from apps.fhir.models import (
     FHIRPatient, FHIRCondition, FHIRObservation, FHIRMedicationRequest,
 )
