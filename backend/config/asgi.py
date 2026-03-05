@@ -5,9 +5,7 @@ Supports both HTTP (via Django) and WebSocket (via Django Channels).
 
 import os
 
-from channels.auth import AuthMiddlewareStack
 from channels.routing import ProtocolTypeRouter, URLRouter
-from channels.security.websocket import AllowedHostsOriginValidator
 from django.core.asgi import get_asgi_application
 
 os.environ.setdefault("DJANGO_SETTINGS_MODULE", "config.settings.production")
@@ -18,6 +16,7 @@ django_asgi_app = get_asgi_application()
 # Import WebSocket routing AFTER Django setup
 from apps.a2a_bridge.routing import websocket_urlpatterns as a2a_ws_patterns  # noqa: E402
 from apps.notifications.routing import websocket_urlpatterns as notification_ws_patterns  # noqa: E402
+from apps.tenants.ws_middleware import JWTAuthMiddlewareStack  # noqa: E402
 
 # Combine all WebSocket URL patterns
 from django.urls import path  # noqa: E402
@@ -37,11 +36,12 @@ application = ProtocolTypeRouter(
     {
         # HTTP — standard Django ASGI
         "http": django_asgi_app,
-        # WebSocket — Channels with JWT auth middleware
-        "websocket": AllowedHostsOriginValidator(
-            AuthMiddlewareStack(
-                URLRouter(all_websocket_patterns)
-            )
+        # WebSocket — JWT auth middleware reads ?token= from query string.
+        # AllowedHostsOriginValidator is intentionally omitted because:
+        #   1. Nginx already validates the Origin at the edge.
+        #   2. It would reject LAN-IP connections not listed in ALLOWED_HOSTS.
+        "websocket": JWTAuthMiddlewareStack(
+            URLRouter(all_websocket_patterns)
         ),
     }
 )
