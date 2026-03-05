@@ -1,11 +1,8 @@
-import { io, Socket } from 'socket.io-client'
 import { useAuthStore } from '@/store/authStore'
 import { useAlertStore } from '@/store/alertStore'
 import { useAgentStore } from '@/store/agentStore'
 import type { ClinicalAlert } from '@/types/clinical'
 import type { AgentExecution, AgentStatusInfo } from '@/types/agent'
-
-const WS_URL = import.meta.env.VITE_WS_URL || ''
 
 // ─── Event Types ──────────────────────────────────────────────────────────────
 
@@ -46,43 +43,108 @@ export interface NotificationEvent {
   timestamp: string
 }
 
+// ─── Reconnecting WebSocket ───────────────────────────────────────────────────
+
+type MessageHandler = (data: Record<string, unknown>) => void
+
+class ReconnectingWS {
+  private ws: WebSocket | null = null
+  private url: string
+  private handlers: MessageHandler[] = []
+  private reconnectDelay = 2000
+  private maxDelay = 30000
+  private stopped = false
+  private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+
+  constructor(url: string) {
+    this.url = url
+  }
+
+  connect(): void {
+    if (this.stopped) return
+
+    const token = useAuthStore.getState().token
+    const wsUrl = this.url + (token ? `?token=${encodeURIComponent(token)}` : '')
+
+    try {
+      this.ws = new WebSocket(wsUrl)
+    } catch {
+      this.scheduleReconnect()
+      return
+    }
+
+    this.ws.onopen = () => {
+      console.info(`[WS] Connected: ${this.url}`)
+      this.reconnectDelay = 2000
+    }
+
+    this.ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data) as Record<string, unknown>
+        this.handlers.forEach((h) => h(data))
+      } catch {
+        // ignore non-JSON frames
+      }
+    }
+
+    this.ws.onclose = (event) => {
+      if (!this.stopped) {
+        console.warn(`[WS] Closed (${event.code}): ${this.url}`)
+        this.scheduleReconnect()
+      }
+    }
+
+    this.ws.onerror = () => {
+      // onerror is always followed by onclose — reconnect handled there
+    }
+  }
+
+  private scheduleReconnect(): void {
+    if (this.stopped) return
+    this.reconnectTimer = setTimeout(() => {
+      this.reconnectDelay = Math.min(this.reconnectDelay * 1.5, this.maxDelay)
+      this.connect()
+    }, this.reconnectDelay)
+  }
+
+  addHandler(handler: MessageHandler): void {
+    this.handlers.push(handler)
+  }
+
+  removeHandler(handler: MessageHandler): void {
+    this.handlers = this.handlers.filter((h) => h !== handler)
+  }
+
+  send(data: Record<string, unknown>): void {
+    if (this.ws?.readyState === WebSocket.OPEN) {
+      this.ws.send(JSON.stringify(data))
+    }
+  }
+
+  disconnect(): void {
+    this.stopped = true
+    if (this.reconnectTimer) clearTimeout(this.reconnectTimer)
+    this.ws?.close()
+    this.ws = null
+  }
+
+  get connected(): boolean {
+    return this.ws?.readyState === WebSocket.OPEN
+  }
+}
+
+// ─── Build WebSocket URL ──────────────────────────────────────────────────────
+
+function wsUrl(path: string): string {
+  const proto = window.location.protocol === 'https:' ? 'wss' : 'ws'
+  return `${proto}://${window.location.host}${path}`
+}
+
 // ─── Socket Manager ───────────────────────────────────────────────────────────
 
 class WebSocketManager {
-  private sockets: Map<string, Socket> = new Map()
+  private sockets: Map<string, ReconnectingWS> = new Map()
   private vitalCallbacks: Map<string, ((data: VitalUpdate) => void)[]> = new Map()
-  private reconnectTimers: Map<string, ReturnType<typeof setTimeout>> = new Map()
-
-  private createSocket(namespace: string): Socket {
-    const token = useAuthStore.getState().token
-
-    const socket = io(`${WS_URL}${namespace}`, {
-      auth: { token },
-      transports: ['websocket', 'polling'],
-      reconnection: true,
-      reconnectionAttempts: 10,
-      reconnectionDelay: 1000,
-      reconnectionDelayMax: 5000,
-      timeout: 10000,
-    })
-
-    socket.on('connect', () => {
-      console.info(`[WS] Connected to ${namespace}`)
-      // Clear any pending reconnect timer
-      const timer = this.reconnectTimers.get(namespace)
-      if (timer) clearTimeout(timer)
-    })
-
-    socket.on('disconnect', (reason: string) => {
-      console.warn(`[WS] Disconnected from ${namespace}: ${reason}`)
-    })
-
-    socket.on('connect_error', (err: Error) => {
-      console.error(`[WS] Connection error on ${namespace}:`, err.message)
-    })
-
-    return socket
-  }
 
   // ── Vitals WebSocket ────────────────────────────────────────────────────────
 
@@ -90,179 +152,170 @@ class WebSocketManager {
     patientId: string,
     onVitalUpdate: (data: VitalUpdate) => void,
   ): () => void {
-    const namespace = `/ws/vitals`
-    let socket = this.sockets.get(namespace)
+    const path = `/ws/vitals/${patientId}/`
+    let sock = this.sockets.get(path)
 
-    if (!socket) {
-      socket = this.createSocket(namespace)
-      this.sockets.set(namespace, socket)
+    if (!sock) {
+      sock = new ReconnectingWS(wsUrl(path))
+      sock.connect()
+      this.sockets.set(path, sock)
     }
 
-    // Join patient room
-    socket.emit('join', { patient_id: patientId })
+    const handler: MessageHandler = (data) => {
+      if (data.event === 'vital_update') {
+        onVitalUpdate(data.payload as VitalUpdate)
+      }
+    }
+    sock.addHandler(handler)
 
-    // Register callback
     const callbacks = this.vitalCallbacks.get(patientId) ?? []
     callbacks.push(onVitalUpdate)
     this.vitalCallbacks.set(patientId, callbacks)
 
-    // Listen for vitals
-    const handler = (data: VitalUpdate) => {
-      if (data.patientId === patientId) {
-        onVitalUpdate(data)
-      }
-    }
-
-    socket.on('vital_update', handler)
-    socket.on(`vital_update:${patientId}`, onVitalUpdate)
-
-    // Return unsubscribe
     return () => {
-      socket!.off('vital_update', handler)
-      socket!.off(`vital_update:${patientId}`, onVitalUpdate)
-      socket!.emit('leave', { patient_id: patientId })
-
+      sock!.removeHandler(handler)
       const cbs = this.vitalCallbacks.get(patientId) ?? []
-      const filtered = cbs.filter((cb) => cb !== onVitalUpdate)
-      this.vitalCallbacks.set(patientId, filtered)
+      this.vitalCallbacks.set(patientId, cbs.filter((cb) => cb !== onVitalUpdate))
     }
   }
 
-  // ── Agents WebSocket ────────────────────────────────────────────────────────
+  // ── Agents WebSocket (FastAPI /agents/ws) ───────────────────────────────────
 
   connectAgentsSocket(): () => void {
-    const namespace = '/ws/agents'
-    let socket = this.sockets.get(namespace)
+    const path = '/agents/ws'
+    let sock = this.sockets.get(path)
 
-    if (!socket) {
-      socket = this.createSocket(namespace)
-      this.sockets.set(namespace, socket)
+    if (!sock) {
+      sock = new ReconnectingWS(wsUrl(path))
+      sock.connect()
+      this.sockets.set(path, sock)
     }
 
     const { updateAgentStatus, addExecution, updateExecution } = useAgentStore.getState()
 
-    socket.on('agent_status', (data: AgentStatusUpdate) => {
-      updateAgentStatus(data.agentId, data.status)
-    })
+    const handler: MessageHandler = (data) => {
+      const event = data.event as string
 
-    socket.on('execution_started', (data: AgentExecutionUpdate) => {
-      addExecution({
-        id: data.executionId,
-        agentId: data.agentId as AgentExecution['agentId'],
-        agentName: data.agentId,
-        tier: 'tier1_ingestion',
-        status: 'running',
-        triggeredBy: 'system',
-        triggeredAt: data.timestamp,
-        startedAt: data.timestamp,
-        queueDepth: 0,
-      } as AgentExecution)
-    })
+      if (event === 'agent_status') {
+        const payload = data as unknown as AgentStatusUpdate
+        updateAgentStatus(payload.agentId, payload.status)
+      } else if (event === 'execution_started') {
+        const payload = data as unknown as AgentExecutionUpdate
+        addExecution({
+          id: payload.executionId,
+          agentId: payload.agentId as AgentExecution['agentId'],
+          agentName: payload.agentId,
+          tier: 'tier1_ingestion',
+          status: 'running',
+          triggeredBy: 'system',
+          triggeredAt: payload.timestamp,
+          startedAt: payload.timestamp,
+          queueDepth: 0,
+        } as AgentExecution)
+      } else if (event === 'execution_completed') {
+        const payload = data as unknown as AgentExecutionUpdate
+        updateExecution(payload.executionId, {
+          status: payload.status,
+          output: payload.output,
+          completedAt: payload.timestamp,
+        })
+      } else if (event === 'execution_failed') {
+        const payload = data as unknown as AgentExecutionUpdate
+        updateExecution(payload.executionId, {
+          status: 'failed',
+          error: payload.error,
+          completedAt: payload.timestamp,
+        })
+      }
+    }
 
-    socket.on('execution_completed', (data: AgentExecutionUpdate) => {
-      updateExecution(data.executionId, {
-        status: data.status,
-        output: data.output,
-        completedAt: data.timestamp,
-      })
-    })
-
-    socket.on('execution_failed', (data: AgentExecutionUpdate) => {
-      updateExecution(data.executionId, {
-        status: 'failed',
-        error: data.error,
-        completedAt: data.timestamp,
-      })
-    })
+    sock.addHandler(handler)
 
     return () => {
-      socket!.off('agent_status')
-      socket!.off('execution_started')
-      socket!.off('execution_completed')
-      socket!.off('execution_failed')
+      sock!.removeHandler(handler)
     }
   }
 
-  // ── Notifications WebSocket ─────────────────────────────────────────────────
+  // ── Notifications WebSocket (Django Channels /ws/alerts/) ───────────────────
 
   connectNotificationsSocket(): () => void {
-    const namespace = '/ws/notifications'
-    let socket = this.sockets.get(namespace)
+    const path = '/ws/alerts/'
+    let sock = this.sockets.get(path)
 
-    if (!socket) {
-      socket = this.createSocket(namespace)
-      this.sockets.set(namespace, socket)
+    if (!sock) {
+      sock = new ReconnectingWS(wsUrl(path))
+      sock.connect()
+      this.sockets.set(path, sock)
     }
 
     const { addAlert } = useAlertStore.getState()
 
-    socket.on('alert', (data: NotificationEvent) => {
+    const handler: MessageHandler = (data) => {
+      const event = data.event as string
+      if (event !== 'alert' && event !== 'critical_alert') return
+
+      const payload = data.payload as NotificationEvent | undefined
+      if (!payload) return
+
       const alert: ClinicalAlert = {
-        id: data.id,
-        patientId: data.patientId ?? '',
-        patientName: data.patientName ?? '',
-        severity: data.severity,
+        id: payload.id,
+        patientId: payload.patientId ?? '',
+        patientName: payload.patientName ?? '',
+        severity: payload.severity,
         category: 'vital_sign',
-        title: data.title,
-        description: data.message,
-        timestamp: data.timestamp,
+        title: payload.title,
+        description: payload.message,
+        timestamp: payload.timestamp,
         isRead: false,
         isAcknowledged: false,
         escalationCount: 0,
       }
       addAlert(alert)
 
-      // Browser notification
       if (
         'Notification' in window &&
         Notification.permission === 'granted' &&
-        (data.severity === 'critical' || data.severity === 'urgent')
+        (payload.severity === 'critical' || payload.severity === 'urgent')
       ) {
-        new Notification(`InHealth Alert: ${data.title}`, {
-          body: data.message,
+        new Notification(`InHealth Alert: ${payload.title}`, {
+          body: payload.message,
           icon: '/favicon.svg',
-          tag: data.id,
-          requireInteraction: data.severity === 'critical',
+          tag: payload.id,
+          requireInteraction: payload.severity === 'critical',
         })
       }
-    })
 
-    socket.on('critical_alert', (data: NotificationEvent) => {
-      // Critical alerts also trigger audio
-      try {
-        const audio = new Audio('/sounds/critical-alert.mp3')
-        audio.volume = 0.5
-        audio.play().catch(() => {/* silent fail */})
-      } catch {
-        // Audio not available
+      if (event === 'critical_alert') {
+        try {
+          const audio = new Audio('/sounds/critical-alert.mp3')
+          audio.volume = 0.5
+          audio.play().catch(() => {/* silent fail */})
+        } catch {
+          // Audio not available
+        }
       }
-    })
+    }
+
+    sock.addHandler(handler)
 
     return () => {
-      socket!.off('alert')
-      socket!.off('critical_alert')
+      sock!.removeHandler(handler)
     }
   }
 
   // ── Disconnect All ──────────────────────────────────────────────────────────
 
   disconnectAll(): void {
-    this.sockets.forEach((socket, namespace) => {
-      socket.disconnect()
-      console.info(`[WS] Disconnected ${namespace}`)
+    this.sockets.forEach((sock, path) => {
+      sock.disconnect()
+      console.info(`[WS] Disconnected: ${path}`)
     })
     this.sockets.clear()
     this.vitalCallbacks.clear()
-    this.reconnectTimers.forEach((timer) => clearTimeout(timer))
-    this.reconnectTimers.clear()
   }
 
-  getSocket(namespace: string): Socket | undefined {
-    return this.sockets.get(namespace)
-  }
-
-  isConnected(namespace: string): boolean {
-    return this.sockets.get(namespace)?.connected ?? false
+  isConnected(path: string): boolean {
+    return this.sockets.get(path)?.connected ?? false
   }
 }
 
