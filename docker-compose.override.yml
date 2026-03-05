@@ -137,7 +137,7 @@ services:
   mcp-server:
     build:
       target: development
-    command: npx nodemon --watch src --ext ts,js,json --exec "npx ts-node src/index.ts"
+    command: npx nodemon --legacy-watch --watch src --ext ts,js,json --exec "npx ts-node src/index.ts"
     environment:
       NODE_ENV: development
       LOG_LEVEL: debug
@@ -155,7 +155,7 @@ services:
   a2a-gateway:
     build:
       target: development
-    command: npx nodemon --watch src --ext ts,js,json --exec "npx ts-node src/index.ts"
+    command: npx nodemon --legacy-watch --watch src --ext ts,js,json --exec "npx ts-node src/index.ts"
     environment:
       NODE_ENV: development
       LOG_LEVEL: debug
@@ -164,7 +164,7 @@ services:
       - /app/node_modules
     ports:
       # Expose A2A gateway directly for testing
-      - "3003:3002"
+      - "3005:3002"
     mem_limit: 512m
 
   # ---------------------------------------------------------------------------
