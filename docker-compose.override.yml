@@ -163,7 +163,7 @@ services:
       - /app/node_modules
     ports:
       # Expose A2A gateway directly for testing
-      - "3002:3002"
+      - "3003:3002"
     mem_limit: 512m
 
   # ---------------------------------------------------------------------------
