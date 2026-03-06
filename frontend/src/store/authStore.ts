@@ -4,7 +4,7 @@ import api from '@/services/api'
 
 // ─── User Types ───────────────────────────────────────────────────────────────
 
-export type UserRole = 'physician' | 'nurse' | 'patient' | 'admin' | 'org_admin' | 'researcher'
+export type UserRole = 'physician' | 'nurse' | 'patient' | 'admin' | 'org_admin' | 'researcher' | 'pharmacist' | 'billing'
 
 export interface User {
   id: string

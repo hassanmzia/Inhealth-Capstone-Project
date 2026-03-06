@@ -16,6 +16,8 @@ import {
   ChevronRight,
   Activity,
   Heart,
+  MessageSquare,
+  Pill,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAgentStore, selectTotalActiveAgents } from '@/store/agentStore'
@@ -47,6 +49,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       ? '/dashboard/patient'
       : user?.role === 'researcher'
       ? '/dashboard/researcher'
+      : user?.role === 'nurse'
+      ? '/dashboard/nurse'
+      : user?.role === 'pharmacist'
+      ? '/dashboard/pharmacist'
       : '/dashboard'
 
   const navItems: NavItem[] = [
@@ -59,7 +65,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       label: 'Patients',
       href: '/patients',
       icon: Users,
-      roles: ['physician', 'nurse', 'admin', 'org_admin'],
+      roles: ['physician', 'nurse', 'admin', 'org_admin', 'pharmacist'],
     },
     {
       label: 'Clinical Workspace',
@@ -94,10 +100,21 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       roles: ['physician', 'nurse', 'patient'],
     },
     {
+      label: 'Medications',
+      href: '/dashboard/pharmacist',
+      icon: Pill,
+      roles: ['pharmacist'],
+    },
+    {
       label: 'Billing',
       href: '/billing',
       icon: Receipt,
-      roles: ['admin', 'org_admin'],
+      roles: ['admin', 'org_admin', 'billing'],
+    },
+    {
+      label: 'Messages',
+      href: '/messages',
+      icon: MessageSquare,
     },
     {
       label: 'Alerts',

@@ -31,7 +31,7 @@ const registerSchema = z
     phone_number: z.string().optional(),
     password: z.string().min(12, 'Password must be at least 12 characters'),
     password_confirm: z.string().min(12, 'Please confirm your password'),
-    role: z.enum(['patient', 'physician', 'nurse', 'researcher']).default('patient'),
+    role: z.enum(['patient', 'physician', 'nurse', 'researcher', 'pharmacist', 'billing']).default('patient'),
   })
   .refine((d) => d.password === d.password_confirm, {
     message: 'Passwords do not match',
@@ -50,7 +50,9 @@ const ROLES = [
   { value: 'patient', label: 'Patient' },
   { value: 'physician', label: 'Physician' },
   { value: 'nurse', label: 'Nurse' },
+  { value: 'pharmacist', label: 'Pharmacist' },
   { value: 'researcher', label: 'Researcher' },
+  { value: 'billing', label: 'Billing Specialist' },
 ]
 
 export default function RegisterPage() {

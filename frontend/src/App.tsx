@@ -27,6 +27,9 @@ const VitalsPage = React.lazy(() => import('@/pages/vitals/VitalsPage'))
 const WhatIfSimulatorPage = React.lazy(() => import('@/pages/simulator/WhatIfSimulatorPage'))
 const FairnessAnalysisPage = React.lazy(() => import('@/pages/fairness/FairnessAnalysisPage'))
 const TwoFactorPage = React.lazy(() => import('@/pages/auth/TwoFactorPage'))
+const NurseDashboard = React.lazy(() => import('@/pages/dashboard/NurseDashboard'))
+const PharmacistDashboard = React.lazy(() => import('@/pages/dashboard/PharmacistDashboard'))
+const SecureMessagingPage = React.lazy(() => import('@/pages/messaging/SecureMessagingPage'))
 
 // Page transition variants
 const pageVariants = {
@@ -223,6 +226,10 @@ export default function App() {
                       ? '/dashboard/patient'
                       : user?.role === 'researcher'
                       ? '/dashboard/researcher'
+                      : user?.role === 'nurse'
+                      ? '/dashboard/nurse'
+                      : user?.role === 'pharmacist'
+                      ? '/dashboard/pharmacist'
                       : '/dashboard'
                   }
                   replace
@@ -272,6 +279,48 @@ export default function App() {
               }
             />
 
+            {/* Nurse dashboard */}
+            <Route
+              path="dashboard/nurse"
+              element={
+                <ProtectedRoute requiredRoles={['nurse']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <NurseDashboard />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Pharmacist dashboard */}
+            <Route
+              path="dashboard/pharmacist"
+              element={
+                <ProtectedRoute requiredRoles={['pharmacist']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <PharmacistDashboard />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Secure Messaging */}
+            <Route
+              path="messages"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <SecureMessagingPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
             {/* Patient management */}
             <Route
               path="patients/new"
@@ -289,7 +338,7 @@ export default function App() {
             <Route
               path="patients"
               element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin', 'pharmacist']}>
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <PatientListPage />
@@ -302,7 +351,7 @@ export default function App() {
             <Route
               path="patients/:patientId"
               element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin', 'pharmacist']}>
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <PatientDetailPage />
