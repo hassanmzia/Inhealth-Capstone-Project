@@ -22,6 +22,11 @@ const SettingsPage = React.lazy(() => import('@/pages/settings/SettingsPage'))
 const VerifyEmailPage = React.lazy(() => import('@/pages/auth/VerifyEmailPage'))
 const TelemedicinePage = React.lazy(() => import('@/pages/telemedicine/TelemedicinePage'))
 const ClinicalWorkspacePage = React.lazy(() => import('@/pages/clinical/ClinicalWorkspacePage'))
+const BillingPage = React.lazy(() => import('@/pages/billing/BillingPage'))
+const VitalsPage = React.lazy(() => import('@/pages/vitals/VitalsPage'))
+const WhatIfSimulatorPage = React.lazy(() => import('@/pages/simulator/WhatIfSimulatorPage'))
+const FairnessAnalysisPage = React.lazy(() => import('@/pages/fairness/FairnessAnalysisPage'))
+const TwoFactorPage = React.lazy(() => import('@/pages/auth/TwoFactorPage'))
 
 // Page transition variants
 const pageVariants = {
@@ -413,6 +418,76 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <SettingsPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Billing / RCM */}
+            <Route
+              path="billing"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'billing']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <BillingPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Real-time Vitals */}
+            <Route
+              path="vitals"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <VitalsPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* What-If Simulator */}
+            <Route
+              path="simulator"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <WhatIfSimulatorPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* AI Fairness Analysis */}
+            <Route
+              path="fairness"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <FairnessAnalysisPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Two-Factor Authentication */}
+            <Route
+              path="two-factor"
+              element={
+                <ProtectedRoute>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <TwoFactorPage />
                     </AnimatedPage>
                   </Suspense>
                 </ProtectedRoute>

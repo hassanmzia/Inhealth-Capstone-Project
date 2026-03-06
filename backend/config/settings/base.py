@@ -106,6 +106,7 @@ TENANT_APPS = [
     "apps.sdoh",
     "apps.mcp_bridge",
     "apps.a2a_bridge",
+    "apps.telemedicine",
 ]
 
 INSTALLED_APPS = list(SHARED_APPS) + [app for app in TENANT_APPS if app not in SHARED_APPS]
