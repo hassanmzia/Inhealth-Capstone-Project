@@ -17,6 +17,7 @@ from apps.fhir.models import (
     FHIRAppointment,
     FHIRCondition,
     FHIRMedicationRequest,
+    FHIRObservation,
     FHIRPatient,
 )
 from apps.fhir.serializers import FHIRPatientSerializer
@@ -31,6 +32,27 @@ from .serializers import (
 )
 
 logger = logging.getLogger("apps.patients")
+
+# Maps LOINC codes to the VitalType enum values the frontend expects
+_LOINC_TO_VITAL_TYPE = {
+    "8867-4": "heart_rate",
+    "8480-6": "blood_pressure_systolic",
+    "8462-4": "blood_pressure_diastolic",
+    "59408-5": "spo2",
+    "2708-6": "spo2",
+    "8310-5": "temperature",
+    "29463-7": "weight",
+    "8302-2": "height",
+    "39156-5": "bmi",
+    "9279-1": "respiratory_rate",
+    "72514-3": "pain_score",
+}
+
+_INTERP_TO_STATUS = {
+    "N": "normal", "normal": "normal",
+    "H": "warning", "L": "warning", "A": "warning",
+    "HH": "critical", "LL": "critical", "AA": "critical",
+}
 
 
 class PatientViewSet(ModelViewSet):
@@ -57,11 +79,127 @@ class PatientViewSet(ModelViewSet):
     def perform_create(self, serializer):
         serializer.save(tenant=self._tenant())
 
+    def retrieve(self, request, *args, **kwargs):
+        """Return PatientSummary camelCase format for the detail page."""
+        try:
+            patient = (
+                FHIRPatient.objects
+                .prefetch_related("conditions")
+                .get(pk=self.kwargs.get("pk"), tenant=self._tenant())
+            )
+        except FHIRPatient.DoesNotExist:
+            return Response(status=status.HTTP_404_NOT_FOUND)
+        return Response(self._to_summary(patient))
+
+    @action(detail=True, methods=["get"])
+    def vitals(self, request, pk=None):
+        """Return recent vital signs for a patient as VitalSign[]."""
+        try:
+            observations = (
+                FHIRObservation.objects
+                .filter(patient_id=pk, tenant=self._tenant(), code__in=_LOINC_TO_VITAL_TYPE)
+                .order_by("-effective_datetime")[:200]
+            )
+            data = [self._obs_to_vital(obs) for obs in observations]
+        except Exception:
+            data = []
+        return Response(data)
+
+    @action(detail=True, methods=["get"])
+    def medications(self, request, pk=None):
+        """Return active and recent medications as Medication[]."""
+        try:
+            meds = (
+                FHIRMedicationRequest.objects
+                .filter(patient_id=pk, tenant=self._tenant())
+                .order_by("-authored_on")
+            )
+            data = [self._med_to_dict(med) for med in meds]
+        except Exception:
+            data = []
+        return Response(data)
+
+    @action(detail=True, methods=["get"], url_path="care-gaps")
+    def care_gaps(self, request, pk=None):
+        """Return open care gaps for a patient as CareGap[]."""
+        try:
+            from apps.clinical.models import CareGap
+            gaps = CareGap.objects.filter(patient_id=pk, tenant=self._tenant())
+            data = [self._gap_to_dict(g) for g in gaps]
+        except Exception:
+            data = []
+        return Response(data)
+
+    # ── helper serialisers ────────────────────────────────────────────────────
+
+    @staticmethod
+    def _obs_to_vital(obs: FHIRObservation) -> dict:
+        interp = (obs.interpretation or "").strip()
+        return {
+            "id": str(obs.id),
+            "patientId": str(obs.patient_id),
+            "type": _LOINC_TO_VITAL_TYPE.get(obs.code, "heart_rate"),
+            "value": obs.value_quantity if obs.value_quantity is not None else 0,
+            "unit": obs.value_unit,
+            "timestamp": obs.effective_datetime.isoformat(),
+            "status": _INTERP_TO_STATUS.get(interp, "normal"),
+            "source": "device" if obs.device_id else "ehr",
+            "deviceId": obs.device_id or None,
+            "loincCode": obs.code,
+            "normalMin": obs.reference_range_low,
+            "normalMax": obs.reference_range_high,
+        }
+
+    @staticmethod
+    def _med_to_dict(med: FHIRMedicationRequest) -> dict:
+        status_map = {
+            "active": "active", "on-hold": "on_hold",
+            "cancelled": "discontinued", "stopped": "discontinued",
+            "completed": "completed",
+        }
+        return {
+            "id": str(med.id),
+            "patientId": str(med.patient_id),
+            "name": med.medication_display,
+            "rxNormCode": med.medication_code,
+            "dose": str(med.dose_quantity or ""),
+            "doseUnit": med.dose_unit,
+            "frequency": med.frequency,
+            "route": med.route,
+            "prescribedDate": med.authored_on.isoformat(),
+            "startDate": med.authored_on.isoformat(),
+            "endDate": med.validity_period_end.isoformat() if med.validity_period_end else None,
+            "status": status_map.get(med.status, "active"),
+            "daysSupply": med.days_supply,
+            "fhirMedicationRequestId": med.fhir_id,
+        }
+
+    @staticmethod
+    def _gap_to_dict(gap) -> dict:
+        status_map = {
+            "open": "open", "closed": "closed",
+            "deferred": "deferred", "patient_declined": "excluded",
+        }
+        return {
+            "id": str(gap.id),
+            "patientId": str(gap.patient_id),
+            "title": gap.get_gap_type_display(),
+            "description": gap.gap_type,
+            "category": "chronic_management",
+            "priority": gap.priority,
+            "status": status_map.get(gap.status, "open"),
+            "dueDate": gap.due_date.isoformat() if gap.due_date else None,
+            "openedAt": gap.created_at.isoformat(),
+            "closedAt": gap.closed_at.isoformat() if gap.closed_at else None,
+            "deferredUntil": gap.deferred_until.isoformat() if gap.deferred_until else None,
+            "aiRecommendation": gap.ai_recommendation or None,
+        }
+
     def list(self, request, *args, **kwargs):
         """Return PatientSummary shape expected by the frontend."""
         try:
             qs = self.filter_queryset(self.get_queryset()).prefetch_related(
-                "conditions", "analytics_risk_scores"
+                "conditions"
             )
             page = self.paginate_queryset(qs)
             items = page if page is not None else qs
