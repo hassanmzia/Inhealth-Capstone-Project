@@ -63,7 +63,7 @@ export default function PatientDashboard() {
   const h = healthData
 
   return (
-    <motion.div variants={CONTAINER} initial="hidden" animate="show" className="space-y-6 max-w-4xl">
+    <motion.div variants={CONTAINER} initial="hidden" animate="show" className="p-6 space-y-6 max-w-[1400px] mx-auto">
       {/* Welcome */}
       <motion.div variants={ITEM} className="flex items-start justify-between">
         <div>
