@@ -1,0 +1,316 @@
+<mxfile host="draw.io" modified="2026-03-06T00:00:00.000Z" agent="Claude Code" version="24.0.0" etag="inhealth-tech-arch" type="device">
+  <diagram name="Technical Architecture" id="tech-arch-main">
+    <mxGraphModel dx="2800" dy="2200" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="0" pageScale="1" pageWidth="3300" pageHeight="2400" math="0" shadow="0">
+      <root>
+        <mxCell id="0"/>
+        <mxCell id="1" parent="0"/>
+
+        <!-- ========== TITLE ========== -->
+        <mxCell id="title" value="&lt;font style=&quot;font-size:28px&quot;&gt;&lt;b&gt;InHealth Chronic Care — Technical Architecture&lt;/b&gt;&lt;/font&gt;&lt;br&gt;Unified Autonomous Agentic AI Platform for Chronic Disease Management" style="text;html=1;align=center;verticalAlign=middle;resizable=0;points=[];autosize=1;" vertex="1" parent="1">
+          <mxGeometry x="600" y="20" width="900" height="60" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== LAYER 1: PRESENTATION LAYER ========== -->
+        <mxCell id="layer1_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#E8F5E9;strokeColor=#4CAF50;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="100" width="1940" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="layer1_label" value="&lt;b&gt;PRESENTATION LAYER&lt;/b&gt;&lt;br&gt;React 18 + TypeScript + TailwindCSS + shadcn/ui + Recharts" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#2E7D32;" vertex="1" parent="1">
+          <mxGeometry x="100" y="105" width="500" height="40" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="patient_portal" value="&lt;b&gt;Patient Portal&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Vitals Dashboard&lt;br&gt;Medications&lt;br&gt;Appointments&lt;br&gt;Health Goals&lt;br&gt;Secure Messaging&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="120" y="150" width="180" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="clinician_dash" value="&lt;b&gt;Clinician Dashboard&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Risk Stratified Patients&lt;br&gt;AI Recommendations&lt;br&gt;Care Gap Alerts&lt;br&gt;HITL Decisions&lt;br&gt;Real-time Vitals&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="320" y="150" width="180" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="agent_panel" value="&lt;b&gt;Agent Control Panel&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;25 Agent Status Grid&lt;br&gt;Execution Traces&lt;br&gt;Langfuse Integration&lt;br&gt;Trigger Controls&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="520" y="150" width="180" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="analytics_console" value="&lt;b&gt;Analytics Console&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Population Health&lt;br&gt;Cohort Analysis&lt;br&gt;Fairness Analysis&lt;br&gt;What-If Simulator&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="720" y="150" width="180" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="research_ui" value="&lt;b&gt;Research Interface&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Clinical Q&amp;A (NL)&lt;br&gt;Literature Search&lt;br&gt;Evidence Synthesis&lt;br&gt;Trial Matching&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="920" y="150" width="180" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="admin_console" value="&lt;b&gt;Admin Console&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Multi-Tenant Mgmt&lt;br&gt;User Management&lt;br&gt;System Health&lt;br&gt;Billing / RCM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="150" width="180" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="tele_ui" value="&lt;b&gt;Telemedicine&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Video Consult&lt;br&gt;AI-Assisted Notes&lt;br&gt;WebRTC&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="1320" y="150" width="150" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="pwa_badge" value="&lt;b&gt;PWA&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Offline&lt;br&gt;Mobile&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="1490" y="150" width="80" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="store_hooks" value="&lt;b&gt;State &amp; Hooks&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Zustand Stores&lt;br&gt;useWebSocket&lt;br&gt;useFHIR&lt;br&gt;useAgentStatus&lt;br&gt;TanStack Query&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="1590" y="150" width="150" height="130" as="geometry"/>
+        </mxCell>
+        <mxCell id="ui_components" value="&lt;b&gt;UI Kit&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;shadcn/ui&lt;br&gt;FHIR Components&lt;br&gt;Chart Components&lt;br&gt;Dark Mode&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#C8E6C9;strokeColor=#4CAF50;fontColor=#1B5E20;" vertex="1" parent="1">
+          <mxGeometry x="1760" y="150" width="140" height="130" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== NGINX ========== -->
+        <mxCell id="nginx" value="&lt;b&gt;NGINX Reverse Proxy&lt;/b&gt;&lt;br&gt;Port 8788 | HTTPS/WSS | Routes: / → Frontend | /api/ → Django | /ws/ → Channels | /agents/ → FastAPI | /mcp/ → MCP | /a2a/ → A2A" style="rounded=1;whiteSpace=wrap;fillColor=#FFF3E0;strokeColor=#FF9800;strokeWidth=2;fontColor=#E65100;" vertex="1" parent="1">
+          <mxGeometry x="80" y="320" width="1940" height="50" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow from presentation to nginx -->
+        <mxCell id="arrow_pres_nginx" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;strokeWidth=2;" edge="1" source="layer1_bg" target="nginx" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== LAYER 2: BACKEND API LAYER ========== -->
+        <mxCell id="layer2_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#E3F2FD;strokeColor=#1976D2;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="390" width="1940" height="320" as="geometry"/>
+        </mxCell>
+        <mxCell id="layer2_label" value="&lt;b&gt;BACKEND API LAYER&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#0D47A1;" vertex="1" parent="1">
+          <mxGeometry x="100" y="395" width="250" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow from nginx to backend -->
+        <mxCell id="arrow_nginx_backend" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;strokeWidth=2;" edge="1" source="nginx" target="layer2_bg" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Django -->
+        <mxCell id="django_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#BBDEFB;strokeColor=#1976D2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="425" width="1100" height="270" as="geometry"/>
+        </mxCell>
+        <mxCell id="django_title" value="&lt;b&gt;Django 5 + DRF + Django Channels (ASGI)&lt;/b&gt;&lt;br&gt;JWT + OAuth2 | RBAC (8 roles) | django-tenants (schema isolation)" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#0D47A1;" vertex="1" parent="1">
+          <mxGeometry x="110" y="430" width="600" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- Django Apps Row 1 -->
+        <mxCell id="app_accounts" value="&lt;b&gt;accounts&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;JWT, OAuth2&lt;br&gt;RBAC, 2FA&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="115" y="470" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_tenants" value="&lt;b&gt;tenants&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Multi-tenant&lt;br&gt;Branding&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="225" y="470" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_fhir" value="&lt;b&gt;fhir&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;14 FHIR R4&lt;br&gt;Resources&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="335" y="470" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_hl7" value="&lt;b&gt;hl7&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;HL7 v2 Parser&lt;br&gt;ADT/ORU/ORM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="445" y="470" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_patients" value="&lt;b&gt;patients&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;EMR/EHR&lt;br&gt;Demographics&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="555" y="470" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_clinical" value="&lt;b&gt;clinical&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Encounters&lt;br&gt;Care Gaps&lt;br&gt;Order Sets&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="665" y="470" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_billing" value="&lt;b&gt;billing&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;CPT, Claims&lt;br&gt;RPM, RCM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="775" y="470" width="100" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_notif" value="&lt;b&gt;notifications&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;SMS/Email/Push&lt;br&gt;4-Tier Priority&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="885" y="470" width="105" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_analytics" value="&lt;b&gt;analytics&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Cohorts&lt;br&gt;Pop. Health&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="1000" y="470" width="90" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Django Apps Row 2 -->
+        <mxCell id="app_research" value="&lt;b&gt;research&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Queries, Evidence&lt;br&gt;Clinical Trials&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="115" y="535" width="110" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_tele" value="&lt;b&gt;telemedicine&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Video Sessions&lt;br&gt;AI Notes&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="235" y="535" width="110" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_sdoh" value="&lt;b&gt;sdoh&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Social Determinants&lt;br&gt;Risk Assessment&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="355" y="535" width="120" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_mcp" value="&lt;b&gt;mcp_bridge&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Context Builder&lt;br&gt;Tool Executor&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="485" y="535" width="110" height="55" as="geometry"/>
+        </mxCell>
+        <mxCell id="app_a2a" value="&lt;b&gt;a2a_bridge&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;WebSocket&lt;br&gt;Redis PubSub&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="605" y="535" width="110" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- Celery -->
+        <mxCell id="celery" value="&lt;b&gt;Celery Workers + Beat&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Async tasks, scheduled jobs&lt;br&gt;Redis broker&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="725" y="535" width="160" height="55" as="geometry"/>
+        </mxCell>
+
+        <!-- ML Models -->
+        <mxCell id="ml_models" value="&lt;b&gt;ML Models&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;LSTM Glucose | XGBoost Risk&lt;br&gt;Random Forest | HMM Lifestyle&lt;br&gt;Multi-modal Fusion | Digital Twin&lt;br&gt;Federated Learning&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="115" y="600" width="220" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Graph / Vector -->
+        <mxCell id="graph_layer" value="&lt;b&gt;Graph Layer&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Neo4j Connection&lt;br&gt;Cypher Queries&lt;br&gt;PageRank Risk&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="345" y="600" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="vector_layer" value="&lt;b&gt;Vector Layer&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Qdrant Client&lt;br&gt;RAG Pipeline&lt;br&gt;Embeddings&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;fontSize=10;" vertex="1" parent="1">
+          <mxGeometry x="485" y="600" width="130" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- Node.js Services -->
+        <mxCell id="node_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#BBDEFB;strokeColor=#1976D2;" vertex="1" parent="1">
+          <mxGeometry x="1230" y="425" width="770" height="270" as="geometry"/>
+        </mxCell>
+        <mxCell id="node_title" value="&lt;b&gt;Node.js Gateway Services&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#0D47A1;" vertex="1" parent="1">
+          <mxGeometry x="1240" y="430" width="300" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="mcp_server" value="&lt;b&gt;MCP Server&lt;/b&gt;&lt;br&gt;Port 3001&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;Tool Registry (8 tools)&lt;br&gt;Context Management&lt;br&gt;LLM Proxy&lt;br&gt;Auth Middleware&lt;br&gt;Prometheus Metrics&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;" vertex="1" parent="1">
+          <mxGeometry x="1260" y="460" width="200" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="a2a_gateway" value="&lt;b&gt;A2A Gateway&lt;/b&gt;&lt;br&gt;Port 3002&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;Agent Card Registry&lt;br&gt;.well-known/agent.json&lt;br&gt;Task Delegation&lt;br&gt;Protocol Versioning&lt;br&gt;Message Routing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;" vertex="1" parent="1">
+          <mxGeometry x="1500" y="460" width="200" height="150" as="geometry"/>
+        </mxCell>
+        <mxCell id="otel_langfuse" value="&lt;b&gt;Telemetry&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;OpenTelemetry&lt;br&gt;OTLP Exporter&lt;br&gt;Langfuse Integration&lt;br&gt;Trace all LLM calls&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#90CAF9;strokeColor=#1565C0;fontColor=#0D47A1;" vertex="1" parent="1">
+          <mxGeometry x="1740" y="460" width="160" height="150" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== LAYER 3: AGENT ORCHESTRATION LAYER ========== -->
+        <mxCell id="layer3_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#F3E5F5;strokeColor=#9C27B0;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="730" width="1940" height="340" as="geometry"/>
+        </mxCell>
+        <mxCell id="layer3_label" value="&lt;b&gt;AGENT ORCHESTRATION LAYER&lt;/b&gt;&lt;br&gt;FastAPI + LangGraph + LangChain + Celery" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#6A1B9A;" vertex="1" parent="1">
+          <mxGeometry x="100" y="735" width="400" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow from backend to agents -->
+        <mxCell id="arrow_backend_agents" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;strokeWidth=2;" edge="1" source="layer2_bg" target="layer3_bg" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <!-- Supervisor -->
+        <mxCell id="supervisor" value="&lt;b&gt;LangGraph Supervisor (Master Orchestrator)&lt;/b&gt;&lt;br&gt;StateGraph | Parallel Agent Execution | Conditional Routing | HITL Checkpoints" style="rounded=1;whiteSpace=wrap;fillColor=#CE93D8;strokeColor=#7B1FA2;fontColor=#4A148C;strokeWidth=2;" vertex="1" parent="1">
+          <mxGeometry x="100" y="775" width="1900" height="45" as="geometry"/>
+        </mxCell>
+
+        <!-- Agent Tiers -->
+        <mxCell id="tier1" value="&lt;b&gt;T1: MONITORING&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;• Glucose Monitor (LSTM)&lt;br&gt;• Cardiac Monitor&lt;br&gt;• Activity Monitor&lt;br&gt;• Temperature Monitor&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="100" y="835" width="195" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="tier2" value="&lt;b&gt;T2: DIAGNOSTIC&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;• ECG Analysis (STEMI)&lt;br&gt;• Kidney Function&lt;br&gt;• Imaging Analysis (AI)&lt;br&gt;• Lab Interpretation&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="310" y="835" width="195" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="tier3" value="&lt;b&gt;T3: RISK ASSESSMENT&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;• Comorbidity Risk&lt;br&gt;• Disease Prediction (XGBoost)&lt;br&gt;• Family History (Neo4j)&lt;br&gt;• SDOH Risk&lt;br&gt;• ML Ensemble (Attention)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="520" y="835" width="210" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="tier4" value="&lt;b&gt;T4: INTERVENTION&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;• Lifestyle Coaching&lt;br&gt;• Medication Rec. (RAG)&lt;br&gt;• Contraindication Check&lt;br&gt;• Triage &amp; Emergency&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="745" y="835" width="195" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="tier5" value="&lt;b&gt;T5: ACTION&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;• Physician Notify&lt;br&gt;• Patient Notify&lt;br&gt;• Scheduling&lt;br&gt;• EHR Integration&lt;br&gt;• Billing / RPM&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="955" y="835" width="175" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="research_agents" value="&lt;b&gt;RESEARCH SYSTEM&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;• Literature Agent (PubMed)&lt;br&gt;• Synthesis Agent&lt;br&gt;• Trial Matching&lt;br&gt;• Guideline Agent&lt;br&gt;• Q&amp;A Agent (RAG)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="1145" y="835" width="195" height="100" as="geometry"/>
+        </mxCell>
+        <mxCell id="security_agents" value="&lt;b&gt;SECURITY&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;• PHI Detector&lt;br&gt;• Guardrails&lt;br&gt;• Audit Logger&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="1355" y="835" width="135" height="100" as="geometry"/>
+        </mxCell>
+
+        <!-- Agent Tools -->
+        <mxCell id="agent_tools" value="&lt;b&gt;Agent Tools (LangChain)&lt;/b&gt;: FHIR Query | Neo4j Cypher | Qdrant Search | Notification Dispatch | Geospatial Hospital | NL2SQL | Voice (Whisper)" style="rounded=1;whiteSpace=wrap;fillColor=#E1BEE7;strokeColor=#8E24AA;fontColor=#4A148C;" vertex="1" parent="1">
+          <mxGeometry x="100" y="950" width="1900" height="35" as="geometry"/>
+        </mxCell>
+
+        <!-- Redis A2A Bus label -->
+        <mxCell id="redis_bus" value="&lt;font color=&quot;#6A1B9A&quot;&gt;&lt;b&gt;Redis A2A Message Bus&lt;/b&gt; (7 Channels | Typed: ALERT, REQUEST, RESPONSE, DATA_UPDATE)&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="1510" y="860" width="480" height="30" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== LAYER 4: DATA LAYER ========== -->
+        <mxCell id="layer4_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#FFF8E1;strokeColor=#FFC107;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1090" width="1940" height="200" as="geometry"/>
+        </mxCell>
+        <mxCell id="layer4_label" value="&lt;b&gt;DATA LAYER&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#F57F17;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1095" width="200" height="25" as="geometry"/>
+        </mxCell>
+
+        <!-- Arrow from agents to data -->
+        <mxCell id="arrow_agents_data" style="edgeStyle=orthogonalEdgeStyle;strokeColor=#666666;strokeWidth=2;" edge="1" source="layer3_bg" target="layer4_bg" parent="1">
+          <mxGeometry relative="1" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="postgres" value="&lt;b&gt;PostgreSQL 15&lt;/b&gt;&lt;br&gt;Port 5588&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;FHIR R4 Schema&lt;br&gt;Clinical EMR Schema&lt;br&gt;Analytics Schema&lt;br&gt;Tenant Schema&lt;br&gt;Audit Schema&lt;br&gt;pg_vector + PostGIS&lt;br&gt;Multi-tenant (schema/org)&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFE082;strokeColor=#F9A825;fontColor=#5D4037;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1120" width="200" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="neo4j" value="&lt;b&gt;Neo4j 5.12&lt;/b&gt;&lt;br&gt;Bolt 7688 | HTTP 7588&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;Clinical Knowledge Graph&lt;br&gt;11 Node Types&lt;br&gt;17 Relationship Types&lt;br&gt;APOC + GDS&lt;br&gt;Drug Interactions&lt;br&gt;Tenant-scoped Labels&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFE082;strokeColor=#F9A825;fontColor=#5D4037;" vertex="1" parent="1">
+          <mxGeometry x="320" y="1120" width="210" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="qdrant" value="&lt;b&gt;Qdrant&lt;/b&gt;&lt;br&gt;Port 6388&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;Vector RAG&lt;br&gt;5 Collections:&lt;br&gt;clinical_guidelines&lt;br&gt;medical_literature&lt;br&gt;patient_notes&lt;br&gt;drug_information&lt;br&gt;disease_knowledge&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFE082;strokeColor=#F9A825;fontColor=#5D4037;" vertex="1" parent="1">
+          <mxGeometry x="550" y="1120" width="180" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="redis" value="&lt;b&gt;Redis 7&lt;/b&gt;&lt;br&gt;Port 6489&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;Cache Layer&lt;br&gt;Celery Broker&lt;br&gt;A2A PubSub&lt;br&gt;Session Store&lt;br&gt;Tenant-prefixed&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFE082;strokeColor=#F9A825;fontColor=#5D4037;" vertex="1" parent="1">
+          <mxGeometry x="750" y="1120" width="160" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="ollama" value="&lt;b&gt;Ollama LLM&lt;/b&gt;&lt;br&gt;Port 11788&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;Llama 3.2 (local)&lt;br&gt;HIPAA-safe&lt;br&gt;+ Claude API fallback&lt;br&gt;+ GPT-4o fallback&lt;br&gt;PHI redaction layer&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFE082;strokeColor=#F9A825;fontColor=#5D4037;" vertex="1" parent="1">
+          <mxGeometry x="930" y="1120" width="170" height="155" as="geometry"/>
+        </mxCell>
+        <mxCell id="minio" value="&lt;b&gt;MinIO&lt;/b&gt;&lt;br&gt;API 9588 | UI 9589&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;─────────────&lt;br&gt;Object Storage&lt;br&gt;Medical Images&lt;br&gt;Reports &amp; Docs&lt;br&gt;ML Model Artifacts&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#FFE082;strokeColor=#F9A825;fontColor=#5D4037;" vertex="1" parent="1">
+          <mxGeometry x="1120" y="1120" width="170" height="155" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== LAYER 5: OBSERVABILITY ========== -->
+        <mxCell id="layer5_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#FCE4EC;strokeColor=#E91E63;strokeWidth=2;arcSize=6;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1310" width="1940" height="140" as="geometry"/>
+        </mxCell>
+        <mxCell id="layer5_label" value="&lt;b&gt;OBSERVABILITY &amp; MONITORING&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#C2185B;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1315" width="300" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="prometheus" value="&lt;b&gt;Prometheus&lt;/b&gt;&lt;br&gt;Port 9390&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Metrics Scraping&lt;br&gt;3 Alert Rule Sets&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#F8BBD0;strokeColor=#C2185B;fontColor=#880E4F;" vertex="1" parent="1">
+          <mxGeometry x="100" y="1345" width="170" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="grafana" value="&lt;b&gt;Grafana&lt;/b&gt;&lt;br&gt;Port 9391&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;5 Dashboards:&lt;br&gt;Agent Ops | Clinical | System&lt;br&gt;Population | LLM Costs&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#F8BBD0;strokeColor=#C2185B;fontColor=#880E4F;" vertex="1" parent="1">
+          <mxGeometry x="290" y="1345" width="220" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="alertmanager" value="&lt;b&gt;Alertmanager&lt;/b&gt;&lt;br&gt;Port 9393&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;PagerDuty/Slack&lt;br&gt;Alert Routing&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#F8BBD0;strokeColor=#C2185B;fontColor=#880E4F;" vertex="1" parent="1">
+          <mxGeometry x="530" y="1345" width="160" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="langfuse" value="&lt;b&gt;Langfuse&lt;/b&gt;&lt;br&gt;Port 3488&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;LLM Traces &amp; Evals&lt;br&gt;Agent Cost Tracking&lt;br&gt;Faithfulness Scores&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#F8BBD0;strokeColor=#C2185B;fontColor=#880E4F;" vertex="1" parent="1">
+          <mxGeometry x="710" y="1345" width="180" height="85" as="geometry"/>
+        </mxCell>
+        <mxCell id="otel" value="&lt;b&gt;OpenTelemetry&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:10px&quot;&gt;Distributed Tracing&lt;br&gt;Django + FastAPI Instrumentation&lt;br&gt;Psycopg2 + Redis + HTTPX&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#F8BBD0;strokeColor=#C2185B;fontColor=#880E4F;" vertex="1" parent="1">
+          <mxGeometry x="910" y="1345" width="230" height="85" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== INTEROPERABILITY BOX (right side) ========== -->
+        <mxCell id="interop_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#E0F7FA;strokeColor=#00BCD4;strokeWidth=2;arcSize=8;" vertex="1" parent="1">
+          <mxGeometry x="1350" y="1120" width="650" height="310" as="geometry"/>
+        </mxCell>
+        <mxCell id="interop_label" value="&lt;b&gt;INTEROPERABILITY &amp; COMPLIANCE&lt;/b&gt;" style="text;html=1;align=left;verticalAlign=top;fillColor=none;strokeColor=none;fontColor=#006064;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="1125" width="300" height="25" as="geometry"/>
+        </mxCell>
+
+        <mxCell id="fhir_std" value="&lt;b&gt;FHIR R4&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;14 Resources&lt;br&gt;LOINC, SNOMED CT&lt;br&gt;RxNorm, ICD-10/11&lt;br&gt;CPT Codes&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="1155" width="140" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="hl7_std" value="&lt;b&gt;HL7 v2&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;ADT Messages&lt;br&gt;ORU Lab Results&lt;br&gt;ORM Orders&lt;br&gt;MLLP Listener&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1530" y="1155" width="140" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="hipaa" value="&lt;b&gt;HIPAA Compliance&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;AES-256 at rest&lt;br&gt;TLS 1.3 in transit&lt;br&gt;Immutable audit log&lt;br&gt;PHI auto-redaction&lt;br&gt;Consent management&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1690" y="1155" width="150" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="mcp_proto" value="&lt;b&gt;MCP Protocol&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Tool Registry&lt;br&gt;Context Distribution&lt;br&gt;LLM Integration&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1860" y="1155" width="120" height="90" as="geometry"/>
+        </mxCell>
+        <mxCell id="a2a_proto" value="&lt;b&gt;A2A Protocol&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Agent Cards&lt;br&gt;Task Delegation&lt;br&gt;Protocol Versioning&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1370" y="1260" width="130" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="wearables" value="&lt;b&gt;IoT / Wearables&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;CGM | Smartwatch&lt;br&gt;Pulse Oximeter&lt;br&gt;BP Monitor&lt;br&gt;IoT Simulator&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1520" y="1260" width="140" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="external_apis" value="&lt;b&gt;External APIs&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;PubMed E-utilities&lt;br&gt;ClinicalTrials.gov&lt;br&gt;Semantic Scholar&lt;br&gt;Twilio SMS&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1680" y="1260" width="140" height="80" as="geometry"/>
+        </mxCell>
+        <mxCell id="k8s" value="&lt;b&gt;Kubernetes&lt;/b&gt;&lt;br&gt;&lt;font style=&quot;font-size:9px&quot;&gt;Helm Charts&lt;br&gt;20 Services&lt;br&gt;Auto-scaling&lt;/font&gt;" style="rounded=1;whiteSpace=wrap;fillColor=#B2EBF2;strokeColor=#00838F;fontColor=#004D40;" vertex="1" parent="1">
+          <mxGeometry x="1840" y="1260" width="130" height="80" as="geometry"/>
+        </mxCell>
+
+        <!-- ========== LEGEND ========== -->
+        <mxCell id="legend_bg" value="" style="rounded=1;whiteSpace=wrap;fillColor=#FAFAFA;strokeColor=#BDBDBD;strokeWidth=1;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1470" width="1940" height="40" as="geometry"/>
+        </mxCell>
+        <mxCell id="legend" value="&lt;font style=&quot;font-size:11px&quot;&gt;&lt;b&gt;Legend:&lt;/b&gt;  🟢 Presentation  🟠 Proxy  🔵 Backend API  🟣 Agent Orchestration  🟡 Data Stores  🔴 Observability  🔵 Interoperability  |  &lt;b&gt;430+ files | 20 Docker services | 15 Django apps | 25+ AI agents | 14 FHIR resources&lt;/b&gt;&lt;/font&gt;" style="text;html=1;align=center;verticalAlign=middle;fillColor=none;strokeColor=none;" vertex="1" parent="1">
+          <mxGeometry x="80" y="1475" width="1940" height="30" as="geometry"/>
+        </mxCell>
+
+      </root>
+    </mxGraphModel>
+  </diagram>
+</mxfile>
