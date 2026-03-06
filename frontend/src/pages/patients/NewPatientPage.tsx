@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMutation } from '@tanstack/react-query'
 import { useForm } from 'react-hook-form'
@@ -32,9 +32,17 @@ function loadDraft(): Partial<PatientFormData> {
   }
 }
 
+/** True only if the draft has user-entered data beyond bare defaults. */
+function hasMeaningfulDraft(): boolean {
+  const draft = loadDraft()
+  const meaningful = ['first_name', 'last_name', 'mrn', 'birth_date', 'email', 'phone'] as const
+  return meaningful.some((k) => !!draft[k])
+}
+
 export default function NewPatientPage() {
   const navigate = useNavigate()
   const [serverError, setServerError] = useState<string | null>(null)
+  const submittedRef = useRef(false)
 
   const {
     register,
@@ -49,12 +57,15 @@ export default function NewPatientPage() {
   // (Vite HMR, nginx restart, etc.) doesn't lose the user's work.
   const watchedValues = watch()
   useEffect(() => {
-    sessionStorage.setItem(DRAFT_KEY, JSON.stringify(watchedValues))
+    if (!submittedRef.current) {
+      sessionStorage.setItem(DRAFT_KEY, JSON.stringify(watchedValues))
+    }
   }, [watchedValues])
 
   const createMutation = useMutation({
     mutationFn: (data: PatientFormData) => api.post('/patients/', data).then((r) => r.data),
     onSuccess: (patient) => {
+      submittedRef.current = true
       sessionStorage.removeItem(DRAFT_KEY)
       navigate(`/patients/${patient.id}`)
     },
@@ -102,7 +113,7 @@ export default function NewPatientPage() {
         )}
 
         {/* Draft restored banner */}
-        {Object.keys(loadDraft()).length > 0 && (
+        {hasMeaningfulDraft() && (
           <div className="flex items-center justify-between p-3 rounded-lg bg-warning-50 dark:bg-warning-900/20 border border-warning-200 dark:border-warning-800 text-warning-700 dark:text-warning-400 text-sm">
             <span>Draft restored after page reload.</span>
             <button
