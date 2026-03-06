@@ -1,4 +1,5 @@
 import React from 'react';
+import { cn } from '@/lib/utils';
 
 interface CardProps {
   children: React.ReactNode;
@@ -7,25 +8,29 @@ interface CardProps {
 }
 
 export const Card: React.FC<CardProps> = ({ children, className = '', padding = true }) => (
-  <div className={`bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm ${padding ? 'p-6' : ''} ${className}`}>
+  <div className={cn(
+    'bg-card rounded-2xl border border-border/60 shadow-card transition-all duration-200 hover:shadow-card-hover',
+    padding && 'p-5 sm:p-6',
+    className,
+  )}>
     {children}
   </div>
 );
 
 export const CardHeader: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`flex items-center justify-between mb-4 ${className}`}>
+  <div className={cn('flex items-center justify-between mb-4', className)}>
     {children}
   </div>
 );
 
 export const CardTitle: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <h3 className={`text-lg font-semibold text-gray-900 dark:text-white ${className}`}>
+  <h3 className={cn('text-lg font-semibold text-foreground', className)}>
     {children}
   </h3>
 );
 
 export const CardDescription: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <p className={`text-sm text-gray-500 dark:text-gray-400 ${className}`}>
+  <p className={cn('text-sm text-muted-foreground', className)}>
     {children}
   </p>
 );
@@ -35,7 +40,7 @@ export const CardContent: React.FC<{ children: React.ReactNode; className?: stri
 );
 
 export const CardFooter: React.FC<{ children: React.ReactNode; className?: string }> = ({ children, className = '' }) => (
-  <div className={`mt-4 pt-4 border-t border-gray-200 dark:border-gray-700 flex items-center justify-end gap-2 ${className}`}>
+  <div className={cn('mt-4 pt-4 border-t border-border/60 flex items-center justify-end gap-2', className)}>
     {children}
   </div>
 );

@@ -151,15 +151,26 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
   return (
     <motion.aside
-      animate={{ width: collapsed ? 64 : 240 }}
-      transition={{ duration: 0.2, ease: 'easeInOut' }}
-      className="relative flex flex-col h-full bg-clinical-900 dark:bg-clinical-950 border-r border-clinical-800 dark:border-clinical-900 overflow-hidden"
+      animate={{ width: collapsed ? 68 : 256 }}
+      transition={{ duration: 0.25, ease: [0.4, 0, 0.2, 1] }}
+      className="relative flex flex-col h-full overflow-hidden"
+      style={{
+        background: 'linear-gradient(180deg, #0c1222 0%, #111827 50%, #0f172a 100%)',
+      }}
     >
+      {/* Ambient gradient overlay */}
+      <div
+        className="absolute inset-0 opacity-30 pointer-events-none"
+        style={{
+          background: 'radial-gradient(ellipse at 20% 0%, rgba(59, 130, 246, 0.15) 0%, transparent 60%), radial-gradient(ellipse at 80% 100%, rgba(139, 92, 246, 0.1) 0%, transparent 60%)',
+        }}
+      />
+
       {/* Logo */}
-      <div className="flex items-center h-16 px-4 border-b border-clinical-800 dark:border-clinical-900 flex-shrink-0">
+      <div className="relative flex items-center h-16 px-4 border-b border-white/[0.06] flex-shrink-0">
         <div className="flex items-center gap-3 min-w-0">
-          <div className="w-8 h-8 rounded-lg bg-gradient-clinical flex items-center justify-center flex-shrink-0">
-            <Heart className="w-4 h-4 text-white" />
+          <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-primary-500 to-primary-700 flex items-center justify-center flex-shrink-0 shadow-lg shadow-primary-500/20">
+            <Heart className="w-4.5 h-4.5 text-white" />
           </div>
           <AnimatePresence>
             {!collapsed && (
@@ -170,8 +181,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
                 transition={{ duration: 0.15 }}
                 className="min-w-0"
               >
-                <p className="text-white font-bold text-sm leading-none">InHealth</p>
-                <p className="text-clinical-400 text-xs leading-none mt-0.5">Chronic Care</p>
+                <p className="text-white font-bold text-sm tracking-tight leading-none">InHealth</p>
+                <p className="text-clinical-500 text-[11px] leading-none mt-1">Chronic Care</p>
               </motion.div>
             )}
           </AnimatePresence>
@@ -179,10 +190,10 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       </div>
 
       {/* Navigation */}
-      <nav className="flex-1 py-4 overflow-y-auto overflow-x-hidden">
-        <ul className="space-y-1 px-2">
+      <nav className="relative flex-1 py-3 overflow-y-auto overflow-x-hidden scrollbar-hide">
+        <ul className="space-y-0.5 px-2">
           {filteredNavItems.map((item) => (
-            <NavItem
+            <SidebarNavItem
               key={item.href + item.label}
               item={item}
               collapsed={collapsed}
@@ -192,12 +203,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
         </ul>
 
         {/* Divider */}
-        <div className="mx-2 my-4 border-t border-clinical-800 dark:border-clinical-900" />
+        <div className="mx-4 my-3 border-t border-white/[0.06]" />
 
         {/* Bottom items */}
-        <ul className="space-y-1 px-2">
+        <ul className="space-y-0.5 px-2">
           {filteredBottomItems.map((item) => (
-            <NavItem
+            <SidebarNavItem
               key={item.href}
               item={item}
               collapsed={collapsed}
@@ -209,12 +220,19 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
 
       {/* Agent activity indicator */}
       {!collapsed && activeAgents > 0 && (
-        <div className="mx-3 mb-3 p-2.5 rounded-lg bg-primary-900/40 border border-primary-700/30">
-          <div className="flex items-center gap-2">
-            <Activity className="w-3.5 h-3.5 text-primary-400 animate-pulse flex-shrink-0" />
-            <p className="text-xs text-primary-300 font-medium">
-              {activeAgents} agent{activeAgents !== 1 ? 's' : ''} running
-            </p>
+        <div className="relative mx-3 mb-3 p-3 rounded-xl overflow-hidden">
+          <div className="absolute inset-0 bg-primary-500/10 border border-primary-500/20 rounded-xl" />
+          <div className="relative flex items-center gap-2.5">
+            <div className="relative">
+              <Activity className="w-4 h-4 text-primary-400" />
+              <div className="absolute -top-0.5 -right-0.5 w-2 h-2 rounded-full bg-secondary-400 animate-pulse" />
+            </div>
+            <div className="flex-1 min-w-0">
+              <p className="text-xs text-primary-300 font-semibold">
+                {activeAgents} agent{activeAgents !== 1 ? 's' : ''} active
+              </p>
+              <p className="text-[10px] text-clinical-500">Processing tasks</p>
+            </div>
           </div>
         </div>
       )}
@@ -222,7 +240,7 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       {/* Collapse toggle button */}
       <button
         onClick={onToggle}
-        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-clinical-700 border border-clinical-600 text-clinical-300 hover:bg-clinical-600 hover:text-white transition-colors flex items-center justify-center shadow-lg z-10"
+        className="absolute -right-3 top-20 w-6 h-6 rounded-full bg-clinical-800 border border-clinical-700 text-clinical-400 hover:bg-clinical-700 hover:text-white transition-all duration-200 flex items-center justify-center shadow-lg z-10 hover:scale-110"
         title={collapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {collapsed ? (
@@ -249,12 +267,14 @@ interface NavItemProps {
   currentPath: string
 }
 
-function NavItem({ item, collapsed, currentPath }: NavItemProps) {
+function SidebarNavItem({ item, collapsed, currentPath }: NavItemProps) {
   const Icon = item.icon
   const badgeCount = item.badge?.()
   const isActive =
     item.href === '/dashboard' || item.href.startsWith('/dashboard/')
       ? currentPath === item.href
+      : item.href === '/billing'
+      ? currentPath === '/billing'
       : currentPath.startsWith(item.href)
 
   return (
@@ -262,23 +282,40 @@ function NavItem({ item, collapsed, currentPath }: NavItemProps) {
       <NavLink
         to={item.href}
         className={cn(
-          'flex items-center gap-3 px-2 py-2 rounded-lg transition-all duration-150 group relative',
+          'flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all duration-200 group relative',
           isActive
-            ? 'bg-primary-600/20 text-primary-300 border border-primary-600/20'
-            : 'text-clinical-400 hover:text-clinical-200 hover:bg-clinical-800',
+            ? 'text-white'
+            : 'text-clinical-400 hover:text-clinical-200 hover:bg-white/[0.04]',
         )}
         title={collapsed ? item.label : undefined}
       >
-        {/* Active indicator */}
+        {/* Active background with glow */}
         {isActive && (
-          <div className="absolute left-0 top-1/2 -translate-y-1/2 w-0.5 h-5 bg-primary-400 rounded-r-full" />
+          <motion.div
+            layoutId="sidebar-active"
+            className="absolute inset-0 rounded-xl"
+            style={{
+              background: 'linear-gradient(135deg, rgba(59, 130, 246, 0.15) 0%, rgba(59, 130, 246, 0.08) 100%)',
+              border: '1px solid rgba(59, 130, 246, 0.2)',
+            }}
+            transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+          />
+        )}
+
+        {/* Active left accent */}
+        {isActive && (
+          <motion.div
+            layoutId="sidebar-accent"
+            className="absolute left-0 top-1/2 -translate-y-1/2 w-[3px] h-5 rounded-r-full bg-primary-400"
+            transition={{ type: 'spring', bounce: 0.15, duration: 0.5 }}
+          />
         )}
 
         {/* Icon */}
-        <div className="relative flex-shrink-0">
+        <div className="relative flex-shrink-0 z-10">
           <Icon
             className={cn(
-              'w-5 h-5 transition-colors',
+              'w-[18px] h-[18px] transition-all duration-200',
               isActive ? 'text-primary-400' : 'text-clinical-500 group-hover:text-clinical-300',
             )}
           />
@@ -286,7 +323,7 @@ function NavItem({ item, collapsed, currentPath }: NavItemProps) {
           {collapsed && badgeCount !== null && badgeCount !== undefined && badgeCount > 0 && (
             <span
               className={cn(
-                'absolute -top-1 -right-1 w-4 h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center',
+                'absolute -top-1.5 -right-1.5 min-w-[16px] h-4 rounded-full text-[9px] font-bold text-white flex items-center justify-center px-1',
                 item.badgeColor ?? 'bg-danger-500',
               )}
             >
@@ -303,9 +340,9 @@ function NavItem({ item, collapsed, currentPath }: NavItemProps) {
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
               transition={{ duration: 0.1 }}
-              className="flex-1 flex items-center justify-between min-w-0"
+              className="flex-1 flex items-center justify-between min-w-0 z-10"
             >
-              <span className="text-sm font-medium truncate">{item.label}</span>
+              <span className="text-[13px] font-medium truncate">{item.label}</span>
               {badgeCount !== null && badgeCount !== undefined && badgeCount > 0 && (
                 <span
                   className={cn(

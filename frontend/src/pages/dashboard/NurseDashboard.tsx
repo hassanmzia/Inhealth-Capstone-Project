@@ -115,18 +115,18 @@ export default function NurseDashboard() {
   }
 
   const summaryCards = [
-    { label: 'My Patients', value: stats.assigned_patients, icon: Users, color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/20' },
-    { label: 'Critical Alerts', value: stats.critical_alerts, icon: AlertTriangle, color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/20' },
-    { label: 'Vitals Overdue', value: stats.vitals_due, icon: Clock, color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/20' },
-    { label: 'Tasks Pending', value: stats.tasks_pending, icon: ClipboardList, color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/20' },
+    { label: 'My Patients', value: stats.assigned_patients, icon: Users, gradient: 'from-primary-500 to-primary-700' },
+    { label: 'Critical Alerts', value: stats.critical_alerts, icon: AlertTriangle, gradient: 'from-danger-500 to-danger-700' },
+    { label: 'Vitals Overdue', value: stats.vitals_due, icon: Clock, gradient: 'from-warning-500 to-warning-700' },
+    { label: 'Tasks Pending', value: stats.tasks_pending, icon: ClipboardList, gradient: 'from-purple-500 to-purple-700' },
   ]
 
   return (
-    <div className="p-6 space-y-6 max-w-[1600px] mx-auto">
+    <div className="space-y-6 max-w-[1600px] mx-auto">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
         <div>
-          <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
+          <h1 className="text-2xl sm:text-3xl font-bold text-foreground tracking-tight flex items-center gap-2">
             <Stethoscope className="w-7 h-7 text-primary-500" />
             Nurse Dashboard
           </h1>
@@ -135,13 +135,13 @@ export default function NurseDashboard() {
           </p>
         </div>
         <div className="flex gap-2">
-          <Link to="/vitals" className="px-4 py-2 bg-primary-600 text-white text-sm rounded-lg hover:bg-primary-700 transition-colors flex items-center gap-2">
+          <Link to="/vitals" className="px-4 py-2.5 bg-gradient-to-r from-primary-600 to-primary-700 text-white text-sm rounded-xl hover:from-primary-700 hover:to-primary-800 transition-all shadow-sm shadow-primary-500/20 flex items-center gap-2">
             <Activity className="w-4 h-4" /> Live Vitals
           </Link>
-          <Link to="/alerts" className="px-4 py-2 bg-red-600 text-white text-sm rounded-lg hover:bg-red-700 transition-colors flex items-center gap-2 relative">
+          <Link to="/alerts" className="px-4 py-2.5 bg-gradient-to-r from-danger-600 to-danger-700 text-white text-sm rounded-xl hover:from-danger-700 hover:to-danger-800 transition-all shadow-sm shadow-danger-500/20 flex items-center gap-2 relative">
             <AlertTriangle className="w-4 h-4" /> Alerts
             {stats.critical_alerts > 0 && (
-              <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-red-600 text-[10px] font-bold rounded-full flex items-center justify-center">
+              <span className="absolute -top-1 -right-1 w-5 h-5 bg-white text-danger-600 text-[10px] font-bold rounded-full flex items-center justify-center shadow-sm">
                 {stats.critical_alerts}
               </span>
             )}
@@ -149,18 +149,19 @@ export default function NurseDashboard() {
         </div>
       </div>
 
-      {/* Summary Cards */}
-      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+      {/* Summary Cards — gradient */}
+      <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 sm:gap-4">
         {summaryCards.map((card) => {
           const Icon = card.icon
           return (
-            <div key={card.label} className={`${card.bg} rounded-xl p-4 border border-border`}>
-              <div className="flex items-center justify-between">
-                <div>
-                  <p className="text-sm text-muted-foreground">{card.label}</p>
-                  <p className="text-2xl font-bold mt-1">{card.value}</p>
+            <div key={card.label} className={`relative overflow-hidden rounded-2xl p-4 sm:p-5 text-white bg-gradient-to-br ${card.gradient}`}>
+              <div className="absolute -right-4 -top-4 w-20 h-20 rounded-full bg-white/10" />
+              <div className="relative">
+                <div className="p-2 rounded-xl bg-white/20 w-fit mb-3">
+                  <Icon className="w-4 h-4 sm:w-5 sm:h-5" />
                 </div>
-                <Icon className={`w-8 h-8 ${card.color}`} />
+                <p className="text-2xl sm:text-3xl font-bold font-mono tabular-nums">{card.value}</p>
+                <p className="text-xs sm:text-sm text-white/80 mt-1 font-medium">{card.label}</p>
               </div>
             </div>
           )
@@ -168,8 +169,8 @@ export default function NurseDashboard() {
       </div>
 
       {/* Vital Sign Tasks */}
-      <div className="bg-card rounded-xl border border-border">
-        <div className="p-4 border-b border-border flex items-center justify-between">
+      <div className="clinical-card !p-0">
+        <div className="p-5 border-b border-border/60 flex items-center justify-between">
           <h2 className="font-semibold text-foreground flex items-center gap-2">
             <Activity className="w-5 h-5 text-primary-500" />
             Vital Sign Collection Queue
@@ -211,7 +212,7 @@ export default function NurseDashboard() {
                   <p className="text-sm"><span className="text-muted-foreground">{task.vital_type}:</span> {task.last_value}</p>
                   <p className="text-xs text-muted-foreground">Last reading: {task.last_reading}</p>
                 </div>
-                <button className="mt-2 w-full text-xs px-3 py-1.5 bg-primary-600 text-white rounded-lg hover:bg-primary-700 transition-colors">
+                <button className="mt-2 w-full text-xs px-3 py-2 bg-gradient-to-r from-primary-600 to-primary-700 text-white rounded-xl hover:from-primary-700 hover:to-primary-800 transition-all shadow-sm shadow-primary-500/20">
                   Record Vitals
                 </button>
               </div>
@@ -221,8 +222,8 @@ export default function NurseDashboard() {
       </div>
 
       {/* Patient Rounds */}
-      <div className="bg-card rounded-xl border border-border">
-        <div className="p-4 border-b border-border flex items-center justify-between">
+      <div className="clinical-card !p-0">
+        <div className="p-5 border-b border-border/60 flex items-center justify-between">
           <h2 className="font-semibold text-foreground flex items-center gap-2">
             <ClipboardList className="w-5 h-5 text-purple-500" />
             Patient Rounds
@@ -297,7 +298,7 @@ export default function NurseDashboard() {
             <Link
               key={action.label}
               to={action.href}
-              className="bg-card rounded-xl border border-border p-4 hover:border-primary-300 hover:shadow-md transition-all group"
+              className="clinical-card hover:border-primary-300/60 hover:shadow-card-hover hover:-translate-y-0.5 transition-all duration-300 group"
             >
               <Icon className="w-6 h-6 text-primary-500 group-hover:text-primary-600 mb-2" />
               <p className="font-medium text-sm">{action.label}</p>

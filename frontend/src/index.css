@@ -23,7 +23,16 @@
     --border: 214 32% 91%;
     --input: 214 32% 91%;
     --ring: 213 80% 48%;
-    --radius: 0.5rem;
+    --radius: 0.75rem;
+
+    /* Glass tokens */
+    --glass-bg: rgba(255, 255, 255, 0.7);
+    --glass-border: rgba(255, 255, 255, 0.3);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.06);
+
+    /* Sidebar gradient */
+    --sidebar-from: 222 47% 8%;
+    --sidebar-to: 217 50% 12%;
   }
 
   .dark {
@@ -46,6 +55,13 @@
     --border: 217 33% 20%;
     --input: 217 33% 20%;
     --ring: 213 80% 55%;
+
+    --glass-bg: rgba(15, 23, 42, 0.65);
+    --glass-border: rgba(51, 65, 85, 0.4);
+    --glass-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+
+    --sidebar-from: 222 47% 5%;
+    --sidebar-to: 217 50% 8%;
   }
 }
 
@@ -54,14 +70,21 @@
     @apply border-border;
   }
 
-  body {
-    @apply bg-background text-foreground font-sans antialiased;
+  html {
+    -webkit-tap-highlight-color: transparent;
+    scroll-behavior: smooth;
   }
 
-  /* Clinical scrollbar */
+  body {
+    @apply bg-background text-foreground font-sans antialiased;
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  /* Refined scrollbar */
   ::-webkit-scrollbar {
-    width: 6px;
-    height: 6px;
+    width: 5px;
+    height: 5px;
   }
 
   ::-webkit-scrollbar-track {
@@ -69,18 +92,75 @@
   }
 
   ::-webkit-scrollbar-thumb {
-    @apply bg-clinical-300 dark:bg-clinical-600 rounded-full;
+    @apply bg-clinical-300/60 dark:bg-clinical-600/60 rounded-full;
   }
 
   ::-webkit-scrollbar-thumb:hover {
     @apply bg-clinical-400 dark:bg-clinical-500;
   }
+
+  /* Selection color */
+  ::selection {
+    @apply bg-primary-200 dark:bg-primary-800/50;
+  }
 }
 
 @layer components {
-  /* Clinical card base */
+  /* ─── Glass card ──────────────────────────────────────────────────── */
   .clinical-card {
-    @apply bg-card rounded-lg border border-border shadow-card p-4;
+    @apply relative bg-card rounded-2xl border border-border/60 p-5;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 4px 16px rgba(0, 0, 0, 0.03);
+    transition: box-shadow 0.25s ease, border-color 0.25s ease, transform 0.2s ease;
+  }
+
+  .clinical-card:hover {
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.04),
+      0 8px 24px rgba(0, 0, 0, 0.06);
+    @apply border-border;
+  }
+
+  .dark .clinical-card {
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.2),
+      0 4px 16px rgba(0, 0, 0, 0.12);
+  }
+
+  .dark .clinical-card:hover {
+    box-shadow:
+      0 2px 4px rgba(0, 0, 0, 0.2),
+      0 8px 24px rgba(0, 0, 0, 0.2);
+  }
+
+  /* Glass morphism card */
+  .glass-card {
+    background: var(--glass-bg);
+    backdrop-filter: blur(16px) saturate(180%);
+    -webkit-backdrop-filter: blur(16px) saturate(180%);
+    border: 1px solid var(--glass-border);
+    box-shadow: var(--glass-shadow);
+    @apply rounded-2xl p-5;
+  }
+
+  /* Gradient stat card */
+  .stat-card {
+    @apply relative rounded-2xl p-5 overflow-hidden;
+    transition: transform 0.2s ease, box-shadow 0.25s ease;
+  }
+
+  .stat-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 12px 32px rgba(0, 0, 0, 0.1);
+  }
+
+  .stat-card::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    opacity: 0.08;
+    background: radial-gradient(circle at 30% 20%, currentColor, transparent 60%);
   }
 
   /* Status indicator dots */
@@ -106,7 +186,7 @@
 
   /* Vital value display */
   .vital-value {
-    @apply font-mono text-2xl font-bold tabular-nums;
+    @apply font-mono text-2xl font-bold tabular-nums tracking-tight;
   }
 
   .vital-label {
@@ -115,34 +195,92 @@
 
   /* Risk badge */
   .risk-badge-critical {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400;
   }
 
   .risk-badge-high {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-orange-100 text-orange-700 dark:bg-orange-900/30 dark:text-orange-400;
   }
 
   .risk-badge-medium {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400;
   }
 
   .risk-badge-low {
-    @apply inline-flex items-center px-2 py-0.5 rounded text-xs font-semibold bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold bg-secondary-100 text-secondary-700 dark:bg-secondary-900/30 dark:text-secondary-400;
   }
 
   /* Agent tier badge */
   .tier-badge {
-    @apply inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium;
+    @apply inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium;
   }
 
-  /* Shimmer loading skeleton */
+  /* Enhanced loading skeleton */
   .skeleton {
-    @apply animate-pulse bg-clinical-200 dark:bg-clinical-700 rounded;
+    @apply animate-shimmer rounded-lg;
+    background: linear-gradient(
+      90deg,
+      hsl(var(--muted)) 25%,
+      hsl(var(--accent)) 50%,
+      hsl(var(--muted)) 75%
+    );
+    background-size: 200% 100%;
   }
 
   /* Gradient text for hero sections */
   .gradient-text {
-    @apply bg-gradient-to-r from-primary-600 to-primary-400 bg-clip-text text-transparent;
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #3b82f6 0%, #06b6d4 50%, #8b5cf6 100%);
+  }
+
+  .gradient-text-health {
+    @apply bg-clip-text text-transparent;
+    background-image: linear-gradient(135deg, #16a34a 0%, #06b6d4 100%);
+  }
+
+  /* Sidebar nav item glow effect */
+  .nav-glow {
+    position: relative;
+  }
+
+  .nav-glow::after {
+    content: '';
+    position: absolute;
+    inset: 0;
+    border-radius: inherit;
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    box-shadow: inset 0 0 12px rgba(59, 130, 246, 0.15);
+    pointer-events: none;
+  }
+
+  .nav-glow.active::after {
+    opacity: 1;
+  }
+
+  /* Focus ring style */
+  .focus-ring {
+    @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary-500/50 focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  /* Ambient glow behind cards */
+  .ambient-glow {
+    position: relative;
+  }
+
+  .ambient-glow::before {
+    content: '';
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    transform: translate(-50%, -50%);
+    width: 80%;
+    height: 80%;
+    border-radius: 50%;
+    background: radial-gradient(circle, var(--glow-color, rgba(59,130,246,0.12)) 0%, transparent 70%);
+    pointer-events: none;
+    z-index: -1;
+    filter: blur(20px);
   }
 }
 
@@ -160,11 +298,50 @@
   .theme-transition {
     @apply transition-colors duration-200;
   }
+
+  /* Mobile safe area padding */
+  .safe-bottom {
+    padding-bottom: env(safe-area-inset-bottom, 0px);
+  }
+
+  .safe-top {
+    padding-top: env(safe-area-inset-top, 0px);
+  }
+
+  /* Line clamp for mobile */
+  .line-clamp-1 {
+    display: -webkit-box;
+    -webkit-line-clamp: 1;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  .line-clamp-2 {
+    display: -webkit-box;
+    -webkit-line-clamp: 2;
+    -webkit-box-orient: vertical;
+    overflow: hidden;
+  }
+
+  /* Hide scrollbar utility */
+  .scrollbar-hide {
+    -ms-overflow-style: none;
+    scrollbar-width: none;
+  }
+
+  .scrollbar-hide::-webkit-scrollbar {
+    display: none;
+  }
+
+  /* Touch-friendly targets */
+  .touch-target {
+    @apply min-h-[44px] min-w-[44px];
+  }
 }
 
 /* React Flow custom styles */
 .react-flow__node {
-  @apply rounded-lg border-2 border-border bg-card text-foreground shadow-card text-xs font-medium;
+  @apply rounded-xl border-2 border-border bg-card text-foreground shadow-card text-xs font-medium;
 }
 
 .react-flow__edge-path {
@@ -173,10 +350,60 @@
 }
 
 .react-flow__controls {
-  @apply bg-card border border-border rounded-lg shadow-card;
+  @apply bg-card border border-border rounded-xl shadow-card;
 }
 
 /* Custom recharts tooltip */
 .recharts-tooltip-wrapper .recharts-default-tooltip {
-  @apply bg-card border border-border rounded-lg shadow-card text-xs !important;
+  @apply bg-card border border-border rounded-xl shadow-card text-xs !important;
+}
+
+/* Mobile-specific overrides */
+@media (max-width: 640px) {
+  .clinical-card {
+    @apply p-4 rounded-xl;
+  }
+
+  .glass-card {
+    @apply p-4 rounded-xl;
+  }
+
+  .stat-card {
+    @apply p-4 rounded-xl;
+  }
+
+  /* Make tables scrollable on mobile */
+  .mobile-scroll-table {
+    @apply overflow-x-auto -mx-4 px-4;
+  }
+}
+
+/* Touch device optimizations */
+@media (hover: none) and (pointer: coarse) {
+  .clinical-card:hover {
+    transform: none;
+    box-shadow:
+      0 1px 2px rgba(0, 0, 0, 0.04),
+      0 4px 16px rgba(0, 0, 0, 0.03);
+  }
+
+  .stat-card:hover {
+    transform: none;
+  }
+}
+
+/* Smooth page transitions */
+@media (prefers-reduced-motion: no-preference) {
+  .clinical-card {
+    will-change: box-shadow, border-color;
+  }
+}
+
+/* Print styles */
+@media print {
+  .clinical-card {
+    border: 1px solid #ccc;
+    box-shadow: none;
+    break-inside: avoid;
+  }
 }
