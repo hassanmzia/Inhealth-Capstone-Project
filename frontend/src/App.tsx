@@ -25,6 +25,7 @@ const ClinicalWorkspacePage = React.lazy(() => import('@/pages/clinical/Clinical
 const BillingPage = React.lazy(() => import('@/pages/billing/BillingPage'))
 const VitalsPage = React.lazy(() => import('@/pages/vitals/VitalsPage'))
 const WhatIfSimulatorPage = React.lazy(() => import('@/pages/simulator/WhatIfSimulatorPage'))
+const VitalsSimulatorPage = React.lazy(() => import('@/pages/simulator/VitalsSimulatorPage'))
 const FairnessAnalysisPage = React.lazy(() => import('@/pages/fairness/FairnessAnalysisPage'))
 const TwoFactorPage = React.lazy(() => import('@/pages/auth/TwoFactorPage'))
 const NurseDashboard = React.lazy(() => import('@/pages/dashboard/NurseDashboard'))
@@ -511,6 +512,20 @@ export default function App() {
                   <Suspense fallback={<PageLoader />}>
                     <AnimatedPage>
                       <WhatIfSimulatorPage />
+                    </AnimatedPage>
+                  </Suspense>
+                </ProtectedRoute>
+              }
+            />
+
+            {/* Vitals Simulator */}
+            <Route
+              path="vitals-simulator"
+              element={
+                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin']}>
+                  <Suspense fallback={<PageLoader />}>
+                    <AnimatedPage>
+                      <VitalsSimulatorPage />
                     </AnimatedPage>
                   </Suspense>
                 </ProtectedRoute>

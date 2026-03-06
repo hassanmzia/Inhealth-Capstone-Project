@@ -17,6 +17,7 @@ import {
   Activity,
   Heart,
   MessageSquare,
+  Zap,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAgentStore, selectTotalActiveAgents } from '@/store/agentStore'
@@ -81,6 +82,12 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       roles: ['physician', 'nurse', 'admin', 'org_admin'],
       badge: () => (activeAgents > 0 ? activeAgents : null),
       badgeColor: 'bg-secondary-500',
+    },
+    {
+      label: 'Vitals Simulator',
+      href: '/vitals-simulator',
+      icon: Zap,
+      roles: ['physician', 'admin', 'org_admin'],
     },
     {
       label: 'Analytics',
