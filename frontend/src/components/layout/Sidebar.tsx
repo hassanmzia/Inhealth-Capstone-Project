@@ -251,7 +251,7 @@ function NavItem({ item, collapsed, currentPath }: NavItemProps) {
   const Icon = item.icon
   const badgeCount = item.badge?.()
   const isActive =
-    item.href === '/dashboard' || item.href === '/dashboard/patient' || item.href === '/dashboard/researcher'
+    item.href === '/dashboard' || item.href.startsWith('/dashboard/')
       ? currentPath === item.href
       : currentPath.startsWith(item.href)
 
