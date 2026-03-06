@@ -84,7 +84,7 @@ class PatientViewSet(ModelViewSet):
         try:
             patient = (
                 FHIRPatient.objects
-                .prefetch_related("conditions", "analytics_risk_scores")
+                .prefetch_related("conditions")
                 .get(pk=self.kwargs.get("pk"), tenant=self._tenant())
             )
         except FHIRPatient.DoesNotExist:
@@ -199,7 +199,7 @@ class PatientViewSet(ModelViewSet):
         """Return PatientSummary shape expected by the frontend."""
         try:
             qs = self.filter_queryset(self.get_queryset()).prefetch_related(
-                "conditions", "analytics_risk_scores"
+                "conditions"
             )
             page = self.paginate_queryset(qs)
             items = page if page is not None else qs
