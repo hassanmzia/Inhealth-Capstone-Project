@@ -17,7 +17,6 @@ import {
   Activity,
   Heart,
   MessageSquare,
-  Pill,
 } from 'lucide-react'
 import { useAuthStore } from '@/store/authStore'
 import { useAgentStore, selectTotalActiveAgents } from '@/store/agentStore'
@@ -53,6 +52,8 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       ? '/dashboard/nurse'
       : user?.role === 'pharmacist'
       ? '/dashboard/pharmacist'
+      : user?.role === 'billing'
+      ? '/billing'
       : '/dashboard'
 
   const navItems: NavItem[] = [
@@ -98,12 +99,6 @@ export default function Sidebar({ collapsed, onToggle }: SidebarProps) {
       href: '/telemedicine',
       icon: Video,
       roles: ['physician', 'nurse', 'patient'],
-    },
-    {
-      label: 'Medications',
-      href: '/dashboard/pharmacist',
-      icon: Pill,
-      roles: ['pharmacist'],
     },
     {
       label: 'Billing',

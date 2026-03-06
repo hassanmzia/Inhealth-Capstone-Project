@@ -230,6 +230,8 @@ export default function App() {
                       ? '/dashboard/nurse'
                       : user?.role === 'pharmacist'
                       ? '/dashboard/pharmacist'
+                      : user?.role === 'billing'
+                      ? '/billing'
                       : '/dashboard'
                   }
                   replace

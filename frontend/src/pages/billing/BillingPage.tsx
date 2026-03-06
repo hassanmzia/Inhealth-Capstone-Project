@@ -108,7 +108,7 @@ export default function BillingPage() {
   const STATUS_COLORS = ['#94a3b8', '#3b82f6', '#f59e0b', '#16a34a', '#e11d48', '#8b5cf6']
 
   return (
-    <motion.div variants={CONTAINER} initial="hidden" animate="show" className="space-y-6 max-w-7xl">
+    <motion.div variants={CONTAINER} initial="hidden" animate="show" className="space-y-6 max-w-[1600px] mx-auto">
       <motion.div variants={ITEM} className="flex items-center justify-between">
         <div>
           <h1 className="text-xl font-bold text-foreground flex items-center gap-2">
