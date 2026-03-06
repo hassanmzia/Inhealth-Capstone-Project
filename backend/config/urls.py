@@ -58,6 +58,8 @@ api_v1_patterns = [
     path("a2a/", include("apps.a2a_bridge.urls", namespace="a2a")),
     # SDOH assessments
     path("sdoh/", include("apps.sdoh.urls", namespace="sdoh")),
+    # Telemedicine
+    path("telemedicine/", include("apps.telemedicine.urls", namespace="telemedicine")),
     # OpenAPI schema
     path("schema/", SpectacularAPIView.as_view(), name="schema"),
     path("docs/", SpectacularSwaggerView.as_view(url_name="api-v1:schema"), name="swagger-ui"),
