@@ -70,6 +70,8 @@ export default function SecureMessagingPage() {
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
+  const isPlaceholderThread = selectedThread?.startsWith('t') && /^t\d+$/.test(selectedThread)
+
   // Fetch threads
   const { data: threads } = useQuery({
     queryKey: ['message-threads'],
@@ -92,7 +94,7 @@ export default function SecureMessagingPage() {
     retry: false,
   })
 
-  // Fetch messages for selected thread
+  // Fetch messages for selected thread (skip for placeholder threads)
   const { data: messages } = useQuery({
     queryKey: ['messages', selectedThread],
     queryFn: async () => {
@@ -109,7 +111,7 @@ export default function SecureMessagingPage() {
         return null
       }
     },
-    enabled: !!selectedThread,
+    enabled: !!selectedThread && !isPlaceholderThread,
     retry: false,
   })
 
