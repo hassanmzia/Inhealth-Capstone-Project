@@ -3,7 +3,7 @@
 from django.urls import include, path
 from rest_framework.routers import DefaultRouter
 
-from .views import ClinicalTrialViewSet, MedicalEvidenceViewSet, ResearchQueryViewSet
+from .views import ClinicalTrialViewSet, MedicalEvidenceViewSet, ResearchQueryViewSet, ResearchSearchView
 
 app_name = "research"
 
@@ -13,5 +13,6 @@ router.register("trials", ClinicalTrialViewSet, basename="clinical-trial")
 router.register("evidence", MedicalEvidenceViewSet, basename="medical-evidence")
 
 urlpatterns = [
+    path("search/", ResearchSearchView.as_view(), name="research-search"),
     path("", include(router.urls)),
 ]
