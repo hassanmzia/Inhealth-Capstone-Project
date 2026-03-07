@@ -131,8 +131,8 @@ export const fhirApi: AxiosInstance = axios.create({
   baseURL: import.meta.env.VITE_FHIR_URL || `${BASE_URL}/fhir`,
   timeout: 30000,
   headers: {
-    'Content-Type': 'application/fhir+json',
-    Accept: 'application/fhir+json',
+    'Content-Type': 'application/json',
+    Accept: 'application/json',
   },
 })
 
