@@ -128,7 +128,7 @@ api.interceptors.response.use(
 // ─── FHIR-specific instance ────────────────────────────────────────────────────
 
 export const fhirApi: AxiosInstance = axios.create({
-  baseURL: import.meta.env.VITE_FHIR_URL || '/fhir/R4',
+  baseURL: import.meta.env.VITE_FHIR_URL || `${BASE_URL}/fhir`,
   timeout: 30000,
   headers: {
     'Content-Type': 'application/fhir+json',
