@@ -209,6 +209,10 @@ interface AIRecommendation {
   description: string
   agent: string
   timestamp: string
+  icdCode?: string
+  icdDisplay?: string
+  cptCodes?: { code: string; display: string }[]
+  treatment?: string
 }
 
 function generateLocalRecommendations(readings: GeneratedReading[]): AIRecommendation[] {
@@ -221,59 +225,59 @@ function generateLocalRecommendations(readings: GeneratedReading[]): AIRecommend
 
   // Heart rate checks
   if (v.heartRate > 120) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Tachycardia Detected', description: `Heart rate at ${v.heartRate} bpm. Consider immediate evaluation for arrhythmia, sepsis, or hypovolemia. 12-lead ECG recommended.`, agent: 'Cardiac Monitor Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Tachycardia Detected', description: `Heart rate at ${v.heartRate} bpm. Consider immediate evaluation for arrhythmia, sepsis, or hypovolemia. 12-lead ECG recommended.`, agent: 'Cardiac Monitor Agent', timestamp: latest.timestamp, icdCode: 'R00.0', icdDisplay: 'Tachycardia, unspecified', cptCodes: [{ code: '93000', display: '12-lead ECG with interpretation' }, { code: '93040', display: 'Rhythm ECG (1-3 leads)' }, { code: '99291', display: 'Critical care, first 30-74 min' }], treatment: 'IV Metoprolol 5mg q5min (max 15mg), continuous telemetry monitoring, fluid resuscitation if hypovolemic' })
   } else if (v.heartRate > 100) {
-    recs.push({ id: String(++id), severity: 'warning', title: 'Tachycardia Alert', description: `Heart rate elevated at ${v.heartRate} bpm. Assess for pain, anxiety, fever, dehydration, or medication effects.`, agent: 'Cardiac Monitor Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'warning', title: 'Tachycardia Alert', description: `Heart rate elevated at ${v.heartRate} bpm. Assess for pain, anxiety, fever, dehydration, or medication effects.`, agent: 'Cardiac Monitor Agent', timestamp: latest.timestamp, icdCode: 'R00.0', icdDisplay: 'Tachycardia, unspecified', cptCodes: [{ code: '93000', display: '12-lead ECG with interpretation' }, { code: '93005', display: 'ECG tracing only' }], treatment: 'PO Metoprolol 25-50mg BID, address underlying cause (hydration, pain management, antipyretics)' })
   } else if (v.heartRate < 50) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Bradycardia', description: `Heart rate critically low at ${v.heartRate} bpm. Check for heart block, medication effects (beta-blockers), or vagal response. Prepare for possible transcutaneous pacing.`, agent: 'Cardiac Monitor Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Bradycardia', description: `Heart rate critically low at ${v.heartRate} bpm. Check for heart block, medication effects (beta-blockers), or vagal response. Prepare for possible transcutaneous pacing.`, agent: 'Cardiac Monitor Agent', timestamp: latest.timestamp, icdCode: 'R00.1', icdDisplay: 'Bradycardia, unspecified', cptCodes: [{ code: '93000', display: '12-lead ECG with interpretation' }, { code: '33210', display: 'Temporary transvenous pacemaker insertion' }, { code: '99291', display: 'Critical care, first 30-74 min' }], treatment: 'Atropine 1mg IV q3-5min (max 3mg), transcutaneous pacing if unresponsive, hold beta-blockers/CCBs' })
   }
 
   // Blood pressure checks
   if (v.systolicBP > 180 || v.diastolicBP > 120) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Hypertensive Emergency', description: `BP ${v.systolicBP}/${v.diastolicBP} mmHg. Assess for end-organ damage. Consider IV antihypertensives. Target 25% reduction in first hour.`, agent: 'BP Management Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Hypertensive Emergency', description: `BP ${v.systolicBP}/${v.diastolicBP} mmHg. Assess for end-organ damage. Consider IV antihypertensives. Target 25% reduction in first hour.`, agent: 'BP Management Agent', timestamp: latest.timestamp, icdCode: 'I16.1', icdDisplay: 'Hypertensive emergency', cptCodes: [{ code: '99291', display: 'Critical care, first 30-74 min' }, { code: '36000', display: 'IV access for drug administration' }, { code: '93000', display: '12-lead ECG with interpretation' }], treatment: 'IV Nicardipine 5mg/hr (titrate 2.5mg/hr q5min, max 15mg/hr) or IV Labetalol 20mg bolus then 2mg/min drip. Target 25% MAP reduction in 1hr.' })
   } else if (v.systolicBP > 160 || v.diastolicBP > 100) {
-    recs.push({ id: String(++id), severity: 'warning', title: 'Hypertension Stage 2', description: `BP ${v.systolicBP}/${v.diastolicBP} mmHg. Review current antihypertensive regimen. Consider dose adjustment or adding second agent.`, agent: 'BP Management Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'warning', title: 'Hypertension Stage 2', description: `BP ${v.systolicBP}/${v.diastolicBP} mmHg. Review current antihypertensive regimen. Consider dose adjustment or adding second agent.`, agent: 'BP Management Agent', timestamp: latest.timestamp, icdCode: 'I10', icdDisplay: 'Essential (primary) hypertension', cptCodes: [{ code: '99214', display: 'Office visit, moderate complexity' }, { code: '93000', display: '12-lead ECG with interpretation' }], treatment: 'Lisinopril 10-20mg daily or Amlodipine 5-10mg daily. Add HCTZ 12.5-25mg if on monotherapy. Recheck BP in 2-4 weeks.' })
   } else if (v.systolicBP < 90) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Hypotension Alert', description: `Systolic BP at ${v.systolicBP} mmHg. Assess for shock, dehydration, or sepsis. Consider fluid resuscitation.`, agent: 'BP Management Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Hypotension Alert', description: `Systolic BP at ${v.systolicBP} mmHg. Assess for shock, dehydration, or sepsis. Consider fluid resuscitation.`, agent: 'BP Management Agent', timestamp: latest.timestamp, icdCode: 'I95.9', icdDisplay: 'Hypotension, unspecified', cptCodes: [{ code: '99291', display: 'Critical care, first 30-74 min' }, { code: '36000', display: 'IV access for drug administration' }, { code: '96360', display: 'IV infusion, hydration (first 31-60 min)' }], treatment: 'NS bolus 500-1000mL IV, Trendelenburg position, Norepinephrine 0.1-0.5 mcg/kg/min if unresponsive to fluids' })
   }
 
   // SpO2 checks
   if (v.spo2 < 90) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Hypoxemia', description: `SpO2 at ${v.spo2}%. Initiate supplemental O2 immediately. Consider ABG, CXR, and possible intubation if not improving.`, agent: 'Respiratory Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Hypoxemia', description: `SpO2 at ${v.spo2}%. Initiate supplemental O2 immediately. Consider ABG, CXR, and possible intubation if not improving.`, agent: 'Respiratory Agent', timestamp: latest.timestamp, icdCode: 'J96.01', icdDisplay: 'Acute respiratory failure with hypoxia', cptCodes: [{ code: '94760', display: 'Pulse oximetry (continuous)' }, { code: '71046', display: 'Chest X-ray, 2 views' }, { code: '82803', display: 'Arterial blood gas (ABG)' }, { code: '31500', display: 'Emergency endotracheal intubation' }], treatment: 'High-flow O2 via non-rebreather mask 15L/min, prepare for intubation if SpO2 not improving. RSI: Propofol 1.5mg/kg + Succinylcholine 1.5mg/kg.' })
   } else if (v.spo2 < 94) {
-    recs.push({ id: String(++id), severity: 'warning', title: 'Desaturation Warning', description: `SpO2 at ${v.spo2}%. Apply supplemental O2 via nasal cannula. Monitor closely and consider ABG.`, agent: 'Respiratory Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'warning', title: 'Desaturation Warning', description: `SpO2 at ${v.spo2}%. Apply supplemental O2 via nasal cannula. Monitor closely and consider ABG.`, agent: 'Respiratory Agent', timestamp: latest.timestamp, icdCode: 'R09.02', icdDisplay: 'Hypoxemia', cptCodes: [{ code: '94760', display: 'Pulse oximetry (continuous)' }, { code: '82803', display: 'Arterial blood gas (ABG)' }, { code: '71046', display: 'Chest X-ray, 2 views' }], treatment: 'Nasal cannula O2 2-4L/min, titrate to SpO2 > 94%. If COPD patient, target 88-92%. Obtain ABG if not improving.' })
   }
 
   // Glucose checks
   if (v.glucose > 300) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Hyperglycemia', description: `Blood glucose at ${v.glucose} mg/dL. Check for DKA (ketones, anion gap). Start insulin protocol and IV fluids. Monitor q1h.`, agent: 'Glycemic Control Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Severe Hyperglycemia', description: `Blood glucose at ${v.glucose} mg/dL. Check for DKA (ketones, anion gap). Start insulin protocol and IV fluids. Monitor q1h.`, agent: 'Glycemic Control Agent', timestamp: latest.timestamp, icdCode: 'E11.65', icdDisplay: 'Type 2 DM with hyperglycemia', cptCodes: [{ code: '82947', display: 'Blood glucose quantitative' }, { code: '82570', display: 'Urine creatinine' }, { code: '80048', display: 'Basic metabolic panel (BMP)' }, { code: '96360', display: 'IV infusion, hydration' }], treatment: 'Insulin IV drip 0.1 units/kg/hr, NS 1L/hr x 2hr then 250mL/hr. Check BMP, ketones, anion gap. Monitor BG q1h. Replace K+ if < 5.3 mEq/L.' })
   } else if (v.glucose > 200) {
-    recs.push({ id: String(++id), severity: 'warning', title: 'Hyperglycemia Alert', description: `Blood glucose elevated at ${v.glucose} mg/dL. Administer correction dose per sliding scale. Reassess in 2 hours.`, agent: 'Glycemic Control Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'warning', title: 'Hyperglycemia Alert', description: `Blood glucose elevated at ${v.glucose} mg/dL. Administer correction dose per sliding scale. Reassess in 2 hours.`, agent: 'Glycemic Control Agent', timestamp: latest.timestamp, icdCode: 'R73.9', icdDisplay: 'Hyperglycemia, unspecified', cptCodes: [{ code: '82947', display: 'Blood glucose quantitative' }, { code: '83036', display: 'Hemoglobin A1c (HbA1c)' }], treatment: 'Rapid-acting insulin per sliding scale (Lispro/Aspart). BG 201-250: 2U, 251-300: 4U, 301-350: 6U. Reassess in 2hr.' })
   } else if (v.glucose < 70) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Hypoglycemia Detected', description: `Blood glucose critically low at ${v.glucose} mg/dL. Administer 15g fast-acting carbohydrate. If NPO or unconscious, give IV dextrose 50%.`, agent: 'Glycemic Control Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Hypoglycemia Detected', description: `Blood glucose critically low at ${v.glucose} mg/dL. Administer 15g fast-acting carbohydrate. If NPO or unconscious, give IV dextrose 50%.`, agent: 'Glycemic Control Agent', timestamp: latest.timestamp, icdCode: 'E16.2', icdDisplay: 'Hypoglycemia, unspecified', cptCodes: [{ code: '82947', display: 'Blood glucose quantitative' }, { code: '96374', display: 'IV push, single drug' }, { code: '80048', display: 'Basic metabolic panel (BMP)' }], treatment: 'If conscious: 15g oral glucose (4oz juice), recheck in 15min. If unconscious/NPO: D50W 25mL (12.5g) IV push or Glucagon 1mg IM. Hold insulin/sulfonylureas.' })
   }
 
   // Temperature checks
   if (v.temperature > 102) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'High Fever', description: `Temperature ${v.temperature}°F. Obtain blood cultures x2, CBC, lactate. Consider empiric antibiotics. Sepsis screening recommended.`, agent: 'Infection Control Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'High Fever', description: `Temperature ${v.temperature}°F. Obtain blood cultures x2, CBC, lactate. Consider empiric antibiotics. Sepsis screening recommended.`, agent: 'Infection Control Agent', timestamp: latest.timestamp, icdCode: 'R50.9', icdDisplay: 'Fever, unspecified', cptCodes: [{ code: '87040', display: 'Blood culture, aerobic' }, { code: '85025', display: 'CBC with differential' }, { code: '83605', display: 'Lactic acid (lactate)' }, { code: '71046', display: 'Chest X-ray, 2 views' }], treatment: 'Acetaminophen 1000mg IV/PO q6h, blood cultures x2 from separate sites, empiric Vancomycin 25mg/kg IV + Piperacillin-Tazobactam 4.5g IV q6h.' })
   } else if (v.temperature > 100.4) {
-    recs.push({ id: String(++id), severity: 'warning', title: 'Fever Detected', description: `Temperature ${v.temperature}°F. Administer antipyretics. Evaluate for infection source. Consider UA, CXR if new onset.`, agent: 'Infection Control Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'warning', title: 'Fever Detected', description: `Temperature ${v.temperature}°F. Administer antipyretics. Evaluate for infection source. Consider UA, CXR if new onset.`, agent: 'Infection Control Agent', timestamp: latest.timestamp, icdCode: 'R50.9', icdDisplay: 'Fever, unspecified', cptCodes: [{ code: '85025', display: 'CBC with differential' }, { code: '81001', display: 'Urinalysis, automated with micro' }, { code: '71046', display: 'Chest X-ray, 2 views' }], treatment: 'Acetaminophen 650-1000mg PO q6h or Ibuprofen 400-600mg PO q6h. Obtain UA, CBC, CXR if new onset. Cooling measures PRN.' })
   }
 
   // Respiratory rate checks
   if (v.respRate > 28) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'Tachypnea — Respiratory Failure Risk', description: `Respiratory rate at ${v.respRate} br/min. Assess for respiratory distress, metabolic acidosis, or anxiety. ABG recommended.`, agent: 'Respiratory Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'Tachypnea — Respiratory Failure Risk', description: `Respiratory rate at ${v.respRate} br/min. Assess for respiratory distress, metabolic acidosis, or anxiety. ABG recommended.`, agent: 'Respiratory Agent', timestamp: latest.timestamp, icdCode: 'R06.82', icdDisplay: 'Tachypnea, not elsewhere classified', cptCodes: [{ code: '82803', display: 'Arterial blood gas (ABG)' }, { code: '94760', display: 'Pulse oximetry (continuous)' }, { code: '71046', display: 'Chest X-ray, 2 views' }, { code: '99291', display: 'Critical care, first 30-74 min' }], treatment: 'Supplemental O2, obtain ABG stat. If metabolic acidosis: identify and treat cause. If respiratory failure: consider BiPAP or intubation.' })
   } else if (v.respRate > 22) {
-    recs.push({ id: String(++id), severity: 'warning', title: 'Elevated Respiratory Rate', description: `Respiratory rate at ${v.respRate} br/min. Monitor closely. Assess for pain, fever, or anxiety as contributing factors.`, agent: 'Respiratory Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'warning', title: 'Elevated Respiratory Rate', description: `Respiratory rate at ${v.respRate} br/min. Monitor closely. Assess for pain, fever, or anxiety as contributing factors.`, agent: 'Respiratory Agent', timestamp: latest.timestamp, icdCode: 'R06.82', icdDisplay: 'Tachypnea, not elsewhere classified', cptCodes: [{ code: '94760', display: 'Pulse oximetry (continuous)' }, { code: '71046', display: 'Chest X-ray, 2 views' }], treatment: 'Continuous pulse oximetry, address underlying cause. Anxiolytic if anxiety-driven. Pain management if pain-related.' })
   }
 
-  // Multi-vital pattern detection
+  // Multi-vital pattern detection (SIRS/Sepsis)
   if (v.heartRate > 100 && v.systolicBP < 100 && v.temperature > 100.4 && v.respRate > 22) {
-    recs.push({ id: String(++id), severity: 'critical', title: 'SIRS/Sepsis Criteria Met', description: `Multiple abnormalities: HR ${v.heartRate}, BP ${v.systolicBP}/${v.diastolicBP}, Temp ${v.temperature}°F, RR ${v.respRate}. Activate sepsis bundle: cultures, lactate, IV fluids 30mL/kg, broad-spectrum antibiotics within 1 hour.`, agent: 'Sepsis Screening Agent', timestamp: latest.timestamp })
+    recs.push({ id: String(++id), severity: 'critical', title: 'SIRS/Sepsis Criteria Met', description: `Multiple abnormalities: HR ${v.heartRate}, BP ${v.systolicBP}/${v.diastolicBP}, Temp ${v.temperature}°F, RR ${v.respRate}. Activate sepsis bundle: cultures, lactate, IV fluids 30mL/kg, broad-spectrum antibiotics within 1 hour.`, agent: 'Sepsis Screening Agent', timestamp: latest.timestamp, icdCode: 'A41.9', icdDisplay: 'Sepsis, unspecified organism', cptCodes: [{ code: '99291', display: 'Critical care, first 30-74 min' }, { code: '87040', display: 'Blood culture, aerobic' }, { code: '83605', display: 'Lactic acid (lactate)' }, { code: '36000', display: 'IV access for drug administration' }, { code: '96360', display: 'IV infusion, hydration' }], treatment: 'SEP-1 Bundle: Blood cultures x2, Lactate level, NS 30mL/kg IV bolus within 3hr, Broad-spectrum ABX within 1hr (Vanc + Zosyn). Repeat lactate if > 2. Vasopressors if MAP < 65 after fluids.' })
   }
 
   if (recs.length === 0) {
-    recs.push({ id: '0', severity: 'info', title: 'All Vitals Within Normal Range', description: 'No abnormalities detected. Continue routine monitoring per care plan.', agent: 'Clinical Decision Support', timestamp: latest.timestamp })
+    recs.push({ id: '0', severity: 'info', title: 'All Vitals Within Normal Range', description: 'No abnormalities detected. Continue routine monitoring per care plan.', agent: 'Clinical Decision Support', timestamp: latest.timestamp, icdCode: 'Z00.00', icdDisplay: 'General adult medical examination', cptCodes: [{ code: '99213', display: 'Office visit, low complexity' }], treatment: 'Continue current care plan. Next routine vitals check per protocol.' })
   }
 
   return recs
@@ -683,6 +687,40 @@ export default function VitalsSimulatorPage() {
                     <div className="flex-1 min-w-0">
                       <p className="text-xs font-bold text-foreground">{rec.title}</p>
                       <p className="text-[11px] text-muted-foreground mt-1 leading-relaxed">{rec.description}</p>
+
+                      {/* ICD-10 & CPT Codes */}
+                      {rec.icdCode && (
+                        <div className="mt-2 space-y-1.5">
+                          <div className="flex items-center gap-1.5">
+                            <span className="text-[10px] px-1.5 py-0.5 bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 rounded font-mono font-bold">
+                              ICD-10: {rec.icdCode}
+                            </span>
+                            <span className="text-[10px] text-muted-foreground">{rec.icdDisplay}</span>
+                          </div>
+                          {rec.cptCodes && rec.cptCodes.length > 0 && (
+                            <div className="flex flex-wrap gap-1">
+                              {rec.cptCodes.map((cpt) => (
+                                <span
+                                  key={cpt.code}
+                                  className="text-[10px] px-1.5 py-0.5 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-700 dark:text-emerald-300 rounded font-mono"
+                                  title={cpt.display}
+                                >
+                                  CPT {cpt.code}
+                                </span>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      )}
+
+                      {/* Treatment Plan */}
+                      {rec.treatment && (
+                        <div className="mt-2 p-2 bg-muted/50 rounded border border-muted">
+                          <p className="text-[10px] font-semibold text-foreground mb-0.5">Recommended Treatment</p>
+                          <p className="text-[10px] text-muted-foreground leading-relaxed">{rec.treatment}</p>
+                        </div>
+                      )}
+
                       <div className="flex items-center gap-2 mt-2">
                         <span className="text-[10px] px-1.5 py-0.5 bg-muted rounded font-medium text-muted-foreground">
                           {rec.agent}
