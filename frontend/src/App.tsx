@@ -1,5 +1,5 @@
-import React, { Component, Suspense, useEffect } from 'react'
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import React, { Component, Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '@/store/authStore'
 import MainLayout from '@/components/layout/MainLayout'
@@ -131,20 +131,9 @@ interface ProtectedRouteProps {
 
 function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore()
-  const location = useLocation()
-  const navigate = useNavigate()
 
-  // Redirect to login after logout — useEffect avoids conflicts with
-  // AnimatePresence exit animations that caused blank screens
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: location }, replace: true })
-    }
-  }, [isAuthenticated, navigate, location])
-
-  if (!isAuthenticated) {
-    return null
-  }
+  // Auth redirect is handled at App level (before AnimatePresence)
+  if (!isAuthenticated) return null
 
   if (requiredRoles && user && !requiredRoles.includes(user.role)) {
     const fallback =
@@ -176,9 +165,19 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Public paths that don't require authentication
+const PUBLIC_PATHS = ['/login', '/register', '/verify-email']
+
 export default function App() {
   const location = useLocation()
   const { isAuthenticated, user } = useAuthStore()
+
+  // Redirect to login BEFORE AnimatePresence renders protected routes.
+  // This avoids the blank-page deadlock caused by Navigate inside
+  // AnimatePresence mode="wait" exit animations.
+  if (!isAuthenticated && !PUBLIC_PATHS.includes(location.pathname)) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
 
   return (
     <ErrorBoundary>
