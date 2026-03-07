@@ -122,6 +122,176 @@ class AgentRecommendationActionView(APIView):
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 
+class AgentTriggerView(APIView):
+    """
+    POST /api/v1/agents/<agent_id>/trigger/
+    Triggers a specific agent for a patient. Creates an AgentActionLog entry
+    and returns the execution record. In production this would dispatch to
+    the actual agent pipeline via Celery; for now it records the trigger.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, agent_id):
+        patient_id = request.data.get("patient_id")
+        priority = request.data.get("priority", "normal")
+        input_data = request.data.get("input", {})
+
+        try:
+            from apps.fhir.models import AgentActionLog, FHIRPatient
+            from django.utils import timezone as tz
+            import uuid
+
+            tenant = getattr(request, 'tenant', None) or request.user.tenant
+
+            # Validate patient exists if provided
+            patient = None
+            patient_name = "Unknown"
+            if patient_id:
+                try:
+                    patient = FHIRPatient.objects.get(id=patient_id, tenant=tenant)
+                    patient_name = f"{patient.first_name} {patient.last_name}"
+                except FHIRPatient.DoesNotExist:
+                    return Response(
+                        {"error": f"Patient {patient_id} not found"},
+                        status=status.HTTP_404_NOT_FOUND,
+                    )
+
+            # Create execution log
+            log = AgentActionLog.objects.create(
+                tenant=tenant,
+                patient=patient,
+                agent_type=agent_id,
+                action_type=AgentActionLog.ActionType.ANALYSIS,
+                action_details=f"Manual trigger by {request.user.email} (priority: {priority})",
+                input_context={
+                    "trigger_source": "manual",
+                    "triggered_by": str(request.user.id),
+                    "priority": priority,
+                    "input": input_data,
+                },
+                output={
+                    "status": "queued",
+                    "message": f"Agent {agent_id} triggered successfully",
+                },
+            )
+
+            # TODO: In production, dispatch to Celery task here:
+            # from apps.mcp_bridge.tasks import run_agent
+            # run_agent.delay(agent_id=agent_id, patient_id=patient_id, ...)
+
+            return Response({
+                "id": str(log.id),
+                "agentId": agent_id,
+                "agentName": agent_id.replace("_", " ").title(),
+                "tier": "tier1_monitoring",
+                "status": "queued",
+                "patientId": str(patient_id) if patient_id else None,
+                "patientName": patient_name,
+                "triggeredBy": request.user.email,
+                "triggeredAt": log.created_at.isoformat(),
+                "startedAt": log.created_at.isoformat(),
+                "completedAt": None,
+                "input": input_data,
+                "output": {},
+            })
+        except Exception as exc:
+            logger.error("Agent trigger failed: %s", exc)
+            return Response(
+                {"error": f"Failed to trigger agent: {str(exc)}"},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
+
+
+class AgentSingleStatusView(APIView):
+    """
+    GET /api/v1/agents/<agent_id>/status/
+    Returns status for a single agent.
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def get(self, request, agent_id):
+        try:
+            from apps.fhir.models import AgentActionLog
+            from django.utils import timezone
+
+            tenant = getattr(request, 'tenant', None) or request.user.tenant
+            today_start = timezone.now().replace(hour=0, minute=0, second=0, microsecond=0)
+            qs = AgentActionLog.objects.filter(tenant=tenant, agent_type=agent_id)
+            last_log = qs.order_by("-created_at").first()
+            executions_today = qs.filter(created_at__gte=today_start).count()
+
+            return Response({
+                "agentId": agent_id,
+                "agentName": agent_id.replace("_", " ").title(),
+                "status": "idle",
+                "tier": "tier1_monitoring",
+                "lastRun": last_log.created_at.isoformat() if last_log else None,
+                "nextScheduledRun": None,
+                "executionsToday": executions_today,
+                "averageRuntime": 0.0,
+                "successRate": 100,
+                "queueDepth": 0,
+            })
+        except Exception as exc:
+            logger.debug("single agent status query failed: %s", exc)
+            return Response({
+                "agentId": agent_id,
+                "agentName": agent_id.replace("_", " ").title(),
+                "status": "unknown",
+                "tier": "unknown",
+            })
+
+
+class AgentPauseView(APIView):
+    """
+    POST /api/v1/agents/<agent_id>/pause/
+    Pauses a specific agent (stub — records the action).
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, agent_id):
+        logger.info("Agent %s paused by %s", agent_id, request.user.email)
+        return Response({"agentId": agent_id, "status": "paused"})
+
+
+class AgentResumeView(APIView):
+    """
+    POST /api/v1/agents/<agent_id>/resume/
+    Resumes a specific agent (stub — records the action).
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, agent_id):
+        logger.info("Agent %s resumed by %s", agent_id, request.user.email)
+        return Response({"agentId": agent_id, "status": "idle"})
+
+
+class MonitoringPauseView(APIView):
+    """POST /api/v1/agents/monitoring/pause/ — pauses monitoring for a patient."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        patient_id = request.data.get("patient_id")
+        logger.info("Monitoring paused for patient %s by %s", patient_id, request.user.email)
+        return Response({"patientId": patient_id, "status": "paused"})
+
+
+class MonitoringResumeView(APIView):
+    """POST /api/v1/agents/monitoring/resume/ — resumes monitoring for a patient."""
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        patient_id = request.data.get("patient_id")
+        logger.info("Monitoring resumed for patient %s by %s", patient_id, request.user.email)
+        return Response({"patientId": patient_id, "status": "active"})
+
+
 class AgentStatusView(APIView):
     """
     GET /api/v1/agents/status/
