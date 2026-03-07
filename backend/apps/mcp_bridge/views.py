@@ -137,12 +137,32 @@ class AgentTriggerView(APIView):
         priority = request.data.get("priority", "normal")
         input_data = request.data.get("input", {})
 
+        # Map frontend agent IDs to valid AgentType choices
+        _AGENT_TYPE_MAP = {
+            "vital_signs_agent": "triage",
+            "vitals_monitor": "triage",
+            "temperature_agent": "triage",
+            "triage_agent": "triage",
+            "triage": "triage",
+            "medication_reviewer": "medication",
+            "medication_safety": "medication",
+            "medication": "medication",
+            "care_plan_optimizer": "care_plan",
+            "care_plan": "care_plan",
+            "lab_analyzer": "diagnostic",
+            "diagnostic": "diagnostic",
+            "risk_stratifier": "diagnostic",
+            "research": "research",
+            "patient_engagement": "patient_engagement",
+            "population_health": "population_health",
+            "orchestrator": "orchestrator",
+        }
+
         try:
             from apps.fhir.models import AgentActionLog, FHIRPatient
-            from django.utils import timezone as tz
-            import uuid
 
             tenant = getattr(request, 'tenant', None) or request.user.tenant
+            mapped_agent_type = _AGENT_TYPE_MAP.get(agent_id, "triage")
 
             # Validate patient exists if provided
             patient = None
@@ -161,14 +181,15 @@ class AgentTriggerView(APIView):
             log = AgentActionLog.objects.create(
                 tenant=tenant,
                 patient=patient,
-                agent_type=agent_id,
-                action_type=AgentActionLog.ActionType.ANALYSIS,
-                action_details=f"Manual trigger by {request.user.email} (priority: {priority})",
+                agent_type=mapped_agent_type,
+                action_type=AgentActionLog.ActionType.ALERT_GENERATED,
+                action_details={"description": f"Manual trigger by {request.user.email} (priority: {priority})"},
                 input_context={
                     "trigger_source": "manual",
                     "triggered_by": str(request.user.id),
                     "priority": priority,
                     "input": input_data,
+                    "original_agent_id": agent_id,
                 },
                 output={
                     "status": "queued",
