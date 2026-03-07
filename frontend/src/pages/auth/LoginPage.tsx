@@ -45,7 +45,7 @@ export default function LoginPage() {
     document.documentElement.classList.contains('dark'),
   )
 
-  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/dashboard'
+  const from = (location.state as { from?: { pathname: string } })?.from?.pathname ?? '/'
 
   const {
     register,

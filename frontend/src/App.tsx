@@ -138,7 +138,15 @@ function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   }
 
   if (requiredRoles && user && !requiredRoles.includes(user.role)) {
-    return <Navigate to="/dashboard" replace />
+    // Role-aware fallback — send each role to their own dashboard
+    const fallback =
+      user.role === 'patient' ? '/dashboard/patient'
+      : user.role === 'researcher' ? '/dashboard/researcher'
+      : user.role === 'nurse' ? '/dashboard/nurse'
+      : user.role === 'pharmacist' ? '/dashboard/pharmacist'
+      : user.role === 'billing' ? '/billing'
+      : '/dashboard'
+    return <Navigate to={fallback} replace />
   }
 
   return <>{children}</>

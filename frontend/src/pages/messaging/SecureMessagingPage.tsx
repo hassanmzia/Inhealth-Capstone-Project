@@ -78,7 +78,13 @@ export default function SecureMessagingPage() {
         const res = await api.get<MessageThread[]>('/notifications/', {
           params: { type: 'message' },
         })
-        return res.data
+        // API may return paginated {results:[]} or plain array
+        const data = res.data
+        if (Array.isArray(data)) return data
+        if (data && Array.isArray((data as Record<string, unknown>).results)) {
+          return (data as Record<string, unknown>).results as MessageThread[]
+        }
+        return null
       } catch {
         return null
       }
@@ -93,7 +99,12 @@ export default function SecureMessagingPage() {
       if (!selectedThread) return []
       try {
         const res = await api.get<Message[]>(`/notifications/${selectedThread}/messages/`)
-        return res.data
+        const data = res.data
+        if (Array.isArray(data)) return data
+        if (data && Array.isArray((data as Record<string, unknown>).results)) {
+          return (data as Record<string, unknown>).results as Message[]
+        }
+        return null
       } catch {
         return null
       }
@@ -114,8 +125,8 @@ export default function SecureMessagingPage() {
     },
   })
 
-  const threadList = threads ?? placeholderThreads
-  const messageList = messages ?? (selectedThread ? placeholderMessages[selectedThread] ?? [] : [])
+  const threadList = (Array.isArray(threads) ? threads : null) ?? placeholderThreads
+  const messageList = (Array.isArray(messages) ? messages : null) ?? (selectedThread ? placeholderMessages[selectedThread] ?? [] : [])
   const selectedThreadData = threadList.find(t => t.id === selectedThread)
 
   const filteredThreads = searchQuery
