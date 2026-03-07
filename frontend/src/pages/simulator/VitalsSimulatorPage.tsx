@@ -1,5 +1,5 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useQuery, useMutation } from '@tanstack/react-query'
+import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   Activity,
@@ -323,11 +323,19 @@ export default function VitalsSimulatorPage() {
 
   const patients = patientsData?.results ?? []
 
-  // Post vitals to backend
-  const postVitalsMutation = useMutation({
-    mutationFn: async (reading: GeneratedReading) => {
+  // Refs for stable references in tick callback (avoids interval restart on every render)
+  const selectedPatientIdRef = useRef(selectedPatientId)
+  selectedPatientIdRef.current = selectedPatientId
+  const paramsRef = useRef(params)
+  paramsRef.current = params
+  const intervalMsRef = useRef(intervalMs)
+  intervalMsRef.current = intervalMs
+
+  // Post vitals to backend (fire-and-forget, errors are silently caught)
+  const postVitals = useCallback(async (reading: GeneratedReading) => {
+    try {
       await api.post('/clinical/vitals/', {
-        patient_id: selectedPatientId,
+        patient_id: selectedPatientIdRef.current,
         readings: Object.entries(reading.values).map(([key, value]) => ({
           vital_type: key,
           value,
@@ -335,28 +343,29 @@ export default function VitalsSimulatorPage() {
           source: 'simulator',
         })),
       })
-    },
-  })
+    } catch {
+      // Backend may not have this endpoint — silently ignore
+    }
+  }, [])
 
-  // Fetch AI recommendations from backend
-  const fetchAIRecommendations = useMutation({
-    mutationFn: async () => {
+  // Fetch AI recommendations from backend (errors silently caught)
+  const fetchBackendRecommendations = useCallback(async () => {
+    try {
       const res = await api.get('/agents/recommendations/', {
-        params: { patient_id: selectedPatientId, limit: 10 },
+        params: { patient_id: selectedPatientIdRef.current, limit: 10 },
       })
-      return res.data
-    },
-    onSuccess: (data) => {
-      if (Array.isArray(data) && data.length > 0) {
-        setRecommendations(data)
+      if (Array.isArray(res.data) && res.data.length > 0) {
+        setRecommendations(res.data)
       }
-    },
-  })
+    } catch {
+      // Backend may not have this endpoint — use local recommendations only
+    }
+  }, [])
 
   const tick = useCallback(() => {
     readingCountRef.current += 1
-    const timeLabel = `T+${readingCountRef.current * (intervalMs / 1000)}s`
-    const reading = generateReading(params, timeLabel)
+    const timeLabel = `T+${readingCountRef.current * (intervalMsRef.current / 1000)}s`
+    const reading = generateReading(paramsRef.current, timeLabel)
 
     setReadings((prev) => {
       const next = [...prev, reading]
@@ -370,14 +379,14 @@ export default function VitalsSimulatorPage() {
       return prev
     })
 
-    // Try to post to backend (fire and forget)
-    postVitalsMutation.mutate(reading)
+    // Try to post to backend (fire and forget — won't crash on failure)
+    postVitals(reading)
 
     // Try to fetch backend AI recommendations periodically
     if (readingCountRef.current % 5 === 0) {
-      fetchAIRecommendations.mutate()
+      fetchBackendRecommendations()
     }
-  }, [params, intervalMs, selectedPatientId, postVitalsMutation, fetchAIRecommendations])
+  }, [postVitals, fetchBackendRecommendations])
 
   const startSimulation = () => {
     if (isRunning) return
