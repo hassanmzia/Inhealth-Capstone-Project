@@ -241,10 +241,12 @@ class MCPAgent(ABC):
     async def get_mcp_context(self, patient_id: str) -> Dict[str, Any]:
         """
         Build the MCP-formatted context for this agent:
-          - Patient demographics and active conditions from FHIR
+          - Patient demographics, conditions, medications, allergies from FHIR
+          - Recent encounters and diagnostic reports for clinical context
           - Relevant clinical guidelines via RAG (Qdrant)
           - Agent-specific tool constraints and permissions
         """
+        import asyncio
         import httpx
 
         context: Dict[str, Any] = {
@@ -259,15 +261,27 @@ class MCPAgent(ABC):
             },
         }
 
-        # Fetch patient demographics from FHIR
+        # Fetch comprehensive patient data from FHIR in parallel
         try:
             async with httpx.AsyncClient(timeout=10.0) as client:
-                resp = await client.get(
-                    f"{self._fhir_base_url}/Patient/{patient_id}",
-                    headers={"Accept": "application/fhir+json"},
+                headers = {"Accept": "application/fhir+json"}
+                base = self._fhir_base_url
+
+                patient_req = client.get(f"{base}/Patient/{patient_id}", headers=headers)
+                conditions_req = client.get(f"{base}/Condition", params={"patient": patient_id, "clinical-status": "active"}, headers=headers)
+                meds_req = client.get(f"{base}/MedicationRequest", params={"patient": patient_id, "status": "active"}, headers=headers)
+                allergies_req = client.get(f"{base}/AllergyIntolerance", params={"patient": patient_id}, headers=headers)
+                encounters_req = client.get(f"{base}/Encounter", params={"patient": patient_id}, headers=headers)
+                reports_req = client.get(f"{base}/DiagnosticReport", params={"patient": patient_id}, headers=headers)
+
+                results = await asyncio.gather(
+                    patient_req, conditions_req, meds_req, allergies_req, encounters_req, reports_req,
+                    return_exceptions=True,
                 )
-                if resp.status_code == 200:
-                    patient_data = resp.json()
+
+                # Patient demographics
+                if not isinstance(results[0], Exception) and results[0].status_code == 200:
+                    patient_data = results[0].json()
                     context["patient"] = {
                         "id": patient_id,
                         "birthDate": patient_data.get("birthDate", ""),
@@ -276,9 +290,72 @@ class MCPAgent(ABC):
                     }
                 else:
                     context["patient"] = {"id": patient_id}
+
+                # Active conditions
+                if not isinstance(results[1], Exception) and results[1].status_code == 200:
+                    bundle = results[1].json()
+                    context["conditions"] = [
+                        {"code": e.get("resource", {}).get("code", {}).get("coding", [{}])[0].get("code", ""),
+                         "display": e.get("resource", {}).get("code", {}).get("coding", [{}])[0].get("display", "")}
+                        for e in bundle.get("entry", [])
+                    ]
+                else:
+                    context["conditions"] = []
+
+                # Active medications
+                if not isinstance(results[2], Exception) and results[2].status_code == 200:
+                    bundle = results[2].json()
+                    context["medications"] = [
+                        {"display": e.get("resource", {}).get("medicationCodeableConcept", {}).get("coding", [{}])[0].get("display", ""),
+                         "dosage": e.get("resource", {}).get("dosageInstruction", [{}])[0].get("text", "") if e.get("resource", {}).get("dosageInstruction") else ""}
+                        for e in bundle.get("entry", [])
+                    ]
+                else:
+                    context["medications"] = []
+
+                # Allergies
+                if not isinstance(results[3], Exception) and results[3].status_code == 200:
+                    bundle = results[3].json()
+                    context["allergies"] = [
+                        {"display": e.get("resource", {}).get("code", {}).get("coding", [{}])[0].get("display", ""),
+                         "criticality": e.get("resource", {}).get("criticality", "")}
+                        for e in bundle.get("entry", [])
+                    ]
+                else:
+                    context["allergies"] = []
+
+                # Recent encounters
+                if not isinstance(results[4], Exception) and results[4].status_code == 200:
+                    bundle = results[4].json()
+                    context["recent_encounters"] = [
+                        {"type": e.get("resource", {}).get("type", [{}])[0].get("coding", [{}])[0].get("display", ""),
+                         "reason": e.get("resource", {}).get("reasonCode", [{}])[0].get("coding", [{}])[0].get("display", "") if e.get("resource", {}).get("reasonCode") else "",
+                         "date": e.get("resource", {}).get("period", {}).get("start", "")}
+                        for e in bundle.get("entry", [])[:10]
+                    ]
+                else:
+                    context["recent_encounters"] = []
+
+                # Diagnostic reports
+                if not isinstance(results[5], Exception) and results[5].status_code == 200:
+                    bundle = results[5].json()
+                    context["diagnostic_reports"] = [
+                        {"display": e.get("resource", {}).get("code", {}).get("coding", [{}])[0].get("display", ""),
+                         "conclusion": e.get("resource", {}).get("conclusion", ""),
+                         "date": e.get("resource", {}).get("effectiveDateTime", "")}
+                        for e in bundle.get("entry", [])[:20]
+                    ]
+                else:
+                    context["diagnostic_reports"] = []
+
         except Exception as exc:
-            logger.debug("FHIR patient fetch failed: %s", exc)
+            logger.debug("FHIR patient data fetch failed: %s", exc)
             context["patient"] = {"id": patient_id}
+            context["conditions"] = []
+            context["medications"] = []
+            context["allergies"] = []
+            context["recent_encounters"] = []
+            context["diagnostic_reports"] = []
 
         # Retrieve relevant guidelines via RAG
         try:

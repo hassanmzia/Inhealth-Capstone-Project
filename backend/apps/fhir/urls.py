@@ -11,6 +11,8 @@ from .views import (
     FHIRAppointmentViewSet,
     FHIRCarePlanViewSet,
     FHIRConditionViewSet,
+    FHIRDiagnosticReportViewSet,
+    FHIRDocumentReferenceViewSet,
     FHIREncounterViewSet,
     FHIRImmunizationViewSet,
     FHIRMedicationRequestViewSet,
@@ -30,6 +32,8 @@ router.register("Appointment", FHIRAppointmentViewSet, basename="fhir-appointmen
 router.register("CarePlan", FHIRCarePlanViewSet, basename="fhir-care-plan")
 router.register("Encounter", FHIREncounterViewSet, basename="fhir-encounter")
 router.register("Immunization", FHIRImmunizationViewSet, basename="fhir-immunization")
+router.register("DiagnosticReport", FHIRDiagnosticReportViewSet, basename="fhir-diagnostic-report")
+router.register("DocumentReference", FHIRDocumentReferenceViewSet, basename="fhir-document-reference")
 
 urlpatterns = [
     path("", include(router.urls)),

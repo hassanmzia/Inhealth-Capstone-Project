@@ -205,6 +205,22 @@ class FHIRDocumentReferenceSerializer(serializers.ModelSerializer):
         return "DocumentReference"
 
 
+class FHIRDiagnosticReportSerializer(serializers.ModelSerializer):
+    resourceType = serializers.SerializerMethodField()
+
+    class Meta:
+        model = FHIRDiagnosticReport
+        fields = [
+            "resourceType", "fhir_id", "status", "category_code",
+            "code", "display", "effective_datetime", "issued",
+            "conclusion", "conclusion_code", "presented_form",
+            "meta_version_id", "meta_last_updated",
+        ]
+
+    def get_resourceType(self, obj):
+        return "DiagnosticReport"
+
+
 class AgentActionLogSerializer(serializers.ModelSerializer):
     class Meta:
         model = AgentActionLog

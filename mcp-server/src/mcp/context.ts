@@ -10,6 +10,9 @@ import {
   Allergy,
   AllergyReaction,
   RiskScore,
+  EncounterNote,
+  DiagnosticReportSummary,
+  ClinicalNote,
   ClinicalConstraints,
   VectorSearchResult,
   Message,
@@ -70,6 +73,9 @@ export async function fetchPatientFromFHIR(patientId: string): Promise<PatientCo
       vitalsResponse,
       allergiesResponse,
       riskScoresResponse,
+      encountersResponse,
+      diagnosticReportsResponse,
+      documentRefsResponse,
     ] = await Promise.all([
       djangoClient.get(`/api/fhir/Patient/${patientId}/`),
       djangoClient.get(`/api/fhir/query/`, {
@@ -85,6 +91,15 @@ export async function fetchPatientFromFHIR(patientId: string): Promise<PatientCo
         params: { patient_id: patientId, resource_type: "AllergyIntolerance", limit: 50 },
       }),
       djangoClient.get(`/api/ml/risk-scores/${patientId}/`).catch(() => ({ data: { scores: [] } })),
+      djangoClient.get(`/api/fhir/query/`, {
+        params: { patient_id: patientId, resource_type: "Encounter", limit: 10, sort: "-date" },
+      }).catch(() => ({ data: { entry: [] } })),
+      djangoClient.get(`/api/fhir/query/`, {
+        params: { patient_id: patientId, resource_type: "DiagnosticReport", limit: 20, sort: "-date" },
+      }).catch(() => ({ data: { entry: [] } })),
+      djangoClient.get(`/api/fhir/query/`, {
+        params: { patient_id: patientId, resource_type: "DocumentReference", limit: 10, sort: "-date" },
+      }).catch(() => ({ data: { entry: [] } })),
     ]);
 
     const fhirPatient = patientResponse.data as FHIRPatientData;
@@ -94,6 +109,9 @@ export async function fetchPatientFromFHIR(patientId: string): Promise<PatientCo
     const vitals = parseVitals(vitalsResponse.data);
     const allergies = parseAllergies(allergiesResponse.data);
     const riskScores = parseRiskScores(riskScoresResponse.data);
+    const encounters = parseEncounters(encountersResponse.data);
+    const diagnosticReports = parseDiagnosticReports(diagnosticReportsResponse.data);
+    const clinicalNotes = parseClinicalNotes(documentRefsResponse.data);
 
     return {
       id: patientId,
@@ -103,6 +121,9 @@ export async function fetchPatientFromFHIR(patientId: string): Promise<PatientCo
       recent_vitals: vitals,
       allergies,
       risk_scores: riskScores,
+      recent_encounters: encounters,
+      diagnostic_reports: diagnosticReports,
+      clinical_notes: clinicalNotes,
     };
   } catch (error) {
     logger.error("fetchPatientFromFHIR: failed", {
@@ -377,6 +398,127 @@ function parseAllergies(data: { entry?: FHIRAllergyEntry[] }): Allergy[] {
     })
     .filter((a): a is Allergy => a !== null);
 }
+
+// ── Encounter parsing ─────────────────────────────────────────────────────────
+
+interface FHIREncounterEntry {
+  resource?: {
+    id?: string;
+    status?: string;
+    class?: { code?: string; display?: string };
+    type?: Array<{ coding?: Array<{ display?: string }> }>;
+    reasonCode?: Array<{ coding?: Array<{ display?: string }> }>;
+    period?: { start?: string; end?: string };
+    hospitalization?: { dischargeDisposition?: { coding?: Array<{ display?: string }> } };
+    extension?: Array<{
+      url?: string;
+      valueString?: string;
+    }>;
+  };
+}
+
+function parseEncounters(data: { entry?: FHIREncounterEntry[] }): EncounterNote[] {
+  const entries = data.entry || [];
+  return entries
+    .map((entry) => {
+      const resource = entry.resource;
+      if (!resource) return null;
+
+      // Extract SOAP notes from extensions if available
+      const soapNotes: EncounterNote["soap_notes"] = {};
+      for (const ext of resource.extension || []) {
+        if (ext.url?.includes("chief-complaint")) soapNotes.chief_complaint = ext.valueString;
+        if (ext.url?.includes("assessment")) soapNotes.assessment = ext.valueString;
+        if (ext.url?.includes("treatment-plan")) soapNotes.treatment_plan = ext.valueString;
+      }
+
+      return {
+        id: resource.id || "",
+        status: (resource.status || "finished") as EncounterNote["status"],
+        encounter_class: resource.class?.code || "ambulatory",
+        type_display: resource.type?.[0]?.coding?.[0]?.display || "Clinical visit",
+        reason_display: resource.reasonCode?.[0]?.coding?.[0]?.display,
+        period_start: resource.period?.start || new Date().toISOString(),
+        period_end: resource.period?.end,
+        discharge_disposition: resource.hospitalization?.dischargeDisposition?.coding?.[0]?.display,
+        soap_notes: Object.keys(soapNotes).length > 0 ? soapNotes : undefined,
+      } as EncounterNote;
+    })
+    .filter((e): e is EncounterNote => e !== null);
+}
+
+// ── Diagnostic Report parsing ─────────────────────────────────────────────────
+
+interface FHIRDiagnosticReportEntry {
+  resource?: {
+    id?: string;
+    status?: string;
+    category?: Array<{ coding?: Array<{ code?: string; display?: string }> }>;
+    code?: { coding?: Array<{ code?: string; display?: string }> };
+    effectiveDateTime?: string;
+    conclusion?: string;
+    result?: Array<{ display?: string }>;
+  };
+}
+
+function parseDiagnosticReports(data: { entry?: FHIRDiagnosticReportEntry[] }): DiagnosticReportSummary[] {
+  const entries = data.entry || [];
+  return entries
+    .map((entry) => {
+      const resource = entry.resource;
+      if (!resource) return null;
+      const coding = resource.code?.coding?.[0];
+      const categoryCoding = resource.category?.[0]?.coding?.[0];
+
+      return {
+        id: resource.id || "",
+        status: (resource.status || "final") as DiagnosticReportSummary["status"],
+        category: categoryCoding?.code || "LAB",
+        code: coding?.code || "",
+        display: coding?.display || "Unknown Report",
+        effective_date: resource.effectiveDateTime || new Date().toISOString(),
+        conclusion: resource.conclusion,
+        results_summary: resource.result?.map((r) => r.display).filter(Boolean).join("; "),
+      } as DiagnosticReportSummary;
+    })
+    .filter((r): r is DiagnosticReportSummary => r !== null);
+}
+
+// ── Clinical Notes (DocumentReference) parsing ────────────────────────────────
+
+interface FHIRDocumentRefEntry {
+  resource?: {
+    id?: string;
+    type?: { coding?: Array<{ code?: string; display?: string }> };
+    date?: string;
+    description?: string;
+    content?: Array<{ attachment?: { title?: string } }>;
+    category?: Array<{ coding?: Array<{ display?: string }> }>;
+  };
+}
+
+function parseClinicalNotes(data: { entry?: FHIRDocumentRefEntry[] }): ClinicalNote[] {
+  const entries = data.entry || [];
+  return entries
+    .map((entry) => {
+      const resource = entry.resource;
+      if (!resource) return null;
+      const typeCoding = resource.type?.coding?.[0];
+
+      return {
+        id: resource.id || "",
+        type_code: typeCoding?.code || "",
+        type_display: typeCoding?.display || "Clinical Note",
+        date: resource.date || new Date().toISOString(),
+        description: resource.description,
+        content_title: resource.content?.[0]?.attachment?.title,
+        category: resource.category?.[0]?.coding?.[0]?.display,
+      } as ClinicalNote;
+    })
+    .filter((n): n is ClinicalNote => n !== null);
+}
+
+// ── Risk Scores ───────────────────────────────────────────────────────────────
 
 interface RiskScoresData {
   scores?: Array<{
