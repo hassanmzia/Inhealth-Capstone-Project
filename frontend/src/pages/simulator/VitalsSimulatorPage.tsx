@@ -1,5 +1,4 @@
 import { useState, useCallback, useRef, useEffect } from 'react'
-import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   Activity,
@@ -21,7 +20,6 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine,
 } from 'recharts'
-import api from '@/services/api'
 import { cn } from '@/lib/utils'
 
 const CONTAINER = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
@@ -168,8 +166,8 @@ function generateReading(
     const p = params[config.key]
     if (!p) continue
 
-    // Gaussian-ish noise using Box-Muller
-    const u1 = Math.random()
+    // Gaussian-ish noise using Box-Muller (clamp u1 away from 0 to avoid -Infinity from log)
+    const u1 = Math.max(1e-10, Math.random())
     const u2 = Math.random()
     const gaussian = Math.sqrt(-2 * Math.log(u1)) * Math.cos(2 * Math.PI * u2)
 
@@ -306,61 +304,20 @@ export default function VitalsSimulatorPage() {
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const readingCountRef = useRef(0)
 
-  // Fetch patients
-  const { data: patientsData } = useQuery({
-    queryKey: ['sim-patients'],
-    queryFn: () => api.get('/patients/').then((r) => r.data),
-    placeholderData: {
-      results: [
-        { id: 'p1', name: 'Maria Garcia' },
-        { id: 'p2', name: 'James Wilson' },
-        { id: 'p3', name: 'Susan Chen' },
-        { id: 'p4', name: 'Robert Johnson' },
-        { id: 'p5', name: 'Aisha Patel' },
-      ] as Patient[],
-    },
-  })
-
-  const patients = patientsData?.results ?? []
+  // Static patient list (no backend dependency)
+  const patients: Patient[] = [
+    { id: 'p1', name: 'Maria Garcia' },
+    { id: 'p2', name: 'James Wilson' },
+    { id: 'p3', name: 'Susan Chen' },
+    { id: 'p4', name: 'Robert Johnson' },
+    { id: 'p5', name: 'Aisha Patel' },
+  ]
 
   // Refs for stable references in tick callback (avoids interval restart on every render)
-  const selectedPatientIdRef = useRef(selectedPatientId)
-  selectedPatientIdRef.current = selectedPatientId
   const paramsRef = useRef(params)
   paramsRef.current = params
   const intervalMsRef = useRef(intervalMs)
   intervalMsRef.current = intervalMs
-
-  // Post vitals to backend (fire-and-forget, errors are silently caught)
-  const postVitals = useCallback(async (reading: GeneratedReading) => {
-    try {
-      await api.post('/clinical/vitals/', {
-        patient_id: selectedPatientIdRef.current,
-        readings: Object.entries(reading.values).map(([key, value]) => ({
-          vital_type: key,
-          value,
-          timestamp: new Date().toISOString(),
-          source: 'simulator',
-        })),
-      })
-    } catch {
-      // Backend may not have this endpoint — silently ignore
-    }
-  }, [])
-
-  // Fetch AI recommendations from backend (errors silently caught)
-  const fetchBackendRecommendations = useCallback(async () => {
-    try {
-      const res = await api.get('/agents/recommendations/', {
-        params: { patient_id: selectedPatientIdRef.current, limit: 10 },
-      })
-      if (Array.isArray(res.data) && res.data.length > 0) {
-        setRecommendations(res.data)
-      }
-    } catch {
-      // Backend may not have this endpoint — use local recommendations only
-    }
-  }, [])
 
   const tick = useCallback(() => {
     readingCountRef.current += 1
@@ -369,24 +326,14 @@ export default function VitalsSimulatorPage() {
 
     setReadings((prev) => {
       const next = [...prev, reading]
-      return next.length > 60 ? next.slice(-60) : next
+      const trimmed = next.length > 60 ? next.slice(-60) : next
+      // Generate local AI recommendations from latest readings
+      const recs = generateLocalRecommendations(trimmed)
+      // Use queueMicrotask to avoid setting state inside setState
+      queueMicrotask(() => setRecommendations(recs))
+      return trimmed
     })
-
-    // Generate local AI recommendations
-    setReadings((prev) => {
-      const recs = generateLocalRecommendations(prev)
-      setRecommendations(recs)
-      return prev
-    })
-
-    // Try to post to backend (fire and forget — won't crash on failure)
-    postVitals(reading)
-
-    // Try to fetch backend AI recommendations periodically
-    if (readingCountRef.current % 5 === 0) {
-      fetchBackendRecommendations()
-    }
-  }, [postVitals, fetchBackendRecommendations])
+  }, [])
 
   const startSimulation = () => {
     if (isRunning) return
