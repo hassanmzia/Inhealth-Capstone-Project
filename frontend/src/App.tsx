@@ -1,5 +1,5 @@
-import React, { Component, Suspense, useEffect } from 'react'
-import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
+import React, { Component, Suspense } from 'react'
+import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '@/store/authStore'
 import MainLayout from '@/components/layout/MainLayout'
@@ -132,18 +132,11 @@ interface ProtectedRouteProps {
 function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore()
   const location = useLocation()
-  const navigate = useNavigate()
-
-  // Redirect to login after logout — useEffect avoids conflicts with
-  // AnimatePresence exit animations that caused blank screens
-  useEffect(() => {
-    if (!isAuthenticated) {
-      navigate('/login', { state: { from: location }, replace: true })
-    }
-  }, [isAuthenticated, navigate, location])
 
   if (!isAuthenticated) {
-    return null
+    // Use key on Navigate to avoid AnimatePresence conflicts during logout.
+    // The key ensures React treats each redirect as a unique element.
+    return <Navigate to="/login" state={{ from: location }} replace key="auth-redirect" />
   }
 
   if (requiredRoles && user && !requiredRoles.includes(user.role)) {
@@ -183,7 +176,7 @@ export default function App() {
   return (
     <ErrorBoundary>
       <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
+        <Routes location={location} key={`${isAuthenticated ? 'auth' : 'anon'}-${location.pathname}`}>
           {/* Public routes */}
           <Route
             path="/verify-email"

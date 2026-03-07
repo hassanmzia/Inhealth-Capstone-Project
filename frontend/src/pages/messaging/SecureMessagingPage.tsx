@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import {
   MessageSquare,
   Send,
@@ -70,50 +70,10 @@ export default function SecureMessagingPage() {
   const [newMessage, setNewMessage] = useState('')
   const [searchQuery, setSearchQuery] = useState('')
 
-  const isPlaceholderThread = selectedThread?.startsWith('t') && /^t\d+$/.test(selectedThread)
-
-  // Fetch threads
-  const { data: threads } = useQuery({
-    queryKey: ['message-threads'],
-    queryFn: async () => {
-      try {
-        const res = await api.get<MessageThread[]>('/notifications/', {
-          params: { type: 'message' },
-        })
-        // API may return paginated {results:[]} or plain array
-        const data = res.data
-        if (Array.isArray(data)) return data
-        if (data && Array.isArray((data as Record<string, unknown>).results)) {
-          return (data as Record<string, unknown>).results as MessageThread[]
-        }
-        return null
-      } catch {
-        return null
-      }
-    },
-    retry: false,
-  })
-
-  // Fetch messages for selected thread (skip for placeholder threads)
-  const { data: messages } = useQuery({
-    queryKey: ['messages', selectedThread],
-    queryFn: async () => {
-      if (!selectedThread) return []
-      try {
-        const res = await api.get<Message[]>(`/notifications/${selectedThread}/messages/`)
-        const data = res.data
-        if (Array.isArray(data)) return data
-        if (data && Array.isArray((data as Record<string, unknown>).results)) {
-          return (data as Record<string, unknown>).results as Message[]
-        }
-        return null
-      } catch {
-        return null
-      }
-    },
-    enabled: !!selectedThread && !isPlaceholderThread,
-    retry: false,
-  })
+  // NOTE: No dedicated messaging backend exists yet (notifications table
+  // also has no migrations). Use placeholder data until a messaging API is built.
+  const threads: MessageThread[] | null = null
+  const messages: Message[] | null = null
 
   // Send message mutation
   const sendMutation = useMutation({
