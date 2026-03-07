@@ -131,13 +131,9 @@ interface ProtectedRouteProps {
 
 function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore()
-  const location = useLocation()
 
-  if (!isAuthenticated) {
-    // Use key on Navigate to avoid AnimatePresence conflicts during logout.
-    // The key ensures React treats each redirect as a unique element.
-    return <Navigate to="/login" state={{ from: location }} replace key="auth-redirect" />
-  }
+  // Auth redirect is handled at App level (before AnimatePresence)
+  if (!isAuthenticated) return null
 
   if (requiredRoles && user && !requiredRoles.includes(user.role)) {
     const fallback =
@@ -169,14 +165,24 @@ function AnimatedPage({ children }: { children: React.ReactNode }) {
   )
 }
 
+// Public paths that don't require authentication
+const PUBLIC_PATHS = ['/login', '/register', '/verify-email']
+
 export default function App() {
   const location = useLocation()
   const { isAuthenticated, user } = useAuthStore()
 
+  // Redirect to login BEFORE AnimatePresence renders protected routes.
+  // This avoids the blank-page deadlock caused by Navigate inside
+  // AnimatePresence mode="wait" exit animations.
+  if (!isAuthenticated && !PUBLIC_PATHS.includes(location.pathname)) {
+    return <Navigate to="/login" state={{ from: location }} replace />
+  }
+
   return (
     <ErrorBoundary>
       <AnimatePresence mode="wait">
-        <Routes location={location} key={`${isAuthenticated ? 'auth' : 'anon'}-${location.pathname}`}>
+        <Routes location={location} key={location.pathname}>
           {/* Public routes */}
           <Route
             path="/verify-email"
