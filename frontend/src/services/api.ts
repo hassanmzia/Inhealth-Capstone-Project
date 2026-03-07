@@ -170,14 +170,20 @@ function getErrorMessage(error: AxiosError): string {
   const data = error.response.data as Record<string, unknown>
 
   // Try to extract message from various response formats
-  const message =
-    (data?.detail as string) ||
-    (data?.message as string) ||
-    (data?.error as string) ||
+  const raw =
+    data?.detail ||
+    data?.message ||
+    data?.error ||
     ((data?.errors as string[])?.join(', ')) ||
-    (data?.non_field_errors as string)
+    data?.non_field_errors
 
-  if (message) return String(message)
+  if (raw) {
+    if (typeof raw === 'string') return raw
+    // DRF sometimes returns detail as an object or array
+    if (Array.isArray(raw)) return raw.map(String).join(', ')
+    if (typeof raw === 'object') return JSON.stringify(raw)
+    return String(raw)
+  }
 
   switch (status) {
     case 400: return 'Invalid request. Please check your input.'

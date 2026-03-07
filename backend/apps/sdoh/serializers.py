@@ -23,12 +23,16 @@ class SDOHAssessmentSerializer(serializers.ModelSerializer):
         return obj.get_intervention_recommendations()
 
     def get_patient_name(self, obj):
-        return obj.patient.full_name if obj.patient else None
+        try:
+            return obj.patient.full_name if obj.patient else None
+        except Exception:
+            return None
 
     def get_assessed_by_name(self, obj):
-        if obj.assessed_by:
-            return obj.assessed_by.get_full_name()
-        return None
+        try:
+            return obj.assessed_by.get_full_name() if obj.assessed_by else None
+        except Exception:
+            return None
 
     def create(self, validated_data):
         validated_data["tenant"] = self.context["request"].user.tenant

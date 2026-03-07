@@ -19,7 +19,10 @@ class NotificationSerializer(serializers.ModelSerializer):
         ]
 
     def get_patient_name(self, obj):
-        return obj.patient.full_name if obj.patient else None
+        try:
+            return obj.patient.full_name if obj.patient else None
+        except Exception:
+            return None
 
 
 class NotificationTemplateSerializer(serializers.ModelSerializer):
