@@ -62,13 +62,13 @@ class FHIRBaseViewSet(GenericViewSet):
     def list(self, request):
         """FHIR search — GET /fhir/{ResourceType}"""
         qs = self.get_queryset()
-        serializer = self.get_serializer(qs, many=True)
         service = self.get_fhir_service()
         from django.conf import settings
+        resources = [r for r in qs]
         bundle = service.build_fhir_bundle(
             self.resource_type,
-            list(qs),
-            qs.count(),
+            resources,
+            len(resources),
             f"{settings.FHIR_BASE_URL}",
         )
         return Response(bundle)
@@ -76,14 +76,29 @@ class FHIRBaseViewSet(GenericViewSet):
     def retrieve(self, request, pk=None):
         """FHIR read — GET /fhir/{ResourceType}/{id}"""
         service = self.get_fhir_service()
+        # Try lookup by fhir_id first, then fall back to DB primary key
         resource = service.get_resource(self.resource_type, pk)
         if resource is None:
+            model = service.get_model(self.resource_type)
+            try:
+                resource = model.objects.get(pk=pk, tenant=service.tenant)
+            except (model.DoesNotExist, ValueError):
+                return Response(
+                    service.build_operation_outcome("error", "not-found", f"{self.resource_type}/{pk} not found"),
+                    status=status.HTTP_404_NOT_FOUND,
+                )
+        try:
+            serializer = self.get_serializer(resource)
+            return Response(serializer.data)
+        except Exception:
+            logger.exception("Failed to serialize %s/%s", self.resource_type, pk)
+            # Fall back to raw_resource if serializer fails
+            if resource.raw_resource:
+                return Response(resource.raw_resource)
             return Response(
-                service.build_operation_outcome("error", "not-found", f"{self.resource_type}/{pk} not found"),
-                status=status.HTTP_404_NOT_FOUND,
+                service.build_operation_outcome("error", "exception", f"Failed to serialize {self.resource_type}/{pk}"),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
             )
-        serializer = self.get_serializer(resource)
-        return Response(serializer.data)
 
     def create(self, request):
         """FHIR create — POST /fhir/{ResourceType}"""
