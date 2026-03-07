@@ -43,7 +43,13 @@
     - 17.5 [Database Seeding](#175-database-seeding)
     - 17.6 [Service Ports Reference](#176-service-ports-reference)
     - 17.7 [API Reference](#177-api-reference)
-    - 17.8 [Monitoring & Observability](#178-monitoring--observability)
+    - 17.8 [Nginx Reverse Proxy Routing](#178-nginx-reverse-proxy-routing)
+    - 17.9 [Database Architecture](#179-database-architecture)
+    - 17.10 [Celery Scheduled Tasks](#1710-celery-scheduled-tasks)
+    - 17.11 [Makefile Commands](#1711-makefile-commands)
+    - 17.12 [Monitoring & Observability](#1712-monitoring--observability)
+    - 17.13 [Kubernetes Deployment](#1713-kubernetes-deployment)
+    - 17.14 [Security & HIPAA Compliance](#1714-security--hipaa-compliance)
 18. [Troubleshooting](#18-troubleshooting)
 
 ---
@@ -699,24 +705,134 @@ The API is versioned under `/api/v1/`. Interactive documentation is available at
 | `/api/v1/tenants/` | Tenant/organization management |
 | `/api/health/` | Health check (no auth) |
 
-### 17.8 Monitoring & Observability
+### 17.8 Nginx Reverse Proxy Routing
+
+All traffic enters through the Nginx reverse proxy, which routes to the appropriate service:
+
+| Path | Upstream Service | Purpose |
+|------|------------------|---------|
+| `/` | frontend:3000 | React SPA |
+| `/api/*` | django:8000 | Django REST API |
+| `/ws/*` | django:8000 | WebSocket (Django Channels) |
+| `/agents/*` | agents-api:8001 | FastAPI Agent service |
+| `/mcp/*` | mcp-server:3003 | Model Context Protocol |
+| `/a2a/*` | a2a-gateway:3002 | Agent-to-Agent messaging |
+| `/static/*` | nginx local | Django collected static files |
+| `/media/*` | nginx local | User-uploaded files |
+
+### 17.9 Database Architecture
+
+#### PostgreSQL (Multi-Tenant)
+
+The platform uses **django-tenants** for schema-per-organization isolation:
+- Each organization gets its own PostgreSQL schema
+- Extensions: **pgvector** (vector similarity search), **PostGIS** (geospatial queries)
+- FHIR R4 resources stored as structured models (Patient, Observation, Condition, MedicationRequest, etc.)
+
+#### Neo4j (Clinical Knowledge Graph)
+
+11 node types and 17 relationship types for clinical reasoning:
+- **Nodes:** Patient, Disease, Medication, Symptom, LabTest, Gene, FamilyMember, ClinicalGuideline, Hospital, Procedure, DrugClass
+- **Relationships:** HAS_CONDITION, TAKES_MEDICATION, INTERACTS_WITH, CONTRAINDICATED_IN, TREATS, CAUSES_SYMPTOM, INCREASES_RISK_OF, RECOMMENDS, etc.
+- **Algorithms:** PageRank (risk scoring), Shortest Path (drug interactions), Community Detection (disease patterns)
+
+#### Qdrant (Vector Store)
+
+1536-dimensional embeddings across 5 collections:
+
+| Collection | Content | Used for |
+|------------|---------|----------|
+| clinical_guidelines | ADA, ACC/AHA, GOLD, KDIGO guidelines | Evidence-based recommendations |
+| medical_literature | PubMed abstracts and articles | Research Q&A |
+| patient_notes | De-identified clinical notes | Cohort analysis |
+| drug_information | Drug monographs and interactions | Rx recommendations |
+| disease_knowledge | Pathophysiology, differential diagnosis | Educational content |
+
+#### Redis (7 Logical Databases)
+
+| DB | Purpose |
+|----|---------|
+| 0 | Django cache |
+| 1 | Celery task broker |
+| 2 | Celery result backend |
+| 3 | Django Channels (WebSocket) |
+| 4 | Agents API cache |
+| 5 | MCP Server cache |
+| 6 | A2A pub/sub messaging |
+
+### 17.10 Celery Scheduled Tasks
+
+These background tasks run automatically via Celery Beat:
+
+| Task | Schedule | Description |
+|------|----------|-------------|
+| `monitor-all-patients` | Every 5 min | Run vital sign monitoring pipeline |
+| `sync-device-data` | Every 1 min | Sync IoT/wearable data |
+| `generate-population-analytics` | Every hour | Update population health metrics |
+| `check-care-gaps` | Daily 00:00 | Scan for overdue screenings |
+| `sync-clinical-guidelines` | Sunday 02:00 | Update guideline vector embeddings |
+| `cleanup-expired-sessions` | Daily 03:00 | Remove expired JWT tokens |
+
+### 17.11 Makefile Commands
+
+Common developer commands:
+
+```bash
+# Setup & Lifecycle
+make build              # Build all Docker images
+make up                 # Start all services
+make down               # Stop all services
+make restart            # Restart all services
+make status             # Show service status
+make check-health       # Health check all services
+
+# Database
+make migrate            # Run Django migrations
+make seed               # Seed all databases
+make backup-db          # PostgreSQL backup
+make restore-db         # PostgreSQL restore
+
+# Developer Shells
+make shell-django       # Django interactive shell
+make shell-db           # psql shell
+make shell-neo4j        # Cypher shell
+make shell-redis        # redis-cli
+
+# Testing & Linting
+make test               # Run all tests
+make test-backend       # Django + agents tests
+make test-frontend      # React tests
+make lint               # Run all linters
+
+# Logs
+make logs               # Follow all service logs
+make logs-django        # Django logs only
+make logs-agents        # Agents API logs only
+
+# Cleanup
+make clean              # Remove containers (keep data)
+make clean-volumes      # Delete all volumes (DATA LOSS)
+```
+
+### 17.12 Monitoring & Observability
 
 #### Langfuse (AI Agent Tracing)
 
 Access Langfuse at `http://localhost:3488` to view:
 - Execution traces for every AI agent run
-- Token usage and cost tracking
-- Latency analysis
-- Input/output inspection
+- Token usage and cost tracking per agent
+- Latency analysis (p50/p95/p99)
+- Input/output inspection for debugging
 
 #### Prometheus + Grafana
 
 - **Prometheus** (`http://localhost:9190`) scrapes metrics from Django and the Agents API.
-- **Grafana** (`http://localhost:3100`) provides dashboards for:
-  - API request latency and throughput
-  - Agent execution counts and success rates
-  - Database query performance
-  - Celery task queue depth
+- **Grafana** (`http://localhost:3100`) provides 5 pre-built dashboards:
+  1. **Agent Operations** — execution counts, latency, failure rates
+  2. **Clinical Overview** — active patients, alerts, risk distribution
+  3. **System Health** — API latency, DB connections, Redis memory
+  4. **Population Health** — risk pyramid, disease prevalence, care gaps
+  5. **LLM Cost Tracking** — token usage, cost, model performance
 
 #### Alertmanager
 
@@ -724,6 +840,51 @@ Configured at `http://localhost:9193` for automated alerting on:
 - High error rates
 - Slow response times
 - Service health failures
+- Supports PagerDuty and Slack webhook integrations
+
+### 17.13 Kubernetes Deployment
+
+For production multi-node deployment, a Helm chart is provided at `Installation/healthcare-k8s-helm2/`.
+
+**Prerequisites:**
+- Kubernetes 1.24+, Helm 3.8+
+- Minimum cluster: 50 CPU, 150 GB RAM, 1 TB storage
+
+**Quick install:**
+
+```bash
+cd Installation/healthcare-k8s-helm2
+
+# Automated installation
+./install.sh
+
+# Or manual
+helm install healthcare . \
+  --namespace healthcare-prod \
+  --create-namespace \
+  --values production-values.yaml \
+  --set global.domain=your-domain.com
+```
+
+**Scaling:**
+- Django: 5–20 replicas (HPA auto-scaling)
+- Celery workers: 3–10 replicas
+- PostgreSQL: primary + 2 read replicas
+- Neo4j: clustered with 3 nodes
+
+### 17.14 Security & HIPAA Compliance
+
+| Safeguard | Implementation |
+|-----------|---------------|
+| **Encryption at rest** | AES-256 via Fernet on PHI fields |
+| **Encryption in transit** | TLS 1.3 via Nginx |
+| **Authentication** | JWT (15-min access + 7-day refresh) + TOTP 2FA |
+| **Authorization** | RBAC with 8 healthcare roles, tenant schema isolation |
+| **PHI protection** | Automatic detection/redaction via Presidio before LLM calls |
+| **Audit logging** | Immutable trail in PostgreSQL, 6-year retention (HIPAA) |
+| **Network isolation** | Docker network, no external connections by default |
+| **Input validation** | Sanitization on all API endpoints |
+| **Prompt injection** | Guardrails agent + input filtering on LLM calls |
 
 ---
 
@@ -742,12 +903,35 @@ Configured at `http://localhost:9193` for automated alerting on:
 | **502 Bad Gateway** | The Django or frontend service may still be starting. Check `docker compose logs -f nginx`. |
 | **Database connection error** | Verify PostgreSQL is running: `docker compose ps postgres`. Check connection settings in `.env`. |
 | **Celery tasks not running** | Check Celery worker logs: `docker compose logs -f celery-worker`. Verify Redis connectivity. |
+| **Migrations stuck** | Run `docker compose exec django python manage.py showmigrations` to find pending migrations. Apply with `--verbosity=3` for debugging. |
+| **High memory usage** | Reduce `CELERY_WORKER_CONCURRENCY` from 4 to 2. Check container memory limits in `docker-compose.yml`. |
+
+### Verifying Services
+
+```bash
+# Health check
+curl http://localhost/api/health/
+# Expected: {"status": "healthy", "service": "inhealth-api", "version": "1.0.0"}
+
+# Check all containers
+docker compose ps
+
+# Inspect specific service logs
+docker compose logs -f django
+docker compose logs -f celery-worker
+docker compose logs -f agents-api
+
+# Test database connection
+docker compose exec django python manage.py dbshell
+```
 
 ### Getting Help
 
 - **API Docs:** `/api/v1/docs/` (Swagger UI)
 - **Health Check:** `GET /api/health/` — returns `{"status": "healthy"}` if the API is running
 - **Django Admin:** `/admin/` — for direct database inspection (superuser required)
+- **Grafana:** `http://localhost:3100` — for system health dashboards
+- **Langfuse:** `http://localhost:3488` — for AI agent execution debugging
 
 ---
 
