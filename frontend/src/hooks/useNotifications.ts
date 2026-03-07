@@ -227,31 +227,27 @@ export function useNotifications({
   useEffect(() => {
     if (!enableWebSocket || !isAuthenticated) return
 
-    // Connect and subscribe to notifications namespace
+    // Connect and subscribe to notifications namespace.
+    // wsManager.connectNotificationsSocket() routes events to alertStore and
+    // handles reconnection internally — no need for additional socket listeners.
     const cleanup = wsManager.connectNotificationsSocket()
     wsCleanupRef.current = cleanup
-    setIsConnected(wsManager.isConnected('/ws/notifications'))
+    setIsConnected(wsManager.isConnected('/ws/alerts/'))
 
-    // Listen for alert events dispatched by wsManager → alertStore pipeline
-    // wsManager.connectNotificationsSocket() already routes events to alertStore,
-    // but we also listen here for UI-level side-effects (sound, browser notif)
-    const socket = wsManager.getSocket('/ws/notifications')
-    if (socket) {
-      socket.on('connect', () => setIsConnected(true))
-      socket.on('disconnect', () => setIsConnected(false))
-      socket.on('alert', handleIncomingAlert)
-      socket.on('clinical_alert', handleIncomingAlert)
-      socket.on('notification', (data: ClinicalAlert) => handleIncomingAlert(data))
-    }
+    // Poll connection status periodically (WS reconnects are async)
+    const connCheck = setInterval(() => {
+      setIsConnected(wsManager.isConnected('/ws/alerts/'))
+    }, 5000)
 
     return () => {
+      clearInterval(connCheck)
       if (wsCleanupRef.current) {
         wsCleanupRef.current()
         wsCleanupRef.current = null
       }
       setIsConnected(false)
     }
-  }, [enableWebSocket, isAuthenticated, handleIncomingAlert])
+  }, [enableWebSocket, isAuthenticated])
 
   // ─── Auto-request permission on mount if enabled ──────────────────────────
 
