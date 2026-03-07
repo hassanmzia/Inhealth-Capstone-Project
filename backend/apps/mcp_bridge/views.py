@@ -13,6 +13,35 @@ from .tool_executor import MCPToolExecutor
 
 logger = logging.getLogger("apps.mcp_bridge")
 
+# Lookup table: agent_id → tier (shared across views)
+_AGENT_TIER_MAP = {
+    "fhir_ingestion_agent": "tier1_ingestion",
+    "ehr_sync_agent": "tier1_ingestion",
+    "lab_result_agent": "tier1_ingestion",
+    "vital_signs_agent": "tier1_ingestion",
+    "cgm_data_agent": "tier1_ingestion",
+    "risk_stratification_agent": "tier2_analysis",
+    "predictive_analytics_agent": "tier2_analysis",
+    "nlp_notes_agent": "tier2_analysis",
+    "drug_interaction_agent": "tier2_analysis",
+    "population_health_agent": "tier2_analysis",
+    "clinical_guidelines_agent": "tier3_clinical",
+    "diagnosis_support_agent": "tier3_clinical",
+    "treatment_optimizer_agent": "tier3_clinical",
+    "care_gap_detection_agent": "tier3_clinical",
+    "medication_adherence_agent": "tier3_clinical",
+    "care_plan_agent": "tier4_coordination",
+    "appointment_scheduler_agent": "tier4_coordination",
+    "referral_agent": "tier4_coordination",
+    "sdoh_assessment_agent": "tier4_coordination",
+    "billing_coding_agent": "tier4_coordination",
+    "patient_education_agent": "tier5_engagement",
+    "health_coaching_agent": "tier5_engagement",
+    "notification_agent": "tier5_engagement",
+    "telemedicine_agent": "tier5_engagement",
+    "research_matching_agent": "tier5_engagement",
+}
+
 
 class AgentRecommendationsView(APIView):
     """
@@ -139,7 +168,37 @@ class AgentTriggerView(APIView):
 
         # Map frontend agent IDs to valid AgentType choices
         _AGENT_TYPE_MAP = {
+            # Tier 1 — Data Ingestion
+            "fhir_ingestion_agent": "triage",
+            "ehr_sync_agent": "triage",
+            "lab_result_agent": "diagnostic",
             "vital_signs_agent": "triage",
+            "cgm_data_agent": "triage",
+            # Tier 2 — Analysis
+            "risk_stratification_agent": "diagnostic",
+            "predictive_analytics_agent": "diagnostic",
+            "nlp_notes_agent": "diagnostic",
+            "drug_interaction_agent": "medication",
+            "population_health_agent": "population_health",
+            # Tier 3 — Clinical Intelligence
+            "clinical_guidelines_agent": "care_plan",
+            "diagnosis_support_agent": "diagnostic",
+            "treatment_optimizer_agent": "care_plan",
+            "care_gap_detection_agent": "care_plan",
+            "medication_adherence_agent": "medication",
+            # Tier 4 — Care Coordination
+            "care_plan_agent": "care_plan",
+            "appointment_scheduler_agent": "orchestrator",
+            "referral_agent": "orchestrator",
+            "sdoh_assessment_agent": "population_health",
+            "billing_coding_agent": "orchestrator",
+            # Tier 5 — Patient Engagement
+            "patient_education_agent": "patient_engagement",
+            "health_coaching_agent": "patient_engagement",
+            "notification_agent": "patient_engagement",
+            "telemedicine_agent": "patient_engagement",
+            "research_matching_agent": "research",
+            # Legacy aliases
             "vitals_monitor": "triage",
             "temperature_agent": "triage",
             "triage_agent": "triage",
@@ -205,7 +264,7 @@ class AgentTriggerView(APIView):
                 "id": str(log.id),
                 "agentId": agent_id,
                 "agentName": agent_id.replace("_", " ").title(),
-                "tier": "tier1_monitoring",
+                "tier": _AGENT_TIER_MAP.get(agent_id, "tier1_ingestion"),
                 "status": "queued",
                 "patientId": str(patient_id) if patient_id else None,
                 "patientName": patient_name,
@@ -247,7 +306,7 @@ class AgentSingleStatusView(APIView):
                 "agentId": agent_id,
                 "agentName": agent_id.replace("_", " ").title(),
                 "status": "idle",
-                "tier": "tier1_monitoring",
+                "tier": _AGENT_TIER_MAP.get(agent_id, "tier1_ingestion"),
                 "lastRun": last_log.created_at.isoformat() if last_log else None,
                 "nextScheduledRun": None,
                 "executionsToday": executions_today,
@@ -321,15 +380,38 @@ class AgentStatusView(APIView):
 
     permission_classes = [permissions.IsAuthenticated]
 
-    # Static registry of all agent types in the system
+    # Static registry of all 25 agent types matching frontend AGENT_DEFINITIONS
     _AGENT_REGISTRY = [
-        ("vitals_monitor",       "Vitals Monitor",       "tier1_ingestion"),
-        ("lab_analyzer",         "Lab Analyzer",         "tier2_analysis"),
-        ("risk_stratifier",      "Risk Stratifier",      "tier2_analysis"),
-        ("care_gap_detector",    "Care Gap Detector",    "tier3_clinical"),
-        ("medication_reviewer",  "Medication Reviewer",  "tier3_clinical"),
-        ("care_plan_optimizer",  "Care Plan Optimizer",  "tier4_coordination"),
-        ("patient_engagement",   "Patient Engagement",   "tier5_engagement"),
+        # Tier 1 — Data Ingestion
+        ("fhir_ingestion_agent",       "FHIR Ingestion Agent",       "tier1_ingestion"),
+        ("ehr_sync_agent",             "EHR Sync Agent",             "tier1_ingestion"),
+        ("lab_result_agent",           "Lab Result Agent",           "tier1_ingestion"),
+        ("vital_signs_agent",          "Vital Signs Agent",          "tier1_ingestion"),
+        ("cgm_data_agent",            "CGM Data Agent",             "tier1_ingestion"),
+        # Tier 2 — Analysis
+        ("risk_stratification_agent",  "Risk Stratification Agent",  "tier2_analysis"),
+        ("predictive_analytics_agent", "Predictive Analytics Agent", "tier2_analysis"),
+        ("nlp_notes_agent",           "NLP Clinical Notes Agent",   "tier2_analysis"),
+        ("drug_interaction_agent",     "Drug Interaction Agent",     "tier2_analysis"),
+        ("population_health_agent",    "Population Health Agent",    "tier2_analysis"),
+        # Tier 3 — Clinical Intelligence
+        ("clinical_guidelines_agent",  "Clinical Guidelines Agent",  "tier3_clinical"),
+        ("diagnosis_support_agent",    "Diagnosis Support Agent",    "tier3_clinical"),
+        ("treatment_optimizer_agent",  "Treatment Optimizer Agent",  "tier3_clinical"),
+        ("care_gap_detection_agent",   "Care Gap Detection Agent",   "tier3_clinical"),
+        ("medication_adherence_agent", "Medication Adherence Agent", "tier3_clinical"),
+        # Tier 4 — Care Coordination
+        ("care_plan_agent",            "Care Plan Agent",            "tier4_coordination"),
+        ("appointment_scheduler_agent","Appointment Scheduler Agent","tier4_coordination"),
+        ("referral_agent",             "Referral Agent",             "tier4_coordination"),
+        ("sdoh_assessment_agent",      "SDOH Assessment Agent",      "tier4_coordination"),
+        ("billing_coding_agent",       "Billing & Coding Agent",     "tier4_coordination"),
+        # Tier 5 — Patient Engagement
+        ("patient_education_agent",    "Patient Education Agent",    "tier5_engagement"),
+        ("health_coaching_agent",      "Health Coaching Agent",      "tier5_engagement"),
+        ("notification_agent",         "Notification Agent",         "tier5_engagement"),
+        ("telemedicine_agent",         "Telemedicine Agent",         "tier5_engagement"),
+        ("research_matching_agent",    "Research Matching Agent",    "tier5_engagement"),
     ]
 
     def get(self, request):
@@ -415,7 +497,7 @@ class AgentExecutionsView(APIView):
                     "id": str(log.id),
                     "agentId": log.agent_type,
                     "agentName": log.agent_type.replace("_", " ").title(),
-                    "tier": "tier2_analysis",
+                    "tier": _AGENT_TIER_MAP.get(log.agent_type, "tier1_ingestion"),
                     "status": "completed",
                     "patientId": str(log.patient_id) if log.patient_id else None,
                     "patientName": patient_name,
