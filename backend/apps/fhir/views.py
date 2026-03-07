@@ -17,6 +17,8 @@ from .models import (
     FHIRAppointment,
     FHIRCarePlan,
     FHIRCondition,
+    FHIRDiagnosticReport,
+    FHIRDocumentReference,
     FHIREncounter,
     FHIRImmunization,
     FHIRMedicationRequest,
@@ -28,6 +30,8 @@ from .serializers import (
     FHIRAppointmentSerializer,
     FHIRCarePlanSerializer,
     FHIRConditionSerializer,
+    FHIRDiagnosticReportSerializer,
+    FHIRDocumentReferenceSerializer,
     FHIREncounterSerializer,
     FHIRImmunizationSerializer,
     FHIRMedicationRequestSerializer,
@@ -175,6 +179,12 @@ class FHIRPatientViewSet(FHIRBaseViewSet):
             entries.append({"resource": FHIRMedicationRequestSerializer(med).data})
         for allergy in FHIRAllergyIntolerance.objects.filter(patient=patient):
             entries.append({"resource": FHIRAllergyIntoleranceSerializer(allergy).data})
+        for encounter in FHIREncounter.objects.filter(patient=patient).order_by("-period_start")[:20]:
+            entries.append({"resource": FHIREncounterSerializer(encounter).data})
+        for report in FHIRDiagnosticReport.objects.filter(patient=patient).order_by("-effective_datetime")[:20]:
+            entries.append({"resource": FHIRDiagnosticReportSerializer(report).data})
+        for doc in FHIRDocumentReference.objects.filter(patient=patient).order_by("-date")[:20]:
+            entries.append({"resource": FHIRDocumentReferenceSerializer(doc).data})
 
         from django.utils import timezone
         return Response({
@@ -292,3 +302,37 @@ class FHIRImmunizationViewSet(FHIRBaseViewSet):
         if self.request.query_params.get("patient"):
             qs = qs.filter(patient__fhir_id=self.request.query_params["patient"])
         return qs.order_by("-occurrence_datetime")
+
+
+class FHIRDiagnosticReportViewSet(FHIRBaseViewSet):
+    serializer_class = FHIRDiagnosticReportSerializer
+    resource_type = "DiagnosticReport"
+
+    def get_queryset(self):
+        qs = FHIRDiagnosticReport.objects.filter(tenant=self.get_tenant()).select_related("patient")
+        params = self.request.query_params
+        if params.get("patient"):
+            qs = qs.filter(patient__fhir_id=params["patient"])
+        if params.get("category"):
+            qs = qs.filter(category_code=params["category"])
+        if params.get("code"):
+            qs = qs.filter(code=params["code"])
+        if params.get("date"):
+            qs = qs.filter(effective_datetime__date=params["date"])
+        return qs.order_by("-effective_datetime")
+
+
+class FHIRDocumentReferenceViewSet(FHIRBaseViewSet):
+    serializer_class = FHIRDocumentReferenceSerializer
+    resource_type = "DocumentReference"
+
+    def get_queryset(self):
+        qs = FHIRDocumentReference.objects.filter(tenant=self.get_tenant()).select_related("patient")
+        params = self.request.query_params
+        if params.get("patient"):
+            qs = qs.filter(patient__fhir_id=params["patient"])
+        if params.get("type"):
+            qs = qs.filter(type_code=params["type"])
+        if params.get("category"):
+            qs = qs.filter(category=params["category"])
+        return qs.order_by("-date")

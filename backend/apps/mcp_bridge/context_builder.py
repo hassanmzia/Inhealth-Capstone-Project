@@ -24,12 +24,15 @@ class MCPContextBuilder:
             FHIRAllergyIntolerance,
             FHIRCarePlan,
             FHIRCondition,
+            FHIRDiagnosticReport,
+            FHIRDocumentReference,
+            FHIREncounter,
             FHIRMedicationRequest,
             FHIRObservation,
             FHIRPatient,
         )
         from apps.analytics.models import RiskScore
-        from apps.clinical.models import CareGap
+        from apps.clinical.models import CareGap, Encounter
         from django.utils import timezone
 
         try:
@@ -98,6 +101,51 @@ class MCPContextBuilder:
             ).values("title", "description", "goals", "activities")[:3]
         )
 
+        # Recent encounters with SOAP notes (from clinical Encounter model)
+        recent_encounters = []
+        for enc in Encounter.objects.filter(
+            patient=patient
+        ).order_by("-date")[:10]:
+            enc_data = {
+                "date": enc.date.isoformat() if enc.date else None,
+                "type": enc.encounter_type,
+                "chief_complaint": enc.chief_complaint,
+                "assessment": enc.assessment,
+                "treatment_plan": enc.treatment_plan,
+            }
+            recent_encounters.append(enc_data)
+
+        # FHIR Encounters (structured visit data)
+        fhir_encounters = list(
+            FHIREncounter.objects.filter(
+                patient=patient
+            ).order_by("-period_start").values(
+                "fhir_id", "status", "encounter_class", "type_display",
+                "reason_display", "period_start", "period_end",
+                "discharge_disposition",
+            )[:10]
+        )
+
+        # Diagnostic reports (lab, radiology, pathology)
+        diagnostic_reports = list(
+            FHIRDiagnosticReport.objects.filter(
+                patient=patient
+            ).order_by("-effective_datetime").values(
+                "fhir_id", "status", "category_code", "code",
+                "display", "effective_datetime", "conclusion",
+            )[:20]
+        )
+
+        # Clinical notes (DocumentReference)
+        clinical_notes = list(
+            FHIRDocumentReference.objects.filter(
+                patient=patient
+            ).order_by("-date").values(
+                "fhir_id", "type_code", "type_display", "category",
+                "date", "description", "content_title",
+            )[:10]
+        )
+
         return {
             "mcp_version": "1.0",
             "resource_type": "PatientContext",
@@ -119,6 +167,19 @@ class MCPContextBuilder:
                     for v in recent_vitals
                 ],
             },
+            "encounters": {
+                "recent_visits": recent_encounters,
+                "fhir_encounters": [
+                    {**e, "period_start": e["period_start"].isoformat() if e.get("period_start") else None,
+                     "period_end": e["period_end"].isoformat() if e.get("period_end") else None}
+                    for e in fhir_encounters
+                ],
+            },
+            "diagnostic_reports": [
+                {**r, "effective_datetime": r["effective_datetime"].isoformat() if r.get("effective_datetime") else None}
+                for r in diagnostic_reports
+            ],
+            "clinical_notes": clinical_notes,
             "risk_profile": risk_scores,
             "care_gaps": care_gaps,
             "care_plans": care_plans,

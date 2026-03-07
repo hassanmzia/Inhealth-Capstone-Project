@@ -24,6 +24,9 @@ export interface PatientContext {
   recent_vitals: Vital[];
   allergies: Allergy[];
   risk_scores: RiskScore[];
+  recent_encounters: EncounterNote[];
+  diagnostic_reports: DiagnosticReportSummary[];
+  clinical_notes: ClinicalNote[];
 }
 
 export interface PatientDemographics {
@@ -183,6 +186,43 @@ export interface RiskFactor {
   value: string | number;
   weight: number;
   direction: "positive" | "negative"; // positive increases risk
+}
+
+export interface EncounterNote {
+  id: string;
+  status: "planned" | "in-progress" | "finished" | "cancelled";
+  encounter_class: string; // ambulatory, emergency, inpatient, etc.
+  type_display: string;
+  reason_display?: string;
+  period_start: string;
+  period_end?: string;
+  discharge_disposition?: string;
+  soap_notes?: {
+    chief_complaint?: string;
+    assessment?: string;
+    treatment_plan?: string;
+  };
+}
+
+export interface DiagnosticReportSummary {
+  id: string;
+  status: "registered" | "partial" | "preliminary" | "final" | "amended" | "corrected" | "cancelled";
+  category: string; // LAB, RAD (radiology), PAT (pathology), etc.
+  code: string; // LOINC code
+  display: string;
+  effective_date: string;
+  conclusion?: string;
+  results_summary?: string;
+}
+
+export interface ClinicalNote {
+  id: string;
+  type_code: string;
+  type_display: string; // "Progress Note", "Discharge Summary", etc.
+  date: string;
+  description?: string;
+  content_title?: string;
+  category?: string;
 }
 
 export interface Message {
