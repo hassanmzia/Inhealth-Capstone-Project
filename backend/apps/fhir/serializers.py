@@ -27,7 +27,7 @@ class FHIRPatientSerializer(serializers.ModelSerializer):
     name = serializers.SerializerMethodField()
     identifier = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
-    age = serializers.IntegerField(read_only=True, source="age")
+    age = serializers.IntegerField(read_only=True, allow_null=True)
 
     class Meta:
         model = FHIRPatient
