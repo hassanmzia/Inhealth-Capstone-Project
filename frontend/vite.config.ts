@@ -11,8 +11,19 @@ export default defineConfig({
   },
   server: {
     port: 3000,
+    strictPort: true,
     host: true,
     allowedHosts: ['frontend', 'localhost'],
+    hmr: {
+      // When behind nginx proxy, use the nginx port so the HMR WebSocket
+      // connects through the proxy instead of trying the internal port.
+      clientPort: Number(process.env.VITE_HMR_PORT) || undefined,
+    },
+    watch: {
+      // Use polling in Docker to avoid inotify issues; reduce CPU with longer interval
+      usePolling: true,
+      interval: 2000,
+    },
     proxy: {
       '/api': {
         target: 'http://django:8000',

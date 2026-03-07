@@ -195,6 +195,8 @@ services:
       VITE_APP_NAME: "InHealth Chronic Care [DEV]"
       VITE_SOURCEMAP: "true"
       VITE_REACT_STRICT_MODE: "true"
+      # HMR WebSocket must connect through nginx (port 8788), not the internal Vite port
+      VITE_HMR_PORT: "8788"
       # Use polling instead of inotify to avoid EMFILE on resource-constrained hosts
       CHOKIDAR_USEPOLLING: "true"
       CHOKIDAR_INTERVAL: "2000"
