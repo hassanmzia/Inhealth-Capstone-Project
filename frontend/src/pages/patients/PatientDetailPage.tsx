@@ -341,7 +341,7 @@ function SDOHTab() {
     queryKey: ['sdoh', patientId],
     queryFn: async () => {
       try {
-        const res = await api.get(`/sdoh/`, { params: { patient_id: patientId } })
+        const res = await api.get(`/sdoh/`, { params: { patient: patientId } })
         return res.data?.results ?? res.data ?? []
       } catch { return null }
     },

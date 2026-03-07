@@ -24,9 +24,14 @@ class SDOHAssessmentViewSet(ModelViewSet):
     ordering = ["-assessment_date"]
 
     def get_queryset(self):
-        return SDOHAssessment.objects.filter(
+        qs = SDOHAssessment.objects.filter(
             tenant=(getattr(self.request, 'tenant', None) or self.request.user.tenant)
         ).select_related("patient", "assessed_by")
+        # Accept patient_id as alias for patient filter param
+        patient_id = self.request.query_params.get("patient_id")
+        if patient_id:
+            qs = qs.filter(patient_id=patient_id)
+        return qs
 
     @action(detail=False, methods=["get"])
     def high_risk_patients(self, request):
