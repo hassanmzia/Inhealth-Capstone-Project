@@ -1,5 +1,5 @@
-import React, { Component, Suspense } from 'react'
-import { Routes, Route, Navigate, useLocation } from 'react-router-dom'
+import React, { Component, Suspense, useEffect } from 'react'
+import { Routes, Route, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { motion, AnimatePresence } from 'framer-motion'
 import { useAuthStore } from '@/store/authStore'
 import MainLayout from '@/components/layout/MainLayout'
@@ -132,13 +132,21 @@ interface ProtectedRouteProps {
 function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore()
   const location = useLocation()
+  const navigate = useNavigate()
+
+  // Redirect to login after logout — useEffect avoids conflicts with
+  // AnimatePresence exit animations that caused blank screens
+  useEffect(() => {
+    if (!isAuthenticated) {
+      navigate('/login', { state: { from: location }, replace: true })
+    }
+  }, [isAuthenticated, navigate, location])
 
   if (!isAuthenticated) {
-    return <Navigate to="/login" state={{ from: location }} replace />
+    return null
   }
 
   if (requiredRoles && user && !requiredRoles.includes(user.role)) {
-    // Role-aware fallback — send each role to their own dashboard
     const fallback =
       user.role === 'patient' ? '/dashboard/patient'
       : user.role === 'researcher' ? '/dashboard/researcher'
