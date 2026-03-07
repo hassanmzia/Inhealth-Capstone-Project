@@ -37,6 +37,7 @@ api.interceptors.request.use(
 // ─── Response Interceptor: Token Refresh & Error Handling ─────────────────────
 
 let isRefreshing = false
+let isRedirecting = false
 let failedQueue: Array<{
   resolve: (token: string) => void
   reject: (error: unknown) => void
@@ -92,7 +93,11 @@ api.interceptors.response.use(
       } catch (refreshError) {
         processQueue(refreshError)
         useAuthStore.getState().logout()
-        window.location.href = '/login'
+        // Guard against multiple redirects from concurrent 401 responses
+        if (!isRedirecting) {
+          isRedirecting = true
+          window.location.href = '/login'
+        }
         return Promise.reject(refreshError)
       } finally {
         isRefreshing = false
