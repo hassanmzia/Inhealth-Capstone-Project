@@ -22,7 +22,7 @@ import {
   ReferenceLine,
 } from 'recharts'
 import { cn } from '@/lib/utils'
-import { usePatient, useConditions, useMedications } from '@/hooks/useFHIR'
+import { usePatients, usePatient, useConditions, useMedications } from '@/hooks/useFHIR'
 import * as fhirService from '@/services/fhir'
 import type { FHIRPatient, FHIRCondition, FHIRMedicationRequest, FHIRAllergyIntolerance } from '@/types/fhir'
 
@@ -802,7 +802,7 @@ interface Patient {
 }
 
 export default function VitalsSimulatorPage() {
-  const [selectedPatientId, setSelectedPatientId] = useState<string>('p1')
+  const [selectedPatientId, setSelectedPatientId] = useState<string>('')
   const [selectedProfile, setSelectedProfile] = useState<number>(0)
   const [params, setParams] = useState<Record<string, VitalParams>>(() => {
     const p: Record<string, VitalParams> = {}
@@ -820,19 +820,28 @@ export default function VitalsSimulatorPage() {
   const readingCountRef = useRef(0)
   const [allergies, setAllergies] = useState<FHIRAllergyIntolerance[]>([])
 
-  // Static patient list (no backend dependency)
-  const patients: Patient[] = [
-    { id: 'p1', name: 'Maria Garcia' },
-    { id: 'p2', name: 'James Wilson' },
-    { id: 'p3', name: 'Susan Chen' },
-    { id: 'p4', name: 'Robert Johnson' },
-    { id: 'p5', name: 'Aisha Patel' },
-  ]
+  // Fetch real patients from FHIR API
+  const { data: patientsResult } = usePatients({ _count: 50 })
+  const patients: Patient[] = useMemo(() => {
+    const entries = patientsResult?.entry ?? []
+    return entries.map((e) => {
+      const r = e.resource as FHIRPatient
+      const name = r.name?.[0]
+        ? `${r.name[0].given?.join(' ') ?? ''} ${r.name[0].family ?? ''}`.trim()
+        : r.mrn ?? r.id
+      return { id: r.id, name: name || r.id }
+    })
+  }, [patientsResult])
+
+  // Auto-select first patient when list loads
+  useEffect(() => {
+    if (patients.length > 0 && !patients.find((p) => p.id === selectedPatientId)) {
+      setSelectedPatientId(patients[0].id)
+    }
+  }, [patients, selectedPatientId])
 
   // ─── Fetch Patient Clinical Context ──────────────────────────────────────
-  // Skip FHIR API calls for placeholder patient IDs (p1-p5) that don't exist in backend
-  const isPlaceholderPatient = /^p\d+$/.test(selectedPatientId)
-  const fhirPatientId = isPlaceholderPatient ? undefined : selectedPatientId
+  const fhirPatientId = selectedPatientId || undefined
 
   const { data: fhirPatient } = usePatient(fhirPatientId)
   const { data: conditionsResult } = useConditions(fhirPatientId, 'active')
@@ -840,11 +849,11 @@ export default function VitalsSimulatorPage() {
 
   // Fetch allergies (no dedicated hook, use service directly)
   useEffect(() => {
-    if (!selectedPatientId || isPlaceholderPatient) return
+    if (!selectedPatientId) return
     fhirService.getAllergies(selectedPatientId)
       .then((result) => setAllergies(result.entry?.map((e) => e.resource as FHIRAllergyIntolerance) ?? []))
       .catch(() => setAllergies([]))
-  }, [selectedPatientId, isPlaceholderPatient])
+  }, [selectedPatientId])
 
   // Build patient clinical context from FHIR data
   const patientContext = useMemo<PatientClinicalContext | null>(() => {
@@ -959,9 +968,12 @@ export default function VitalsSimulatorPage() {
             <select
               value={selectedPatientId}
               onChange={(e) => setSelectedPatientId(e.target.value)}
-              disabled={isRunning}
+              disabled={isRunning || patients.length === 0}
               className="pl-9 pr-4 py-2 rounded-lg border border-border bg-card text-foreground text-sm focus:outline-none focus:ring-2 focus:ring-primary-400 appearance-none cursor-pointer disabled:opacity-50"
             >
+              {patients.length === 0 && (
+                <option value="">Loading patients...</option>
+              )}
               {patients.map((p: Patient) => (
                 <option key={p.id} value={p.id}>{p.name}</option>
               ))}
