@@ -9,8 +9,10 @@ Usage:
 import random
 
 from django.core.management.base import BaseCommand
+from django_tenants.utils import schema_context
 
 from apps.research.models import ClinicalTrial, MedicalEvidence
+from apps.tenants.models import Organization
 
 
 CLINICAL_TRIALS = [
@@ -301,10 +303,26 @@ class Command(BaseCommand):
 
     def add_arguments(self, parser):
         parser.add_argument("--clear", action="store_true", help="Clear existing data before seeding")
+        parser.add_argument("--org-slug", default="inhealth-demo", help="Organization slug")
 
     def handle(self, *args, **options):
         random.seed(42)
+        org_slug = options["org_slug"]
 
+        try:
+            org = Organization.objects.get(slug=org_slug)
+        except Organization.DoesNotExist:
+            self.stderr.write(self.style.ERROR(
+                f"Organization '{org_slug}' not found. Run seed_patients.py first."
+            ))
+            return
+
+        self.stdout.write(f"Using organization: {org.name} (schema: {org.schema_name})")
+
+        with schema_context(org.schema_name):
+            self._seed_data(options)
+
+    def _seed_data(self, options):
         if options["clear"]:
             ct_del, _ = ClinicalTrial.objects.all().delete()
             me_del, _ = MedicalEvidence.objects.all().delete()
