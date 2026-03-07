@@ -830,17 +830,21 @@ export default function VitalsSimulatorPage() {
   ]
 
   // ─── Fetch Patient Clinical Context ──────────────────────────────────────
-  const { data: fhirPatient } = usePatient(selectedPatientId)
-  const { data: conditionsResult } = useConditions(selectedPatientId, 'active')
-  const { data: medicationsResult } = useMedications(selectedPatientId, 'active')
+  // Skip FHIR API calls for placeholder patient IDs (p1-p5) that don't exist in backend
+  const isPlaceholderPatient = /^p\d+$/.test(selectedPatientId)
+  const fhirPatientId = isPlaceholderPatient ? undefined : selectedPatientId
+
+  const { data: fhirPatient } = usePatient(fhirPatientId)
+  const { data: conditionsResult } = useConditions(fhirPatientId, 'active')
+  const { data: medicationsResult } = useMedications(fhirPatientId, 'active')
 
   // Fetch allergies (no dedicated hook, use service directly)
   useEffect(() => {
-    if (!selectedPatientId) return
+    if (!selectedPatientId || isPlaceholderPatient) return
     fhirService.getAllergies(selectedPatientId)
       .then((result) => setAllergies(result.entry?.map((e) => e.resource as FHIRAllergyIntolerance) ?? []))
       .catch(() => setAllergies([]))
-  }, [selectedPatientId])
+  }, [selectedPatientId, isPlaceholderPatient])
 
   // Build patient clinical context from FHIR data
   const patientContext = useMemo<PatientClinicalContext | null>(() => {
