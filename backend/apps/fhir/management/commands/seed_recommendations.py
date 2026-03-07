@@ -235,6 +235,27 @@ ICD10_TO_TAG = {
     "I48": "AFib", "I48.91": "AFib",
 }
 
+# Reverse mapping: tag → ICD-10 code and display name for auto-creating conditions
+TAG_TO_CONDITION = {
+    "T2DM": {"code": "E11.9", "display": "Type 2 Diabetes Mellitus"},
+    "HTN": {"code": "I10", "display": "Essential Hypertension"},
+    "CKD": {"code": "N18.3", "display": "Chronic Kidney Disease, Stage 3"},
+    "HF": {"code": "I50.9", "display": "Heart Failure, Unspecified"},
+    "CAD": {"code": "I25.10", "display": "Coronary Artery Disease"},
+    "COPD": {"code": "J44.1", "display": "Chronic Obstructive Pulmonary Disease"},
+    "AFib": {"code": "I48.91", "display": "Atrial Fibrillation, Unspecified"},
+}
+
+# Condition profiles to assign to patients who have no conditions
+# Each profile represents a realistic comorbidity combination
+CONDITION_PROFILES = [
+    ["T2DM", "HTN", "CKD"],
+    ["HTN", "HF", "AFib"],
+    ["T2DM", "CAD", "HTN"],
+    ["COPD", "HTN"],
+    ["T2DM", "CKD", "HF"],
+]
+
 
 class Command(BaseCommand):
     help = "Seed AI recommendations into AgentActionLog for dashboard display"
@@ -286,6 +307,7 @@ class Command(BaseCommand):
             from apps.fhir.models import FHIRCondition
 
             patient_conditions = {}
+            patients_without_conditions = []
             for patient in patients:
                 conditions = FHIRCondition.objects.filter(
                     patient=patient, clinical_status="active"
@@ -300,6 +322,34 @@ class Command(BaseCommand):
                         if prefix in ICD10_TO_TAG:
                             tags.add(ICD10_TO_TAG[prefix])
                 patient_conditions[patient.id] = tags
+                if not tags:
+                    patients_without_conditions.append(patient)
+
+            # Auto-create conditions for patients that have none (e.g. demo/simulator patients)
+            if patients_without_conditions:
+                self.stdout.write(
+                    f"  {len(patients_without_conditions)} patient(s) have no conditions — "
+                    f"auto-assigning clinical profiles for recommendations"
+                )
+                for i, patient in enumerate(patients_without_conditions):
+                    profile = CONDITION_PROFILES[i % len(CONDITION_PROFILES)]
+                    for tag in profile:
+                        cond_info = TAG_TO_CONDITION[tag]
+                        FHIRCondition.objects.get_or_create(
+                            patient=patient,
+                            code=cond_info["code"],
+                            defaults={
+                                "tenant": org,
+                                "display": cond_info["display"],
+                                "clinical_status": "active",
+                                "verification_status": "confirmed",
+                                "category": "encounter-diagnosis",
+                            },
+                        )
+                    patient_conditions[patient.id] = set(profile)
+                    self.stdout.write(
+                        f"    {patient.first_name} {patient.last_name}: {', '.join(profile)}"
+                    )
 
             created_count = 0
 
