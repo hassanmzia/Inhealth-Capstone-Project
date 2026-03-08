@@ -1,5 +1,6 @@
 import { create } from 'zustand'
 import { subscribeWithSelector } from 'zustand/middleware'
+import { subMinutes, subHours } from 'date-fns'
 import type { ClinicalAlert, AlertSeverity } from '@/types/clinical'
 
 // ─── Alert Store State ────────────────────────────────────────────────────────
@@ -53,14 +54,61 @@ function sortAlertsByPriority(alerts: ClinicalAlert[]): ClinicalAlert[] {
   })
 }
 
+// ─── Demo Alerts (shown when no real alerts arrive) ──────────────────────────
+
+const _now = new Date()
+
+const DEMO_ALERTS: ClinicalAlert[] = sortAlertsByPriority([
+  {
+    id: 'demo-a1', patientId: 'demo-p1', patientName: 'James Morrison', severity: 'critical', category: 'vital_sign',
+    title: 'Blood Glucose Critical High', description: 'Blood glucose reading of 342 mg/dL detected via CGM device', value: '342 mg/dL', normalRange: '70-140 mg/dL',
+    timestamp: subMinutes(_now, 23).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 1,
+  },
+  {
+    id: 'demo-a2', patientId: 'demo-p5', patientName: 'William Jackson', severity: 'critical', category: 'lab_result',
+    title: 'eGFR Declining Rapidly', description: 'eGFR dropped to 22 mL/min — CKD Stage 4 progression detected by renal function monitor', value: '22 mL/min',
+    timestamp: subHours(_now, 1).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a3', patientId: 'demo-p2', patientName: 'Maria Gonzalez', severity: 'urgent', category: 'vital_sign',
+    title: 'Blood Pressure Elevated', description: 'BP reading 168/98 mmHg — above target for HF patient. Consider medication adjustment.', value: '168/98 mmHg', normalRange: '<130/80 mmHg',
+    timestamp: subHours(_now, 3).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a4', patientId: 'demo-p3', patientName: 'Robert Chen', severity: 'urgent', category: 'medication',
+    title: 'Medication Non-Adherence Detected', description: 'Missed 3 consecutive doses of Metformin 500mg — PDC dropped to 62%. Patient outreach recommended.',
+    timestamp: subHours(_now, 5).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a5', patientId: 'demo-p4', patientName: 'Dorothy Williams', severity: 'soon', category: 'vital_sign',
+    title: 'SpO2 Below Threshold', description: 'Oxygen saturation at 91% — monitor for COPD exacerbation. Consider pulmonology consult.', value: '91%', normalRange: '95-100%',
+    timestamp: subHours(_now, 8).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a6', patientId: 'demo-p6', patientName: 'Linda Nguyen', severity: 'routine', category: 'lab_result',
+    title: 'HbA1c Result Available', description: 'New HbA1c result: 7.8% — improved from 8.4%. Continue current therapy.', value: '7.8%',
+    timestamp: subHours(_now, 12).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a7', patientId: 'demo-p1', patientName: 'James Morrison', severity: 'urgent', category: 'lab_result',
+    title: 'Potassium Level Elevated', description: 'Serum potassium 5.8 mEq/L — above normal range. Review current medications (ACE inhibitors).', value: '5.8 mEq/L', normalRange: '3.5-5.0 mEq/L',
+    timestamp: subHours(_now, 6).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a8', patientId: 'demo-p5', patientName: 'William Jackson', severity: 'soon', category: 'medication',
+    title: 'Prescription Refill Due', description: 'Sodium Bicarbonate 650mg — 5 days of supply remaining. Auto-refill not enabled.',
+    timestamp: subHours(_now, 14).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
+  },
+])
+
 // ─── Store ────────────────────────────────────────────────────────────────────
 
 export const useAlertStore = create<AlertStoreState>()(
   subscribeWithSelector((set, get) => ({
-    alerts: [],
-    unreadCount: 0,
-    criticalCount: 0,
-    urgentCount: 0,
+    alerts: DEMO_ALERTS,
+    unreadCount: DEMO_ALERTS.filter((a) => !a.isRead).length,
+    criticalCount: DEMO_ALERTS.filter((a) => a.severity === 'critical' && !a.isAcknowledged).length,
+    urgentCount: DEMO_ALERTS.filter((a) => a.severity === 'urgent' && !a.isAcknowledged).length,
     activeTab: 'all',
     showAcknowledged: false,
 
