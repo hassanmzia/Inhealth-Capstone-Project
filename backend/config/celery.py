@@ -123,6 +123,11 @@ app.conf.beat_schedule = {
         "schedule": crontab(hour=3, minute=0),
         "options": {"queue": "default", "priority": 1},
     },
+    "evaluate-care-plan-outcomes": {
+        "task": "apps.fhir.tasks.evaluate_care_plan_outcomes",
+        "schedule": 600.0,  # every 10 minutes
+        "options": {"queue": "clinical", "priority": 6},
+    },
 }
 
 # ---------------------------------------------------------------------------

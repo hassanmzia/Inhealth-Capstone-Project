@@ -872,18 +872,44 @@ function CarePlansSection({ patientId }: { patientId: string }) {
                 </span>
               </div>
             </div>
-            {/* Goals */}
+            {/* Goals with outcome tracking */}
             {plan.goals?.length > 0 && (
-              <div className="mt-3 space-y-1">
+              <div className="mt-3 space-y-2">
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Goals</p>
-                {plan.goals.map((goal: { description: string; status: string; priority: string }, i: number) => (
-                  <div key={i} className="flex items-center gap-2 text-xs text-foreground">
-                    <span className={cn(
-                      'w-1.5 h-1.5 rounded-full flex-shrink-0',
-                      goal.status === 'in-progress' ? 'bg-blue-500' :
-                      goal.status === 'achieved' ? 'bg-green-500' : 'bg-gray-400',
-                    )} />
-                    {goal.description}
+                {plan.goals.map((goal: { description: string; status: string; priority: string; outcome?: string; pre_avg?: number | null; post_avg?: number | null; in_normal_range?: boolean; last_evaluated?: string }, i: number) => (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs text-foreground">
+                      <span className={cn(
+                        'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                        goal.status === 'in-progress' ? 'bg-blue-500' :
+                        goal.status === 'achieved' ? 'bg-green-500' :
+                        goal.status === 'at-risk' ? 'bg-red-500' : 'bg-gray-400',
+                      )} />
+                      <span className="flex-1">{goal.description}</span>
+                      {goal.outcome && (
+                        <span className={cn(
+                          'px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                          goal.outcome === 'improved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                          goal.outcome === 'worsened' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+                        )}>
+                          {goal.outcome === 'improved' ? 'Improving' : goal.outcome === 'worsened' ? 'Worsening' : 'Stable'}
+                        </span>
+                      )}
+                    </div>
+                    {/* Outcome vitals comparison */}
+                    {goal.post_avg != null && (
+                      <div className="ml-3.5 flex items-center gap-3 text-[10px] text-muted-foreground">
+                        {goal.pre_avg != null && (
+                          <span>Before: <span className="font-mono font-semibold text-foreground">{goal.pre_avg}</span></span>
+                        )}
+                        <span>Current: <span className={cn(
+                          'font-mono font-semibold',
+                          goal.in_normal_range ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400',
+                        )}>{goal.post_avg}</span></span>
+                        {goal.in_normal_range && <span className="text-green-600 dark:text-green-400">In range</span>}
+                      </div>
+                    )}
                   </div>
                 ))}
               </div>
@@ -894,20 +920,45 @@ function CarePlansSection({ patientId }: { patientId: string }) {
                 <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Activities</p>
                 {plan.activities.map((act: { detail: string; status: string; evidence_level?: string }, i: number) => (
                   <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
-                    <span className="mt-1 w-1.5 h-1.5 rounded-full bg-primary-400 flex-shrink-0" />
+                    <span className={cn(
+                      'mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0',
+                      act.status === 'completed' ? 'bg-green-500' :
+                      act.status === 'needs-escalation' ? 'bg-red-500' :
+                      act.status === 'in-progress' ? 'bg-blue-400' : 'bg-primary-400',
+                    )} />
                     <span className="flex-1">{act.detail}</span>
-                    {act.evidence_level && (
-                      <span className="text-[10px] font-mono text-primary-600">Lv.{act.evidence_level}</span>
-                    )}
+                    <div className="flex items-center gap-1">
+                      {act.status === 'needs-escalation' && (
+                        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">Escalated</span>
+                      )}
+                      {act.status === 'completed' && (
+                        <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">Done</span>
+                      )}
+                      {act.evidence_level && (
+                        <span className="text-[10px] font-mono text-primary-600">Lv.{act.evidence_level}</span>
+                      )}
+                    </div>
                   </div>
                 ))}
               </div>
             )}
-            {/* Period */}
-            <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">
-              {plan.period_start && <span>Start: {plan.period_start}</span>}
-              {plan.period_end && <span>End: {plan.period_end}</span>}
-              {plan.created && <span>Created: {format(new Date(plan.created), 'MMM d, yyyy')}</span>}
+            {/* Period + feedback indicator */}
+            <div className="mt-2 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                {plan.period_start && <span>Start: {plan.period_start}</span>}
+                {plan.period_end && <span>End: {plan.period_end}</span>}
+                {plan.created && <span>Created: {format(new Date(plan.created), 'MMM d, yyyy')}</span>}
+              </div>
+              {plan.status === 'active' && plan.ai_generated && (
+                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">
+                  Monitoring vitals...
+                </span>
+              )}
+              {plan.status === 'completed' && (
+                <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">
+                  Goals achieved
+                </span>
+              )}
             </div>
           </div>
         ))}
