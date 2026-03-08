@@ -112,6 +112,8 @@ class AgentRecommendationsView(APIView):
                     "createdAt": log.created_at.isoformat(),
                     "expiresAt": output.get("expires_at"),
                     "featureImportance": output.get("feature_importance", []),
+                    "feedbackRating": getattr(log, "feedback_rating", None),
+                    "feedbackComment": getattr(log, "feedback_comment", "") or "",
                 })
         except Exception as e:
             logger.debug("recommendations query failed: %s", e)
@@ -167,6 +169,51 @@ class AgentRecommendationActionView(APIView):
             return Response(response_data)
         except Exception as e:
             logger.debug("recommendation action failed: %s", e)
+            return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
+
+
+class AgentRecommendationFeedbackView(APIView):
+    """
+    POST /api/v1/agents/recommendations/<id>/feedback/
+    Submit clinician quality feedback on a recommendation.
+    Body: { "rating": 1|2, "comment": "optional text" }
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request, pk):
+        rating = request.data.get("rating")
+        comment = request.data.get("comment", "")
+
+        if rating not in (1, 2):
+            return Response(
+                {"error": "rating must be 1 (not helpful) or 2 (helpful)"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        try:
+            from apps.fhir.models import AgentActionLog
+            from django.utils import timezone as tz
+
+            log = AgentActionLog.objects.get(
+                pk=pk,
+                tenant=(getattr(request, "tenant", None) or request.user.tenant),
+                action_type=AgentActionLog.ActionType.RECOMMENDATION,
+            )
+            log.feedback_rating = rating
+            log.feedback_comment = comment
+            log.feedback_at = tz.now()
+            log.save(update_fields=["feedback_rating", "feedback_comment", "feedback_at"])
+
+            return Response({
+                "id": str(log.id),
+                "feedback_rating": log.feedback_rating,
+                "feedback_comment": log.feedback_comment,
+            })
+        except AgentActionLog.DoesNotExist:
+            return Response({"error": "not found"}, status=status.HTTP_404_NOT_FOUND)
+        except Exception as e:
+            logger.debug("feedback submission failed: %s", e)
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)
 
 

@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
@@ -8,10 +9,19 @@ import {
   BarChart2,
   Clock,
   AlertCircle,
+  ThumbsUp,
+  ThumbsDown,
+  MessageSquare,
+  Send,
 } from 'lucide-react'
 import toast from 'react-hot-toast'
 import { formatDistanceToNow } from 'date-fns'
-import { approveRecommendation, rejectRecommendation, type AIRecommendation } from '@/services/agents'
+import {
+  approveRecommendation,
+  rejectRecommendation,
+  submitRecommendationFeedback,
+  type AIRecommendation,
+} from '@/services/agents'
 import { cn, getTierColor } from '@/lib/utils'
 import type { AgentTier } from '@/types/agent'
 
@@ -83,11 +93,15 @@ function RecommendationCard({
   const evidenceConfig = EVIDENCE_CONFIG[rec.evidenceLevel] ?? EVIDENCE_CONFIG.D
   const priorityConfig = PRIORITY_CONFIG[rec.priority] ?? PRIORITY_CONFIG.routine
 
+  // Feedback state
+  const [localRating, setLocalRating] = useState<1 | 2 | null>(rec.feedbackRating ?? null)
+  const [showCommentBox, setShowCommentBox] = useState(false)
+  const [comment, setComment] = useState(rec.feedbackComment ?? '')
+
   const approveMutation = useMutation({
     mutationFn: () => approveRecommendation(rec.id),
     onSuccess: () => {
       toast.success('Recommendation approved — care plan created')
-      // Invalidate care plans so the new one appears immediately
       queryClient.invalidateQueries({ queryKey: ['fhir', 'care-plans'] })
       queryClient.invalidateQueries({ queryKey: ['care-gaps'] })
       onDecision?.()
@@ -104,9 +118,22 @@ function RecommendationCard({
     onError: () => toast.error('Failed to reject'),
   })
 
+  const feedbackMutation = useMutation({
+    mutationFn: ({ rating, feedbackComment }: { rating: 1 | 2; feedbackComment?: string }) =>
+      submitRecommendationFeedback(rec.id, rating, feedbackComment),
+    onSuccess: (_data, variables) => {
+      setLocalRating(variables.rating)
+      setShowCommentBox(false)
+      toast.success(variables.rating === 2 ? 'Marked as helpful' : 'Marked as not helpful')
+    },
+    onError: () => toast.error('Failed to submit feedback'),
+  })
+
   const isPending = rec.status === 'pending'
   const isApproved = rec.status === 'approved'
   const isRejected = rec.status === 'rejected'
+  const isDecided = isApproved || isRejected
+  const hasFeedback = localRating !== null
 
   return (
     <motion.div
@@ -243,6 +270,114 @@ function RecommendationCard({
               <XCircle className="w-3.5 h-3.5" />
               Reject
             </button>
+          </div>
+        )}
+
+        {/* Clinician Feedback — shown after approve/reject */}
+        {isDecided && (
+          <div className="pt-2 border-t border-border">
+            <div className="flex items-center justify-between">
+              <span className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                Was this recommendation helpful?
+              </span>
+              <div className="flex items-center gap-1">
+                {/* Thumbs Up */}
+                <button
+                  onClick={() => {
+                    if (localRating !== 2) {
+                      feedbackMutation.mutate({ rating: 2, feedbackComment: comment || undefined })
+                    }
+                  }}
+                  disabled={feedbackMutation.isPending}
+                  className={cn(
+                    'p-1.5 rounded-lg transition-colors',
+                    localRating === 2
+                      ? 'bg-secondary-100 dark:bg-secondary-900/30 text-secondary-600'
+                      : 'text-muted-foreground hover:text-secondary-600 hover:bg-secondary-50 dark:hover:bg-secondary-900/20',
+                  )}
+                  title="Helpful"
+                >
+                  <ThumbsUp className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Thumbs Down */}
+                <button
+                  onClick={() => {
+                    if (localRating !== 1) {
+                      feedbackMutation.mutate({ rating: 1, feedbackComment: comment || undefined })
+                    }
+                  }}
+                  disabled={feedbackMutation.isPending}
+                  className={cn(
+                    'p-1.5 rounded-lg transition-colors',
+                    localRating === 1
+                      ? 'bg-danger-100 dark:bg-danger-900/30 text-danger-600'
+                      : 'text-muted-foreground hover:text-danger-600 hover:bg-danger-50 dark:hover:bg-danger-900/20',
+                  )}
+                  title="Not helpful"
+                >
+                  <ThumbsDown className="w-3.5 h-3.5" />
+                </button>
+
+                {/* Comment toggle */}
+                <button
+                  onClick={() => setShowCommentBox(!showCommentBox)}
+                  className={cn(
+                    'p-1.5 rounded-lg transition-colors',
+                    showCommentBox
+                      ? 'bg-primary-100 dark:bg-primary-900/30 text-primary-600'
+                      : 'text-muted-foreground hover:text-primary-600 hover:bg-primary-50 dark:hover:bg-primary-900/20',
+                  )}
+                  title="Add comment"
+                >
+                  <MessageSquare className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            </div>
+
+            {/* Feedback badge */}
+            {hasFeedback && !showCommentBox && (
+              <p className="text-[10px] text-muted-foreground mt-1">
+                {localRating === 2 ? 'Marked as helpful' : 'Marked as not helpful'}
+                {rec.feedbackComment && ` — "${rec.feedbackComment}"`}
+              </p>
+            )}
+
+            {/* Comment input */}
+            {showCommentBox && (
+              <div className="mt-2 flex items-center gap-2">
+                <input
+                  type="text"
+                  value={comment}
+                  onChange={(e) => setComment(e.target.value)}
+                  placeholder="Add a comment on this recommendation..."
+                  className="flex-1 text-xs px-3 py-1.5 rounded-lg border border-border bg-muted/50 text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary-400"
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter' && comment.trim()) {
+                      feedbackMutation.mutate({
+                        rating: localRating ?? 2,
+                        feedbackComment: comment.trim(),
+                      })
+                    }
+                  }}
+                />
+                <button
+                  onClick={() => {
+                    if (comment.trim()) {
+                      feedbackMutation.mutate({
+                        rating: localRating ?? 2,
+                        feedbackComment: comment.trim(),
+                      })
+                    }
+                  }}
+                  disabled={!comment.trim() || feedbackMutation.isPending}
+                  className="p-1.5 rounded-lg bg-primary-600 text-white hover:bg-primary-700 transition-colors disabled:opacity-50"
+                  title="Submit feedback"
+                >
+                  <Send className="w-3.5 h-3.5" />
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>
