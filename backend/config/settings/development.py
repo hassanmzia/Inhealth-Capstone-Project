@@ -45,7 +45,13 @@ STORAGES = {
 LOGGING["handlers"]["console"]["formatter"] = "verbose"
 LOGGING["root"]["level"] = "DEBUG"
 LOGGING["loggers"]["apps"]["level"] = "DEBUG"
-LOGGING["loggers"]["django"]["level"] = "DEBUG"
+LOGGING["loggers"]["django"]["level"] = "INFO"
+# Silence per-query SQL logging (extremely noisy with celery-beat ticks)
+LOGGING["loggers"]["django.db.backends"] = {
+    "level": "WARNING",
+    "handlers": ["console"],
+    "propagate": False,
+}
 
 # Disable file handlers in development (no logs directory required)
 for logger in LOGGING["loggers"].values():
