@@ -319,6 +319,7 @@ class PatientViewSet(ModelViewSet):
 
         return {
             "id": str(patient.id),
+            "fhirPatientId": patient.fhir_id,
             "mrn": patient.mrn,
             "firstName": patient.first_name,
             "lastName": patient.last_name,

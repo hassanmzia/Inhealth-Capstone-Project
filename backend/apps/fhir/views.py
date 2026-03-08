@@ -5,6 +5,7 @@ Implements FHIR RESTful API: GET /Patient, POST /Patient, GET /Patient/{id}, etc
 
 import logging
 
+from django.db.models import Q
 from rest_framework import status
 from rest_framework.decorators import action
 from rest_framework.response import Response
@@ -320,11 +321,15 @@ class FHIRCarePlanViewSet(FHIRBaseViewSet):
 
     def get_queryset(self):
         qs = FHIRCarePlan.objects.filter(tenant=self.get_tenant()).select_related("patient")
-        if self.request.query_params.get("patient"):
-            qs = qs.filter(patient__fhir_id=self.request.query_params["patient"])
+        patient_param = self.request.query_params.get("patient")
+        if patient_param:
+            # Accept both internal UUID (from patient detail page) and FHIR ID
+            qs = qs.filter(
+                Q(patient_id=patient_param) | Q(patient__fhir_id=patient_param)
+            )
         if self.request.query_params.get("status"):
             qs = qs.filter(status=self.request.query_params["status"])
-        return qs
+        return qs.order_by("-created_at")
 
 
 class FHIREncounterViewSet(FHIRBaseViewSet):
