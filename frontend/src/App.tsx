@@ -32,7 +32,7 @@ const NurseDashboard = React.lazy(() => import('@/pages/dashboard/NurseDashboard
 const PharmacistDashboard = React.lazy(() => import('@/pages/dashboard/PharmacistDashboard'))
 const SecureMessagingPage = React.lazy(() => import('@/pages/messaging/SecureMessagingPage'))
 
-// Page transition variants
+// Page transition variants (used by public auth pages only — MainLayout handles its own)
 const pageVariants = {
   initial: { opacity: 0, y: 8 },
   in: { opacity: 1, y: 0 },
@@ -132,7 +132,7 @@ interface ProtectedRouteProps {
 function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   const { isAuthenticated, user } = useAuthStore()
 
-  // Auth redirect is handled at App level (before AnimatePresence)
+  // Auth redirect is handled at App level (before routes)
   if (!isAuthenticated) return null
 
   if (requiredRoles && user && !requiredRoles.includes(user.role)) {
@@ -149,7 +149,7 @@ function ProtectedRoute({ children, requiredRoles }: ProtectedRouteProps) {
   return <>{children}</>
 }
 
-// Animated page wrapper
+// Animated page wrapper (for public auth pages only — MainLayout handles protected page animations)
 function AnimatedPage({ children }: { children: React.ReactNode }) {
   return (
     <motion.div
@@ -172,430 +172,380 @@ export default function App() {
   const location = useLocation()
   const { isAuthenticated, user } = useAuthStore()
 
-  // Redirect to login BEFORE AnimatePresence renders protected routes.
-  // This avoids the blank-page deadlock caused by Navigate inside
-  // AnimatePresence mode="wait" exit animations.
+  // Redirect to login BEFORE routes render protected content.
   if (!isAuthenticated && !PUBLIC_PATHS.includes(location.pathname)) {
     return <Navigate to="/login" state={{ from: location }} replace />
   }
 
   return (
     <ErrorBoundary>
-      <AnimatePresence mode="wait">
-        <Routes location={location} key={location.pathname}>
-          {/* Public routes */}
-          <Route
-            path="/verify-email"
-            element={
+      <Routes>
+        {/* Public routes */}
+        <Route
+          path="/verify-email"
+          element={
+            <Suspense fallback={<PageLoader />}>
+              <VerifyEmailPage />
+            </Suspense>
+          }
+        />
+
+        <Route
+          path="/login"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
               <Suspense fallback={<PageLoader />}>
-                <VerifyEmailPage />
+                <AnimatedPage>
+                  <LoginPage />
+                </AnimatedPage>
               </Suspense>
+            )
+          }
+        />
+
+        <Route
+          path="/register"
+          element={
+            isAuthenticated ? (
+              <Navigate to="/dashboard" replace />
+            ) : (
+              <Suspense fallback={<PageLoader />}>
+                <AnimatedPage>
+                  <RegisterPage />
+                </AnimatedPage>
+              </Suspense>
+            )
+          }
+        />
+
+        {/* Protected routes under MainLayout */}
+        <Route
+          path="/"
+          element={
+            <ProtectedRoute>
+              <MainLayout />
+            </ProtectedRoute>
+          }
+        >
+          {/* Dashboard — role-based redirect */}
+          <Route
+            index
+            element={
+              <Navigate
+                to={
+                  user?.role === 'patient'
+                    ? '/dashboard/patient'
+                    : user?.role === 'researcher'
+                    ? '/dashboard/researcher'
+                    : user?.role === 'nurse'
+                    ? '/dashboard/nurse'
+                    : user?.role === 'pharmacist'
+                    ? '/dashboard/pharmacist'
+                    : user?.role === 'billing'
+                    ? '/billing'
+                    : '/dashboard'
+                }
+                replace
+              />
             }
           />
 
+          {/* Clinician dashboard */}
           <Route
-            path="/login"
+            path="dashboard"
             element={
-              isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
+              <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
                 <Suspense fallback={<PageLoader />}>
-                  <AnimatedPage>
-                    <LoginPage />
-                  </AnimatedPage>
+                  <ClinicianDashboard />
                 </Suspense>
-              )
-            }
-          />
-
-          <Route
-            path="/register"
-            element={
-              isAuthenticated ? (
-                <Navigate to="/dashboard" replace />
-              ) : (
-                <Suspense fallback={<PageLoader />}>
-                  <AnimatedPage>
-                    <RegisterPage />
-                  </AnimatedPage>
-                </Suspense>
-              )
-            }
-          />
-
-          {/* Protected routes under MainLayout */}
-          <Route
-            path="/"
-            element={
-              <ProtectedRoute>
-                <MainLayout />
               </ProtectedRoute>
             }
-          >
-            {/* Dashboard — role-based redirect */}
-            <Route
-              index
-              element={
-                <Navigate
-                  to={
-                    user?.role === 'patient'
-                      ? '/dashboard/patient'
-                      : user?.role === 'researcher'
-                      ? '/dashboard/researcher'
-                      : user?.role === 'nurse'
-                      ? '/dashboard/nurse'
-                      : user?.role === 'pharmacist'
-                      ? '/dashboard/pharmacist'
-                      : user?.role === 'billing'
-                      ? '/billing'
-                      : '/dashboard'
-                  }
-                  replace
-                />
-              }
-            />
+          />
 
-            {/* Clinician dashboard */}
-            <Route
-              path="dashboard"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <ClinicianDashboard />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Patient dashboard */}
-            <Route
-              path="dashboard/patient"
-              element={
-                <ProtectedRoute requiredRoles={['patient']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <PatientDashboard />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Researcher dashboard */}
-            <Route
-              path="dashboard/researcher"
-              element={
-                <ProtectedRoute requiredRoles={['researcher']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <ResearcherDashboard />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Nurse dashboard */}
-            <Route
-              path="dashboard/nurse"
-              element={
-                <ProtectedRoute requiredRoles={['nurse']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <NurseDashboard />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Pharmacist dashboard */}
-            <Route
-              path="dashboard/pharmacist"
-              element={
-                <ProtectedRoute requiredRoles={['pharmacist']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <PharmacistDashboard />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Secure Messaging */}
-            <Route
-              path="messages"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <SecureMessagingPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Patient management */}
-            <Route
-              path="patients/new"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <NewPatientPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="patients"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin', 'pharmacist']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <PatientListPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            <Route
-              path="patients/:patientId"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin', 'pharmacist']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <PatientDetailPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* AI Agents */}
-            <Route
-              path="agents"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <AgentControlPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Analytics */}
-            <Route
-              path="analytics"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <AnalyticsPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Research */}
-            <Route
-              path="research"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <ResearchPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Telemedicine */}
-            <Route
-              path="telemedicine"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'patient']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <TelemedicinePage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Clinical Workspace */}
-            <Route
-              path="clinical-workspace"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <ClinicalWorkspacePage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Alerts */}
-            <Route
-              path="alerts"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <AlertsPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Admin */}
-            <Route
-              path="admin"
-              element={
-                <ProtectedRoute requiredRoles={['org_admin', 'admin']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <TenantAdminPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Settings */}
-            <Route
-              path="settings"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <SettingsPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Billing / RCM */}
-            <Route
-              path="billing"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'billing']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <BillingPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Real-time Vitals */}
-            <Route
-              path="vitals"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <VitalsPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* What-If Simulator */}
-            <Route
-              path="simulator"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <WhatIfSimulatorPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Vitals Simulator */}
-            <Route
-              path="vitals-simulator"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <VitalsSimulatorPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* AI Fairness Analysis */}
-            <Route
-              path="fairness"
-              element={
-                <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <FairnessAnalysisPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-
-            {/* Two-Factor Authentication */}
-            <Route
-              path="two-factor"
-              element={
-                <ProtectedRoute>
-                  <Suspense fallback={<PageLoader />}>
-                    <AnimatedPage>
-                      <TwoFactorPage />
-                    </AnimatedPage>
-                  </Suspense>
-                </ProtectedRoute>
-              }
-            />
-          </Route>
-
-          {/* Catch-all */}
+          {/* Patient dashboard */}
           <Route
-            path="*"
+            path="dashboard/patient"
             element={
-              <div className="flex items-center justify-center min-h-screen bg-background">
-                <div className="text-center">
-                  <h1 className="text-6xl font-bold text-primary-600 mb-4">404</h1>
-                  <p className="text-xl text-muted-foreground mb-6">Page not found</p>
-                  <a
-                    href="/dashboard"
-                    className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
-                  >
-                    Return to Dashboard
-                  </a>
-                </div>
-              </div>
+              <ProtectedRoute requiredRoles={['patient']}>
+                <Suspense fallback={<PageLoader />}>
+                  <PatientDashboard />
+                </Suspense>
+              </ProtectedRoute>
             }
           />
-        </Routes>
-      </AnimatePresence>
+
+          {/* Researcher dashboard */}
+          <Route
+            path="dashboard/researcher"
+            element={
+              <ProtectedRoute requiredRoles={['researcher']}>
+                <Suspense fallback={<PageLoader />}>
+                  <ResearcherDashboard />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Nurse dashboard */}
+          <Route
+            path="dashboard/nurse"
+            element={
+              <ProtectedRoute requiredRoles={['nurse']}>
+                <Suspense fallback={<PageLoader />}>
+                  <NurseDashboard />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Pharmacist dashboard */}
+          <Route
+            path="dashboard/pharmacist"
+            element={
+              <ProtectedRoute requiredRoles={['pharmacist']}>
+                <Suspense fallback={<PageLoader />}>
+                  <PharmacistDashboard />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Secure Messaging */}
+          <Route
+            path="messages"
+            element={
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <SecureMessagingPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Patient management */}
+          <Route
+            path="patients/new"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                <Suspense fallback={<PageLoader />}>
+                  <NewPatientPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="patients"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin', 'pharmacist']}>
+                <Suspense fallback={<PageLoader />}>
+                  <PatientListPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          <Route
+            path="patients/:patientId"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin', 'pharmacist']}>
+                <Suspense fallback={<PageLoader />}>
+                  <PatientDetailPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* AI Agents */}
+          <Route
+            path="agents"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin']}>
+                <Suspense fallback={<PageLoader />}>
+                  <AgentControlPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Analytics */}
+          <Route
+            path="analytics"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
+                <Suspense fallback={<PageLoader />}>
+                  <AnalyticsPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Research */}
+          <Route
+            path="research"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
+                <Suspense fallback={<PageLoader />}>
+                  <ResearchPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Telemedicine */}
+          <Route
+            path="telemedicine"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'nurse', 'patient']}>
+                <Suspense fallback={<PageLoader />}>
+                  <TelemedicinePage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Clinical Workspace */}
+          <Route
+            path="clinical-workspace"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                <Suspense fallback={<PageLoader />}>
+                  <ClinicalWorkspacePage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Alerts */}
+          <Route
+            path="alerts"
+            element={
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <AlertsPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Admin */}
+          <Route
+            path="admin"
+            element={
+              <ProtectedRoute requiredRoles={['org_admin', 'admin']}>
+                <Suspense fallback={<PageLoader />}>
+                  <TenantAdminPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Settings */}
+          <Route
+            path="settings"
+            element={
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <SettingsPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Billing / RCM */}
+          <Route
+            path="billing"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'billing']}>
+                <Suspense fallback={<PageLoader />}>
+                  <BillingPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Real-time Vitals */}
+          <Route
+            path="vitals"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'nurse', 'admin', 'org_admin']}>
+                <Suspense fallback={<PageLoader />}>
+                  <VitalsPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* What-If Simulator */}
+          <Route
+            path="simulator"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
+                <Suspense fallback={<PageLoader />}>
+                  <WhatIfSimulatorPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Vitals Simulator */}
+          <Route
+            path="vitals-simulator"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin']}>
+                <Suspense fallback={<PageLoader />}>
+                  <VitalsSimulatorPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* AI Fairness Analysis */}
+          <Route
+            path="fairness"
+            element={
+              <ProtectedRoute requiredRoles={['physician', 'admin', 'org_admin', 'researcher']}>
+                <Suspense fallback={<PageLoader />}>
+                  <FairnessAnalysisPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+
+          {/* Two-Factor Authentication */}
+          <Route
+            path="two-factor"
+            element={
+              <ProtectedRoute>
+                <Suspense fallback={<PageLoader />}>
+                  <TwoFactorPage />
+                </Suspense>
+              </ProtectedRoute>
+            }
+          />
+        </Route>
+
+        {/* Catch-all */}
+        <Route
+          path="*"
+          element={
+            <div className="flex items-center justify-center min-h-screen bg-background">
+              <div className="text-center">
+                <h1 className="text-6xl font-bold text-primary-600 mb-4">404</h1>
+                <p className="text-xl text-muted-foreground mb-6">Page not found</p>
+                <a
+                  href="/dashboard"
+                  className="px-4 py-2 bg-primary-600 text-white rounded-md hover:bg-primary-700 transition-colors"
+                >
+                  Return to Dashboard
+                </a>
+              </div>
+            </div>
+          }
+        />
+      </Routes>
     </ErrorBoundary>
   )
 }
