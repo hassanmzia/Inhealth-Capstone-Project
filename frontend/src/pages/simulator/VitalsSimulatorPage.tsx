@@ -1047,13 +1047,14 @@ export default function VitalsSimulatorPage() {
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
-      // If background timer is NOT running (no "Keep alive"), clear the running flag
-      // so VitalsPage ECG stops. If background IS running, leave it active.
-      if (!bgStore.backgroundEnabled) {
-        bgStore.setRunning(false)
+      // Read current store state directly (not from stale closure)
+      const currentState = useSimulatorStore.getState()
+      // If "Keep alive" is NOT enabled, clear the running flag
+      // so the ECG monitor stops. If background IS enabled, leave it active.
+      if (!currentState.backgroundEnabled) {
+        currentState.setRunning(false)
       }
     }
-  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Restart interval when intervalMs changes during running
