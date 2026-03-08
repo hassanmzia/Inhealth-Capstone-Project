@@ -21,6 +21,7 @@ interface VitalsChartProps {
   showBP?: boolean
   showSpO2?: boolean
   showTemp?: boolean
+  showRR?: boolean
   timeRangeHours?: number
 }
 
@@ -32,6 +33,7 @@ interface ChartDataPoint {
   dia?: number
   spo2?: number
   temp?: number
+  rr?: number
   hrStatus?: string
   bpStatus?: string
   spo2Status?: string
@@ -60,7 +62,7 @@ function CustomTooltip({ active, payload, label }: TooltipProps<number, string>)
           <span className="text-muted-foreground">{entry.name}:</span>
           <span className="font-semibold text-foreground font-mono">
             {entry.value}
-            {entry.name === 'HR' ? ' bpm' : entry.name === 'SpO2' ? '%' : entry.name === 'Temp' ? '°C' : ' mmHg'}
+            {entry.name === 'HR' ? ' bpm' : entry.name === 'SpO2' ? '%' : entry.name === 'Temp' ? '°C' : entry.name === 'RR' ? ' /min' : ' mmHg'}
           </span>
         </div>
       ))}
@@ -75,6 +77,7 @@ export default function VitalsChart({
   showBP = true,
   showSpO2 = true,
   showTemp = false,
+  showRR = false,
   timeRangeHours = 24,
 }: VitalsChartProps) {
   const chartData = useMemo<ChartDataPoint[]>(() => {
@@ -118,6 +121,9 @@ export default function VitalsChart({
           break
         case 'temperature':
           point.temp = v.value
+          break
+        case 'respiratory_rate':
+          point.rr = v.value
           break
       }
     }
@@ -271,6 +277,20 @@ export default function VitalsChart({
               strokeWidth={1.5}
               dot={false}
               activeDot={{ r: 4, fill: '#d97706' }}
+              connectNulls
+            />
+          )}
+
+          {showRR && (
+            <Line
+              yAxisId="left"
+              type="monotone"
+              dataKey="rr"
+              name="RR"
+              stroke="#14b8a6"
+              strokeWidth={1.5}
+              dot={false}
+              activeDot={{ r: 4, fill: '#14b8a6' }}
               connectNulls
             />
           )}
