@@ -1301,7 +1301,7 @@ export default function VitalsSimulatorPage() {
         <div className="lg:col-span-2 space-y-4">
           {readings.length > 0 && (
             <motion.div variants={ITEM} className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {VITAL_CONFIGS.slice(0, 4).map((cfg) => (
+              {VITAL_CONFIGS.map((cfg) => (
                 <div key={cfg.key} className="clinical-card">
                   <h3 className="text-xs font-bold text-foreground mb-3 flex items-center gap-2">
                     <cfg.icon className={cn('w-3.5 h-3.5', cfg.color)} />
