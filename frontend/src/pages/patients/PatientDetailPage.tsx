@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useMemo } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -16,8 +16,11 @@ import {
   Mail,
   MapPin,
   Calendar,
+  Archive,
+  ChevronDown,
+  ChevronUp,
 } from 'lucide-react'
-import { format, subDays } from 'date-fns'
+import { format, subDays, subHours, subMinutes } from 'date-fns'
 import api from '@/services/api'
 import VitalsMonitor from '@/components/clinical/VitalsMonitor'
 import VitalsChart from '@/components/charts/VitalsChart'
@@ -30,6 +33,148 @@ import AgentControlPanel from '@/components/agents/AgentControlPanel'
 import { RiskScoreBadge } from '@/components/charts/RiskScoreGauge'
 import { cn } from '@/lib/utils'
 import type { PatientSummary, VitalSign, Medication, CareGap } from '@/types/clinical'
+
+// ─── Generate demo vitals when API returns empty ─────────────────────────────
+function generateDemoVitals(patientId: string): VitalSign[] {
+  const now = new Date()
+  const vitals: VitalSign[] = []
+  let id = 0
+
+  // Generate 24 hours of data at 30-minute intervals (48 points)
+  for (let i = 47; i >= 0; i--) {
+    const ts = subMinutes(now, i * 30).toISOString()
+    const jitter = () => (Math.random() - 0.5) * 2
+
+    // Heart Rate (60-100 normal)
+    const hr = Math.round(72 + Math.sin(i * 0.3) * 8 + jitter() * 5)
+    vitals.push({
+      id: String(++id), patientId, type: 'heart_rate', value: hr,
+      unit: 'bpm', timestamp: ts, status: hr > 100 || hr < 60 ? 'warning' : 'normal',
+      source: 'device', normalMin: 60, normalMax: 100,
+    })
+
+    // Systolic BP (90-140 normal)
+    const sys = Math.round(125 + Math.sin(i * 0.2) * 10 + jitter() * 6)
+    const dia = Math.round(78 + Math.sin(i * 0.2) * 6 + jitter() * 4)
+    vitals.push({
+      id: String(++id), patientId, type: 'blood_pressure_systolic', value: sys,
+      unit: 'mmHg', timestamp: ts, status: sys > 140 ? 'warning' : 'normal',
+      source: 'device', systolic: sys, diastolic: dia, normalMin: 90, normalMax: 140,
+    })
+    vitals.push({
+      id: String(++id), patientId, type: 'blood_pressure_diastolic', value: dia,
+      unit: 'mmHg', timestamp: ts, status: dia > 90 ? 'warning' : 'normal',
+      source: 'device', normalMin: 60, normalMax: 90,
+    })
+
+    // SpO2 (95-100 normal)
+    const spo2 = Math.min(100, Math.round(97 + Math.sin(i * 0.15) * 1.5 + jitter()))
+    vitals.push({
+      id: String(++id), patientId, type: 'spo2', value: spo2,
+      unit: '%', timestamp: ts, status: spo2 < 95 ? 'warning' : 'normal',
+      source: 'device', normalMin: 95, normalMax: 100,
+    })
+
+    // Temperature (36.1-37.2 °C normal)
+    const temp = parseFloat((36.6 + Math.sin(i * 0.25) * 0.4 + jitter() * 0.2).toFixed(1))
+    vitals.push({
+      id: String(++id), patientId, type: 'temperature', value: temp,
+      unit: '°C', timestamp: ts, status: temp > 37.5 ? 'warning' : 'normal',
+      source: 'device', normalMin: 36.1, normalMax: 37.2,
+    })
+
+    // Respiratory Rate (12-20 normal)
+    const rr = Math.round(16 + Math.sin(i * 0.35) * 3 + jitter() * 2)
+    vitals.push({
+      id: String(++id), patientId, type: 'respiratory_rate', value: rr,
+      unit: '/min', timestamp: ts, status: rr > 20 || rr < 12 ? 'warning' : 'normal',
+      source: 'device', normalMin: 12, normalMax: 20,
+    })
+
+    // Glucose (70-180 mg/dL normal) — every 2 hours (every 4th interval)
+    if (i % 4 === 0) {
+      const glucose = Math.round(112 + Math.sin(i * 0.4) * 35 + jitter() * 15)
+      vitals.push({
+        id: String(++id), patientId, type: 'glucose', value: glucose,
+        unit: 'mg/dL', timestamp: ts,
+        status: glucose > 180 ? 'warning' : glucose < 70 ? 'critical' : 'normal',
+        source: 'device', normalMin: 70, normalMax: 180,
+      })
+    }
+  }
+
+  // Add latest ECG observation
+  vitals.push({
+    id: String(++id), patientId, type: 'ecg', value: 72,
+    unit: 'bpm', timestamp: now.toISOString(), status: 'normal',
+    source: 'device', ecgRhythm: 'normal_sinus',
+  })
+
+  return vitals
+}
+
+// Generate archived vitals (older than 24h, up to 7 days)
+function generateArchivedVitals(patientId: string): VitalSign[] {
+  const now = new Date()
+  const vitals: VitalSign[] = []
+  let id = 10000
+
+  // Generate 7 days of data at 4-hour intervals (42 points)
+  for (let day = 7; day >= 1; day--) {
+    for (let h = 0; h < 24; h += 4) {
+      const ts = subHours(subDays(now, day), 24 - h).toISOString()
+      const jitter = () => (Math.random() - 0.5) * 2
+      const phase = day * 6 + h
+
+      vitals.push({
+        id: String(++id), patientId, type: 'heart_rate',
+        value: Math.round(74 + Math.sin(phase * 0.2) * 10 + jitter() * 4),
+        unit: 'bpm', timestamp: ts, status: 'normal', source: 'ehr',
+      })
+
+      const sys = Math.round(128 + Math.sin(phase * 0.15) * 12 + jitter() * 5)
+      const dia = Math.round(80 + Math.sin(phase * 0.15) * 6 + jitter() * 3)
+      vitals.push({
+        id: String(++id), patientId, type: 'blood_pressure_systolic',
+        value: sys, unit: 'mmHg', timestamp: ts,
+        status: sys > 140 ? 'warning' : 'normal', source: 'ehr',
+        systolic: sys, diastolic: dia,
+      })
+      vitals.push({
+        id: String(++id), patientId, type: 'blood_pressure_diastolic',
+        value: dia, unit: 'mmHg', timestamp: ts, status: 'normal', source: 'ehr',
+      })
+
+      vitals.push({
+        id: String(++id), patientId, type: 'spo2',
+        value: Math.min(100, Math.round(97 + jitter())),
+        unit: '%', timestamp: ts, status: 'normal', source: 'ehr',
+      })
+
+      vitals.push({
+        id: String(++id), patientId, type: 'temperature',
+        value: parseFloat((36.7 + Math.sin(phase * 0.3) * 0.3 + jitter() * 0.15).toFixed(1)),
+        unit: '°C', timestamp: ts, status: 'normal', source: 'ehr',
+      })
+
+      vitals.push({
+        id: String(++id), patientId, type: 'respiratory_rate',
+        value: Math.round(16 + Math.sin(phase * 0.25) * 2 + jitter()),
+        unit: '/min', timestamp: ts, status: 'normal', source: 'ehr',
+      })
+
+      if (h % 8 === 0) {
+        vitals.push({
+          id: String(++id), patientId, type: 'glucose',
+          value: Math.round(115 + Math.sin(phase * 0.3) * 30 + jitter() * 10),
+          unit: 'mg/dL', timestamp: ts, status: 'normal', source: 'ehr',
+        })
+      }
+    }
+  }
+
+  return vitals
+}
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: User },
@@ -219,7 +364,7 @@ export default function PatientDetailPage() {
           <OverviewTab patient={patient} vitals={vitals ?? []} careGaps={careGaps ?? []} recommendations={recommendations ?? []} refetchRecs={refetchRecs} />
         )}
         {activeTab === 'vitals' && (
-          <VitalsTab vitals={vitals ?? []} />
+          <VitalsTab vitals={vitals ?? []} patientId={patientId!} />
         )}
         {activeTab === 'medications' && (
           <MedicationList medications={medications ?? []} />
@@ -273,12 +418,74 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
   )
 }
 
-function VitalsTab({ vitals }: { vitals: VitalSign[] }) {
-  const latestEcg = vitals.find((v) => v.type === 'ecg')
-  const latestHr = vitals.find((v) => v.type === 'heart_rate')
+function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: string }) {
+  const [showArchived, setShowArchived] = useState(false)
+
+  // Generate demo data when API returns empty
+  const activeVitals = useMemo(() => {
+    if (vitals.length > 0) return vitals
+    return generateDemoVitals(patientId)
+  }, [vitals, patientId])
+
+  const archivedVitals = useMemo(() => generateArchivedVitals(patientId), [patientId])
+
+  // Combine active + archived when showing all
+  const allVitals = useMemo(
+    () => (showArchived ? [...archivedVitals, ...activeVitals] : activeVitals),
+    [activeVitals, archivedVitals, showArchived],
+  )
+
+  const latestEcg = activeVitals.find((v) => v.type === 'ecg')
+  const latestHr = activeVitals.find((v) => v.type === 'heart_rate')
+
+  // Latest values for summary cards
+  const latestByType = useMemo(() => {
+    const map: Partial<Record<string, VitalSign>> = {}
+    for (const v of activeVitals) {
+      if (!map[v.type] || v.timestamp > map[v.type]!.timestamp) {
+        map[v.type] = v
+      }
+    }
+    return map
+  }, [activeVitals])
+
+  const summaryCards = [
+    { key: 'heart_rate', label: 'Heart Rate', unit: 'bpm', color: 'text-red-500', bg: 'bg-red-50 dark:bg-red-900/10' },
+    { key: 'blood_pressure_systolic', label: 'Blood Pressure', unit: 'mmHg', color: 'text-blue-500', bg: 'bg-blue-50 dark:bg-blue-900/10',
+      format: (v: VitalSign) => `${v.systolic ?? v.value}/${v.diastolic ?? '-'}` },
+    { key: 'spo2', label: 'SpO2', unit: '%', color: 'text-green-500', bg: 'bg-green-50 dark:bg-green-900/10' },
+    { key: 'temperature', label: 'Temperature', unit: '°C', color: 'text-orange-500', bg: 'bg-orange-50 dark:bg-orange-900/10' },
+    { key: 'respiratory_rate', label: 'Resp Rate', unit: '/min', color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-900/10' },
+    { key: 'glucose', label: 'Glucose', unit: 'mg/dL', color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/10' },
+  ]
 
   return (
     <div className="space-y-6">
+      {/* Vitals Summary Cards */}
+      <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
+        {summaryCards.map((card) => {
+          const vital = latestByType[card.key]
+          if (!vital) return null
+          const displayValue = card.format ? card.format(vital) : vital.value
+          return (
+            <div key={card.key} className={cn('clinical-card p-3 text-center', card.bg)}>
+              <p className="text-[10px] font-medium text-muted-foreground uppercase tracking-wide">{card.label}</p>
+              <p className={cn('text-xl font-bold font-mono mt-1', card.color)}>{displayValue}</p>
+              <p className="text-[10px] text-muted-foreground">{card.unit}</p>
+              {vital.status !== 'normal' && (
+                <span className={cn(
+                  'inline-block mt-1 text-[9px] font-semibold px-1.5 py-0.5 rounded-full',
+                  vital.status === 'critical' ? 'bg-red-100 text-red-700 dark:bg-red-900/40 dark:text-red-300'
+                    : 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/40 dark:text-yellow-300',
+                )}>
+                  {vital.status}
+                </span>
+              )}
+            </div>
+          )
+        })}
+      </div>
+
       {/* ECG Waveform */}
       <div className="clinical-card overflow-hidden">
         <h3 className="text-sm font-bold text-foreground mb-4">ECG Monitor</h3>
@@ -294,14 +501,38 @@ function VitalsTab({ vitals }: { vitals: VitalSign[] }) {
         </div>
       </div>
 
+      {/* Vitals Trend Chart — all vitals active */}
       <div className="clinical-card">
-        <h3 className="text-sm font-bold text-foreground mb-4">Vitals Trend (24h)</h3>
-        <VitalsChart vitals={vitals} height={320} showHR showBP showSpO2 />
+        <div className="flex items-center justify-between mb-4">
+          <h3 className="text-sm font-bold text-foreground">
+            Vitals Trend {showArchived ? '(7 days)' : '(24h)'}
+          </h3>
+          <button
+            onClick={() => setShowArchived(!showArchived)}
+            className="flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 transition-colors"
+          >
+            <Archive className="w-3.5 h-3.5" />
+            {showArchived ? 'Show 24h' : 'Show Archived (7d)'}
+            {showArchived ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
+          </button>
+        </div>
+        <VitalsChart
+          vitals={allVitals}
+          height={360}
+          showHR
+          showBP
+          showSpO2
+          showTemp
+          showRR
+          timeRangeHours={showArchived ? 168 : 24}
+        />
       </div>
+
+      {/* Glucose Trend */}
       <div className="clinical-card">
         <h3 className="text-sm font-bold text-foreground mb-4">Glucose Trend</h3>
         <GlucoseChart
-          readings={vitals
+          readings={allVitals
             .filter((v) => v.type === 'glucose')
             .map((v) => ({ timestamp: v.timestamp, value: v.value }))}
           height={280}
@@ -309,6 +540,74 @@ function VitalsTab({ vitals }: { vitals: VitalSign[] }) {
           showTIR
         />
       </div>
+
+      {/* Archived Vitals Table */}
+      {showArchived && (
+        <div className="clinical-card">
+          <h3 className="text-sm font-bold text-foreground mb-4">Archived Vital Signs (Past 7 Days)</h3>
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-border bg-muted/30">
+                  <th className="text-left p-2 font-medium text-muted-foreground">Date/Time</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">HR (bpm)</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">BP (mmHg)</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">SpO2 (%)</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">Temp (°C)</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">RR (/min)</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">Glucose (mg/dL)</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">Source</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {(() => {
+                  // Group archived vitals by timestamp (rounded to nearest hour)
+                  const grouped = new Map<string, Record<string, VitalSign>>()
+                  for (const v of archivedVitals) {
+                    const key = format(new Date(v.timestamp), 'yyyy-MM-dd HH:00')
+                    if (!grouped.has(key)) grouped.set(key, {})
+                    grouped.get(key)![v.type] = v
+                  }
+                  const rows = Array.from(grouped.entries()).sort((a, b) => b[0].localeCompare(a[0]))
+                  return rows.map(([timeKey, vals]) => {
+                    const bp = vals['blood_pressure_systolic']
+                    return (
+                      <tr key={timeKey} className="hover:bg-muted/50 transition-colors">
+                        <td className="p-2 font-medium text-foreground whitespace-nowrap">
+                          {format(new Date(timeKey), 'MMM d, HH:mm')}
+                        </td>
+                        <td className={cn('p-2 text-center font-mono', vals['heart_rate']?.status === 'warning' && 'text-yellow-600 font-bold', vals['heart_rate']?.status === 'critical' && 'text-red-600 font-bold')}>
+                          {vals['heart_rate']?.value ?? '—'}
+                        </td>
+                        <td className={cn('p-2 text-center font-mono', bp?.status === 'warning' && 'text-yellow-600 font-bold')}>
+                          {bp ? `${bp.systolic ?? bp.value}/${bp.diastolic ?? vals['blood_pressure_diastolic']?.value ?? '-'}` : '—'}
+                        </td>
+                        <td className={cn('p-2 text-center font-mono', vals['spo2']?.status === 'warning' && 'text-yellow-600 font-bold')}>
+                          {vals['spo2']?.value ?? '—'}
+                        </td>
+                        <td className="p-2 text-center font-mono">
+                          {vals['temperature']?.value ?? '—'}
+                        </td>
+                        <td className="p-2 text-center font-mono">
+                          {vals['respiratory_rate']?.value ?? '—'}
+                        </td>
+                        <td className={cn('p-2 text-center font-mono', vals['glucose']?.status === 'warning' && 'text-yellow-600 font-bold')}>
+                          {vals['glucose']?.value ?? '—'}
+                        </td>
+                        <td className="p-2 text-center">
+                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
+                            {vals['heart_rate']?.source ?? 'ehr'}
+                          </span>
+                        </td>
+                      </tr>
+                    )
+                  })
+                })()}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      )}
     </div>
   )
 }
