@@ -17,6 +17,7 @@ import {
   RefreshCw,
   BrainCircuit,
   ShieldAlert,
+  Radio,
 } from 'lucide-react'
 import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
@@ -29,6 +30,7 @@ import type { FHIRPatient, FHIRCondition, FHIRMedicationRequest, FHIRAllergyInto
 import type { EcgRhythm } from '@/types/clinical'
 import { ECG_RHYTHM_LABELS, ECG_RHYTHM_STATUS } from '@/types/clinical'
 import EcgWaveform from '@/components/charts/EcgWaveform'
+import { useSimulatorStore } from '@/store/simulatorStore'
 
 // ─── Patient Clinical Context ────────────────────────────────────────────────
 
@@ -859,6 +861,10 @@ export default function VitalsSimulatorPage() {
   const readingCountRef = useRef(0)
   const [allergies, setAllergies] = useState<FHIRAllergyIntolerance[]>([])
 
+  // Background simulation store
+  const bgStore = useSimulatorStore()
+  const bgRunning = bgStore.isRunning
+
   // Fetch real patients from FHIR API
   const { data: patientsResult } = usePatients({ _count: 50 })
   const patients: Patient[] = useMemo(() => {
@@ -1008,6 +1014,11 @@ export default function VitalsSimulatorPage() {
     // Generate first reading immediately
     tick()
     timerRef.current = setInterval(tick, intervalMs)
+
+    // Also start background store so data keeps flowing if user navigates away
+    if (bgStore.backgroundEnabled && selectedPatientId) {
+      bgStore.startBackground(selectedPatientId, intervalMs)
+    }
   }
 
   const stopSimulation = () => {
@@ -1016,9 +1027,11 @@ export default function VitalsSimulatorPage() {
       clearInterval(timerRef.current)
       timerRef.current = null
     }
+    // Also stop background store
+    bgStore.stop()
   }
 
-  // Cleanup on unmount
+  // Cleanup on unmount — only stop the local timer, NOT the background store
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
@@ -1094,6 +1107,25 @@ export default function VitalsSimulatorPage() {
           >
             <Settings2 className="w-4 h-4" />
           </button>
+
+          {/* Background toggle */}
+          <label className="flex items-center gap-1.5 text-xs text-muted-foreground cursor-pointer select-none" title="Keep generating data when you navigate away">
+            <input
+              type="checkbox"
+              checked={bgStore.backgroundEnabled}
+              onChange={(e) => bgStore.setBackgroundEnabled(e.target.checked)}
+              className="rounded border-border"
+            />
+            <Radio className="w-3.5 h-3.5" />
+            Keep alive
+          </label>
+
+          {/* Background running indicator (visible when bg store is running but local isn't) */}
+          {bgRunning && !isRunning && (
+            <span className="flex items-center gap-1.5 text-xs font-medium text-secondary-600 animate-pulse">
+              <Radio className="w-3.5 h-3.5" /> Background active ({bgStore.tickCount} ticks)
+            </span>
+          )}
 
           {/* Start/Stop */}
           {isRunning ? (
