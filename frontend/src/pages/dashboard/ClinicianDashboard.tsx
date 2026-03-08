@@ -53,19 +53,18 @@ export default function ClinicianDashboard() {
     return DEMO_EXECUTIONS
   }, [executions])
 
-  const { data: stats } = useQuery<DashboardStats>({
+  const { data: statsRaw } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats/').then((r) => r.data),
     refetchInterval: 30000,
-    placeholderData: {
-      totalPatients: 1284,
-      criticalAlerts: 7,
-      activeAgents: activeAgents,
-      openCareGaps: 342,
-      trends: { patients: 3.2, alerts: -12, careGaps: -8 },
-      riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
-    },
+    placeholderData: DEMO_STATS,
   })
+  const stats = useMemo(() => {
+    if (!statsRaw || (statsRaw.totalPatients === 0 && statsRaw.riskDistribution?.total === 0)) {
+      return DEMO_STATS
+    }
+    return statsRaw
+  }, [statsRaw])
 
   const { data: riskPatientsRaw } = useQuery<PatientSummary[]>({
     queryKey: ['high-risk-patients'],
@@ -83,11 +82,7 @@ export default function ClinicianDashboard() {
     placeholderData: [],
   })
 
-  const displayAlerts = useMemo(() => {
-    if (alerts.length > 0) return alerts
-    return DEMO_ALERTS
-  }, [alerts])
-  const criticalAlerts = displayAlerts.filter((a) => a.severity === 'critical' && !a.isAcknowledged)
+  const criticalAlerts = alerts.filter((a) => a.severity === 'critical' && !a.isAcknowledged)
 
   const STAT_CARDS = [
     {
@@ -226,7 +221,7 @@ export default function ClinicianDashboard() {
                 View all <ArrowRight className="w-3 h-3" />
               </button>
             </div>
-            <AlertFeed alerts={displayAlerts.slice(0, 6)} />
+            <AlertFeed alerts={alerts.slice(0, 6)} />
           </motion.div>
 
           {/* Agent activity */}
@@ -428,6 +423,15 @@ function getGreeting(): string {
 
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 
+const DEMO_STATS: DashboardStats = {
+  totalPatients: 1284,
+  criticalAlerts: 7,
+  activeAgents: 3,
+  openCareGaps: 342,
+  trends: { patients: 3.2, alerts: -12, careGaps: -8 },
+  riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
+}
+
 const now = new Date()
 
 const DEMO_HIGH_RISK_PATIENTS: PatientSummary[] = [
@@ -466,39 +470,6 @@ const DEMO_HIGH_RISK_PATIENTS: PatientSummary[] = [
     activeConditions: [{ code: 'I50', display: 'Heart Failure' }, { code: 'E11', display: 'Type 2 Diabetes' }],
     riskScore: { id: 'rs6', patientId: 'demo-p6', type: 'composite', score: 68, category: 'high' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 79 },
     openCareGaps: 2, lastContactDate: subDays(now, 2).toISOString(), alertStatus: 'normal', alertCount: 0, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  },
-]
-
-const DEMO_ALERTS: ClinicalAlert[] = [
-  {
-    id: 'demo-a1', patientId: 'demo-p1', patientName: 'James Morrison', severity: 'critical', category: 'vital_sign',
-    title: 'Blood Glucose Critical High', description: 'Blood glucose reading of 342 mg/dL detected', value: '342 mg/dL', normalRange: '70-140 mg/dL',
-    timestamp: subMinutes(now, 23).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 1,
-  },
-  {
-    id: 'demo-a2', patientId: 'demo-p5', patientName: 'William Jackson', severity: 'critical', category: 'lab_result',
-    title: 'eGFR Declining Rapidly', description: 'eGFR dropped to 22 mL/min — CKD Stage 4 progression', value: '22 mL/min',
-    timestamp: subHours(now, 1).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 0,
-  },
-  {
-    id: 'demo-a3', patientId: 'demo-p2', patientName: 'Maria Gonzalez', severity: 'urgent', category: 'vital_sign',
-    title: 'Blood Pressure Elevated', description: 'BP reading 168/98 mmHg — above target for HF patient', value: '168/98 mmHg', normalRange: '<130/80 mmHg',
-    timestamp: subHours(now, 3).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 0,
-  },
-  {
-    id: 'demo-a4', patientId: 'demo-p3', patientName: 'Robert Chen', severity: 'urgent', category: 'medication',
-    title: 'Medication Non-Adherence', description: 'Missed 3 consecutive doses of Metformin — PDC dropped to 62%',
-    timestamp: subHours(now, 5).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
-  },
-  {
-    id: 'demo-a5', patientId: 'demo-p4', patientName: 'Dorothy Williams', severity: 'soon', category: 'vital_sign',
-    title: 'SpO2 Below Threshold', description: 'Oxygen saturation at 91% — monitor for COPD exacerbation', value: '91%', normalRange: '95-100%',
-    timestamp: subHours(now, 8).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
-  },
-  {
-    id: 'demo-a6', patientId: 'demo-p6', patientName: 'Linda Nguyen', severity: 'routine', category: 'lab_result',
-    title: 'HbA1c Result Available', description: 'New HbA1c result: 7.8% — improved from 8.4%', value: '7.8%',
-    timestamp: subHours(now, 12).toISOString(), isRead: true, isAcknowledged: true, escalationCount: 0,
   },
 ]
 
