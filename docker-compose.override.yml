@@ -75,13 +75,13 @@ services:
         --pattern="*.py"
         --recursive
         -- celery -A config.celery_app worker
-             --loglevel=debug
+             --loglevel=info
              --concurrency=2
              -Q default,high_priority,medical_alerts,notifications,reports
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.development
       DEBUG: "True"
-      CELERY_LOG_LEVEL: debug
+      CELERY_LOG_LEVEL: info
     volumes:
       - ./backend:/app:cached
       - /app/.venv
@@ -94,7 +94,7 @@ services:
   celery-beat:
     build:
       target: development
-    command: celery -A config.celery_app beat --loglevel=debug --scheduler django_celery_beat.schedulers:DatabaseScheduler
+    command: celery -A config.celery_app beat --loglevel=info --scheduler django_celery_beat.schedulers:DatabaseScheduler
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.development
       DEBUG: "True"
@@ -241,12 +241,12 @@ services:
     ports:
       - "5588:5432"
     environment:
-      # More verbose logging in dev
-      POSTGRES_LOG_STATEMENT: all
+      # Log only DDL (CREATE/ALTER/DROP) — use Django debug toolbar for query inspection
+      POSTGRES_LOG_STATEMENT: ddl
     command: >
       postgres
-      -c log_statement=all
-      -c log_min_duration_statement=0
+      -c log_statement=ddl
+      -c log_min_duration_statement=500
       -c max_connections=100
       -c shared_buffers=128MB
 
