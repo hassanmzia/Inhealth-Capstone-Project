@@ -77,7 +77,7 @@ services:
         -- celery -A config.celery_app worker
              --loglevel=info
              --concurrency=2
-             -Q default,high_priority,medical_alerts,notifications,reports
+             -Q default,high_priority,medical_alerts,notifications,reports,clinical,research
     environment:
       DJANGO_SETTINGS_MODULE: config.settings.development
       DEBUG: "True"
