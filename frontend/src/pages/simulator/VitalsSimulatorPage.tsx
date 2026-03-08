@@ -27,7 +27,7 @@ import { usePatients, usePatient, useConditions, useMedications } from '@/hooks/
 import * as fhirService from '@/services/fhir'
 import type { FHIRPatient, FHIRCondition, FHIRMedicationRequest, FHIRAllergyIntolerance } from '@/types/fhir'
 import type { EcgRhythm } from '@/types/clinical'
-import { ECG_RHYTHM_LABELS } from '@/types/clinical'
+import { ECG_RHYTHM_LABELS, ECG_RHYTHM_STATUS } from '@/types/clinical'
 import EcgWaveform from '@/components/charts/EcgWaveform'
 
 // ─── Patient Clinical Context ────────────────────────────────────────────────
@@ -1229,7 +1229,7 @@ export default function VitalsSimulatorPage() {
 
       {/* Live Vital Cards */}
       {latestReading && (
-        <motion.div variants={ITEM} className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-7 gap-3">
+        <motion.div variants={ITEM} className="grid grid-cols-2 sm:grid-cols-4 lg:grid-cols-8 gap-3">
           {VITAL_CONFIGS.map((cfg) => {
             const value = latestReading.values[cfg.key]
             const status: 'normal' | 'warning' | 'critical' =
@@ -1261,6 +1261,38 @@ export default function VitalsSimulatorPage() {
               </div>
             )
           })}
+
+          {/* ECG Numeric Card */}
+          {(() => {
+            const ecgStatus = ECG_RHYTHM_STATUS[ecgRhythm] ?? 'normal'
+            const ecgHr = latestReading.values.heartRate ?? 72
+            return (
+              <div
+                className={cn(
+                  'clinical-card border transition-all',
+                  ecgStatus === 'critical' && 'border-danger-500/50 bg-danger-50/30 dark:bg-danger-900/10 animate-pulse',
+                  ecgStatus === 'warning' && 'border-warning-500/30 bg-warning-50/30 dark:bg-warning-900/10',
+                  ecgStatus === 'normal' && 'border-secondary-500/20 bg-secondary-50/20 dark:bg-secondary-900/5',
+                )}
+              >
+                <div className="flex items-center justify-between mb-1">
+                  <HeartPulse className="w-4 h-4 text-green-500" />
+                  {ecgStatus !== 'normal' && <AlertTriangle className={cn('w-3.5 h-3.5', ecgStatus === 'critical' ? 'text-danger-500' : 'text-warning-500')} />}
+                </div>
+                <p className="text-xl font-bold font-mono text-foreground">{ecgHr}</p>
+                <p className="text-[10px] text-muted-foreground">bpm</p>
+                <p className="text-[10px] font-medium text-foreground mt-0.5">ECG</p>
+                <p className={cn(
+                  'text-[9px] font-semibold mt-0.5 px-1 py-0.5 rounded w-fit',
+                  ecgStatus === 'critical' ? 'bg-danger-100 text-danger-700 dark:bg-danger-900/30 dark:text-danger-400'
+                    : ecgStatus === 'warning' ? 'bg-warning-100 text-warning-700 dark:bg-warning-900/30 dark:text-warning-400'
+                    : 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400',
+                )}>
+                  {ECG_RHYTHM_LABELS[ecgRhythm] ?? 'Unknown'}
+                </p>
+              </div>
+            )
+          })()}
         </motion.div>
       )}
 
