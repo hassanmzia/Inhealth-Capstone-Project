@@ -13,7 +13,7 @@ import {
   Sparkles,
   ArrowRight,
 } from 'lucide-react'
-import { format, subDays, subHours, subMinutes } from 'date-fns'
+import { format, subHours, subMinutes } from 'date-fns'
 import { useAuthStore } from '@/store/authStore'
 import { useAlertStore } from '@/store/alertStore'
 import { useAgentStore, selectTotalActiveAgents } from '@/store/agentStore'
@@ -23,7 +23,7 @@ import AIRecommendationPanel from '@/components/clinical/AIRecommendationPanel'
 import PopulationRiskPyramid from '@/components/charts/PopulationRiskPyramid'
 import AgentActivityTimeline from '@/components/charts/AgentActivityTimeline'
 import { cn } from '@/lib/utils'
-import type { PatientSummary, ClinicalAlert, RiskCategory } from '@/types/clinical'
+import type { PatientSummary, ClinicalAlert } from '@/types/clinical'
 import type { AgentExecution } from '@/types/agent'
 
 const CONTAINER = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
@@ -53,28 +53,16 @@ export default function ClinicianDashboard() {
     return DEMO_EXECUTIONS
   }, [executions])
 
-  const { data: statsRaw } = useQuery<DashboardStats>({
+  const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats/').then((r) => r.data),
     refetchInterval: 30000,
-    placeholderData: DEMO_STATS,
   })
-  const stats = useMemo(() => {
-    if (!statsRaw || (statsRaw.totalPatients === 0 && statsRaw.riskDistribution?.total === 0)) {
-      return DEMO_STATS
-    }
-    return statsRaw
-  }, [statsRaw])
 
-  const { data: riskPatientsRaw } = useQuery<PatientSummary[]>({
+  const { data: riskPatients = [] } = useQuery<PatientSummary[]>({
     queryKey: ['high-risk-patients'],
     queryFn: () => api.get('/patients/?risk_level=critical,high&limit=10').then((r) => r.data?.results ?? []),
-    placeholderData: [],
   })
-  const riskPatients = useMemo(() => {
-    if (riskPatientsRaw && riskPatientsRaw.length > 0) return riskPatientsRaw
-    return DEMO_HIGH_RISK_PATIENTS
-  }, [riskPatientsRaw])
 
   const { data: recommendations, refetch: refetchRecs } = useQuery({
     queryKey: ['recent-recommendations'],
@@ -202,9 +190,17 @@ export default function ClinicianDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {riskPatients.map((patient) => (
-                    <PatientRiskRow key={patient.id} patient={patient} />
-                  ))}
+                  {riskPatients.length > 0 ? (
+                    riskPatients.map((patient) => (
+                      <PatientRiskRow key={patient.id} patient={patient} />
+                    ))
+                  ) : (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-sm text-muted-foreground">
+                        No high-risk patients found
+                      </td>
+                    </tr>
+                  )}
                 </tbody>
               </table>
             </div>
@@ -423,55 +419,7 @@ function getGreeting(): string {
 
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 
-const DEMO_STATS: DashboardStats = {
-  totalPatients: 1284,
-  criticalAlerts: 7,
-  activeAgents: 3,
-  openCareGaps: 342,
-  trends: { patients: 3.2, alerts: -12, careGaps: -8 },
-  riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
-}
-
 const now = new Date()
-
-const DEMO_HIGH_RISK_PATIENTS: PatientSummary[] = [
-  {
-    id: 'demo-p1', mrn: 'MRN001', firstName: 'James', lastName: 'Morrison', dateOfBirth: '1958-03-15', age: 67, gender: 'male',
-    activeConditions: [{ code: 'E11', display: 'Type 2 Diabetes' }, { code: 'I10', display: 'Hypertension' }, { code: 'N18.3', display: 'CKD Stage 3' }],
-    riskScore: { id: 'rs1', patientId: 'demo-p1', type: 'composite', score: 89, category: 'critical' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 92 },
-    openCareGaps: 4, lastContactDate: subDays(now, 3).toISOString(), alertStatus: 'critical', alertCount: 2, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  },
-  {
-    id: 'demo-p2', mrn: 'MRN002', firstName: 'Maria', lastName: 'Gonzalez', dateOfBirth: '1965-07-22', age: 60, gender: 'female',
-    activeConditions: [{ code: 'I50', display: 'Heart Failure' }, { code: 'I10', display: 'Hypertension' }],
-    riskScore: { id: 'rs2', patientId: 'demo-p2', type: 'composite', score: 82, category: 'critical' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 88 },
-    openCareGaps: 3, lastContactDate: subDays(now, 7).toISOString(), alertStatus: 'warning', alertCount: 1, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  },
-  {
-    id: 'demo-p3', mrn: 'MRN003', firstName: 'Robert', lastName: 'Chen', dateOfBirth: '1952-11-08', age: 73, gender: 'male',
-    activeConditions: [{ code: 'E11', display: 'Type 2 Diabetes' }, { code: 'I25', display: 'Coronary Artery Disease' }],
-    riskScore: { id: 'rs3', patientId: 'demo-p3', type: 'composite', score: 76, category: 'high' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 85 },
-    openCareGaps: 2, lastContactDate: subDays(now, 14).toISOString(), alertStatus: 'warning', alertCount: 1, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  },
-  {
-    id: 'demo-p4', mrn: 'MRN004', firstName: 'Dorothy', lastName: 'Williams', dateOfBirth: '1960-04-19', age: 65, gender: 'female',
-    activeConditions: [{ code: 'J44', display: 'COPD' }, { code: 'I48', display: 'Atrial Fibrillation' }],
-    riskScore: { id: 'rs4', patientId: 'demo-p4', type: 'composite', score: 71, category: 'high' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 81 },
-    openCareGaps: 3, lastContactDate: subDays(now, 5).toISOString(), alertStatus: 'normal', alertCount: 0, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  },
-  {
-    id: 'demo-p5', mrn: 'MRN005', firstName: 'William', lastName: 'Jackson', dateOfBirth: '1955-09-30', age: 70, gender: 'male',
-    activeConditions: [{ code: 'E11', display: 'Type 2 Diabetes' }, { code: 'N18.4', display: 'CKD Stage 4' }],
-    riskScore: { id: 'rs5', patientId: 'demo-p5', type: 'composite', score: 85, category: 'critical' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 90 },
-    openCareGaps: 5, lastContactDate: subDays(now, 10).toISOString(), alertStatus: 'critical', alertCount: 3, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  },
-  {
-    id: 'demo-p6', mrn: 'MRN006', firstName: 'Linda', lastName: 'Nguyen', dateOfBirth: '1963-01-12', age: 63, gender: 'female',
-    activeConditions: [{ code: 'I50', display: 'Heart Failure' }, { code: 'E11', display: 'Type 2 Diabetes' }],
-    riskScore: { id: 'rs6', patientId: 'demo-p6', type: 'composite', score: 68, category: 'high' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 79 },
-    openCareGaps: 2, lastContactDate: subDays(now, 2).toISOString(), alertStatus: 'normal', alertCount: 0, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
-  },
-]
 
 const DEMO_EXECUTIONS: AgentExecution[] = [
   { id: 'demo-e1', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'system', triggeredAt: subMinutes(now, 15).toISOString(), startedAt: subMinutes(now, 15).toISOString(), completedAt: subMinutes(now, 14).toISOString(), runtimeSeconds: 4.2 },

@@ -274,19 +274,27 @@ class PatientViewSet(ModelViewSet):
         except Exception:
             pass
 
-        # Latest valid risk score
+        # Latest risk score (try valid first, fall back to most recent)
         risk_score_data = None
         alert_status = "normal"
         try:
+            all_scores = list(patient.analytics_risk_scores.all())
+            # Prefer still-valid scores, fall back to most recent expired
             latest_risk = next(
-                (r for r in patient.analytics_risk_scores.all()
-                 if r.valid_until and r.valid_until > now),
-                None
+                (r for r in all_scores if r.valid_until and r.valid_until > now),
+                all_scores[0] if all_scores else None,
             )
             if latest_risk:
                 risk_score_data = {
-                    "score": latest_risk.score,
-                    "level": latest_risk.risk_level,
+                    "id": str(latest_risk.id),
+                    "patientId": str(patient.id),
+                    "type": latest_risk.score_type or "composite",
+                    "score": round(latest_risk.score * 100, 1),
+                    "category": latest_risk.risk_level,
+                    "calculatedAt": latest_risk.calculated_at.isoformat() if latest_risk.calculated_at else now.isoformat(),
+                    "model": latest_risk.model_version or "InHealth-Risk-v1",
+                    "modelVersion": latest_risk.model_version or "1.0",
+                    "confidence": 85,
                 }
                 alert_status = (
                     "critical" if latest_risk.risk_level in ("critical", "high")
@@ -319,13 +327,17 @@ class PatientViewSet(ModelViewSet):
             "gender": patient.gender,
             "phone": patient.phone,
             "email": patient.email,
-            "active": patient.active,
+            "isActive": patient.active,
+            "tenantId": str(patient.tenant_id),
             "primaryProvider": provider_data,
             "activeConditions": active_conditions,
             "riskScore": risk_score_data,
             "openCareGaps": 0,
             "lastContactDate": None,
             "alertStatus": alert_status,
+            "alertCount": 0,
+            "createdAt": patient.created_at.isoformat() if patient.created_at else now.isoformat(),
+            "updatedAt": patient.updated_at.isoformat() if patient.updated_at else now.isoformat(),
         }
 
     def get_queryset(self):
@@ -353,11 +365,14 @@ class PatientViewSet(ModelViewSet):
                 from django.utils import timezone
                 from apps.analytics.models import RiskScore
                 levels = [r.strip() for r in risk_level_param.split(",")]
-                patient_ids = RiskScore.objects.filter(
+                # Try valid scores first; fall back to all if none are valid
+                base_qs = RiskScore.objects.filter(
                     tenant=tenant,
                     risk_level__in=levels,
-                    valid_until__gt=timezone.now(),
-                ).values_list("patient_id", flat=True).distinct()
+                )
+                valid_qs = base_qs.filter(valid_until__gt=timezone.now())
+                use_qs = valid_qs if valid_qs.exists() else base_qs
+                patient_ids = use_qs.values_list("patient_id", flat=True).distinct()
                 qs = qs.filter(id__in=patient_ids)
             except Exception:
                 pass  # DB not ready — return unfiltered list
