@@ -53,19 +53,18 @@ export default function ClinicianDashboard() {
     return DEMO_EXECUTIONS
   }, [executions])
 
-  const { data: stats } = useQuery<DashboardStats>({
+  const { data: statsRaw } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats/').then((r) => r.data),
     refetchInterval: 30000,
-    placeholderData: {
-      totalPatients: 1284,
-      criticalAlerts: 7,
-      activeAgents: activeAgents,
-      openCareGaps: 342,
-      trends: { patients: 3.2, alerts: -12, careGaps: -8 },
-      riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
-    },
+    placeholderData: DEMO_STATS,
   })
+  const stats = useMemo(() => {
+    if (!statsRaw || (statsRaw.totalPatients === 0 && statsRaw.riskDistribution?.total === 0)) {
+      return DEMO_STATS
+    }
+    return statsRaw
+  }, [statsRaw])
 
   const { data: riskPatientsRaw } = useQuery<PatientSummary[]>({
     queryKey: ['high-risk-patients'],
@@ -423,6 +422,15 @@ function getGreeting(): string {
 }
 
 // ─── Demo Data ────────────────────────────────────────────────────────────────
+
+const DEMO_STATS: DashboardStats = {
+  totalPatients: 1284,
+  criticalAlerts: 7,
+  activeAgents: 3,
+  openCareGaps: 342,
+  trends: { patients: 3.2, alerts: -12, careGaps: -8 },
+  riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
+}
 
 const now = new Date()
 
