@@ -39,6 +39,7 @@ import AIRecommendationPanel from '@/components/clinical/AIRecommendationPanel'
 import AgentControlPanel from '@/components/agents/AgentControlPanel'
 import { RiskScoreBadge } from '@/components/charts/RiskScoreGauge'
 import { cn } from '@/lib/utils'
+import { useSimulatorStore } from '@/store/simulatorStore'
 import type { PatientSummary, VitalSign, Medication, CareGap, EcgRhythm } from '@/types/clinical'
 import { ECG_RHYTHM_LABELS } from '@/types/clinical'
 
@@ -456,11 +457,12 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
     [activeVitals, archivedVitals, showArchived],
   )
 
+  const bgStore = useSimulatorStore()
   const hasRealVitals = vitals.length > 0
   const latestEcg = activeVitals.find((v) => v.type === 'ecg')
   const latestHr = activeVitals.find((v) => v.type === 'heart_rate')
-  // Animate ECG when real heart rate or ECG data exists from API/device
-  const ecgIsLive = hasRealVitals && !!(latestEcg || latestHr)
+  // Only show live ECG when the simulator is actively running
+  const ecgIsLive = bgStore.isRunning && hasRealVitals && !!(latestEcg || latestHr)
 
   // Latest values for summary cards
   const latestByType = useMemo(() => {
@@ -510,20 +512,22 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
         })}
       </div>
 
-      {/* ECG Waveform */}
-      <div className="clinical-card overflow-hidden">
-        <h3 className="text-sm font-bold text-foreground mb-4">ECG Monitor</h3>
-        <div className="flex justify-center">
-          <EcgWaveform
-            heartRate={latestEcg?.value ?? latestHr?.value ?? 72}
-            rhythm={latestEcg?.ecgRhythm ?? 'normal_sinus'}
-            width={Math.min(720, typeof window !== 'undefined' ? window.innerWidth - 120 : 600)}
-            height={200}
-            isLive={ecgIsLive}
-            showOverlay
-          />
+      {/* ECG Waveform — only shown when simulator is actively running */}
+      {ecgIsLive && (
+        <div className="clinical-card overflow-hidden">
+          <h3 className="text-sm font-bold text-foreground mb-4">ECG Monitor</h3>
+          <div className="flex justify-center">
+            <EcgWaveform
+              heartRate={latestEcg?.value ?? latestHr?.value ?? 72}
+              rhythm={latestEcg?.ecgRhythm ?? 'normal_sinus'}
+              width={Math.min(720, typeof window !== 'undefined' ? window.innerWidth - 120 : 600)}
+              height={200}
+              isLive
+              showOverlay
+            />
+          </div>
         </div>
-      </div>
+      )}
 
       {/* Archived ECG Recordings */}
       {showArchived && (() => {
