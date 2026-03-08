@@ -145,6 +145,10 @@ fhirApi.interceptors.request.use((config) => {
   if (user?.tenantId) {
     config.headers['X-Tenant-ID'] = user.tenantId
   }
+  // Ensure trailing slash — Django APPEND_SLASH rejects POST/PUT without one
+  if (config.url && !config.url.endsWith('/')) {
+    config.url += '/'
+  }
   return config
 })
 
