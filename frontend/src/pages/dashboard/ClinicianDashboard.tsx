@@ -53,16 +53,21 @@ export default function ClinicianDashboard() {
     return DEMO_EXECUTIONS
   }, [executions])
 
-  const { data: stats } = useQuery<DashboardStats>({
+  const { data: statsRaw } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
     queryFn: () => api.get('/dashboard/stats/').then((r) => r.data),
     refetchInterval: 30000,
   })
+  const stats = useMemo(() => {
+    if (statsRaw && statsRaw.totalPatients > 0) return statsRaw
+    return DEMO_STATS
+  }, [statsRaw])
 
-  const { data: riskPatients = [] } = useQuery<PatientSummary[]>({
+  const { data: riskPatientsRaw = [] } = useQuery<PatientSummary[]>({
     queryKey: ['high-risk-patients'],
     queryFn: () => api.get('/patients/?risk_level=critical,high&limit=10').then((r) => r.data?.results ?? []),
   })
+  const riskPatients = riskPatientsRaw.length > 0 ? riskPatientsRaw : DEMO_HIGH_RISK_PATIENTS
 
   const { data: recommendations, refetch: refetchRecs } = useQuery({
     queryKey: ['recent-recommendations'],
@@ -420,6 +425,93 @@ function getGreeting(): string {
 // ─── Demo Data ────────────────────────────────────────────────────────────────
 
 const now = new Date()
+
+const DEMO_STATS: DashboardStats = {
+  totalPatients: 20,
+  criticalAlerts: 3,
+  activeAgents: 4,
+  openCareGaps: 47,
+  trends: { patients: 5.2, alerts: -12.5, careGaps: -8.3 },
+  riskDistribution: { critical: 7, high: 5, medium: 5, low: 3, total: 20 },
+}
+
+const DEMO_HIGH_RISK_PATIENTS: PatientSummary[] = [
+  {
+    id: 'demo-p1', mrn: 'MRN001', firstName: 'James', lastName: 'Morrison',
+    dateOfBirth: '1952-03-14', age: 73, gender: 'male',
+    activeConditions: [
+      { code: 'E11.9', display: 'Type 2 Diabetes Mellitus' },
+      { code: 'I10', display: 'Essential Hypertension' },
+      { code: 'N18.3', display: 'Chronic Kidney Disease, Stage 3' },
+    ],
+    riskScore: { id: 'rs-1', patientId: 'demo-p1', type: 'composite', score: 92, category: 'critical', calculatedAt: subHours(now, 6).toISOString(), model: 'InHealth-Risk-v1', modelVersion: 'xgboost_v1', confidence: 87, features: [] },
+    openCareGaps: 4, lastContactDate: subHours(now, 48).toISOString(), alertStatus: 'critical', alertCount: 2, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p4', mrn: 'MRN004', firstName: 'Linda', lastName: 'Patel',
+    dateOfBirth: '1970-02-18', age: 55, gender: 'female',
+    activeConditions: [
+      { code: 'E11.9', display: 'Type 2 Diabetes Mellitus' },
+      { code: 'I10', display: 'Essential Hypertension' },
+      { code: 'J44.1', display: 'COPD with Acute Exacerbation' },
+    ],
+    riskScore: { id: 'rs-4', patientId: 'demo-p4', type: 'composite', score: 88, category: 'critical', calculatedAt: subHours(now, 4).toISOString(), model: 'InHealth-Risk-v1', modelVersion: 'xgboost_v1', confidence: 91, features: [] },
+    openCareGaps: 3, lastContactDate: subHours(now, 72).toISOString(), alertStatus: 'critical', alertCount: 1, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p5', mrn: 'MRN005', firstName: 'William', lastName: 'Thompson',
+    dateOfBirth: '1945-09-30', age: 80, gender: 'male',
+    activeConditions: [
+      { code: 'I25.10', display: 'Coronary Artery Disease' },
+      { code: 'I50.9', display: 'Heart Failure' },
+      { code: 'I48.91', display: 'Atrial Fibrillation' },
+    ],
+    riskScore: { id: 'rs-5', patientId: 'demo-p5', type: 'composite', score: 95, category: 'critical', calculatedAt: subHours(now, 2).toISOString(), model: 'InHealth-Risk-v1', modelVersion: 'xgboost_v1', confidence: 93, features: [] },
+    openCareGaps: 5, lastContactDate: subHours(now, 24).toISOString(), alertStatus: 'critical', alertCount: 3, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p8', mrn: 'MRN008', firstName: 'Jennifer', lastName: 'Brown',
+    dateOfBirth: '1955-12-03', age: 70, gender: 'female',
+    activeConditions: [
+      { code: 'E11.9', display: 'Type 2 Diabetes Mellitus' },
+      { code: 'I10', display: 'Essential Hypertension' },
+      { code: 'N18.3', display: 'Chronic Kidney Disease' },
+    ],
+    riskScore: { id: 'rs-8', patientId: 'demo-p8', type: 'composite', score: 85, category: 'critical', calculatedAt: subHours(now, 8).toISOString(), model: 'InHealth-Risk-v1', modelVersion: 'xgboost_v1', confidence: 89, features: [] },
+    openCareGaps: 2, lastContactDate: subHours(now, 120).toISOString(), alertStatus: 'warning', alertCount: 1, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p2', mrn: 'MRN002', firstName: 'Maria', lastName: 'Gonzalez',
+    dateOfBirth: '1965-07-22', age: 60, gender: 'female',
+    activeConditions: [
+      { code: 'I10', display: 'Essential Hypertension' },
+      { code: 'I50.9', display: 'Heart Failure' },
+    ],
+    riskScore: { id: 'rs-2', patientId: 'demo-p2', type: 'composite', score: 74, category: 'high', calculatedAt: subHours(now, 5).toISOString(), model: 'InHealth-Risk-v1', modelVersion: 'xgboost_v1', confidence: 82, features: [] },
+    openCareGaps: 2, lastContactDate: subHours(now, 36).toISOString(), alertStatus: 'warning', alertCount: 1, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p3', mrn: 'MRN003', firstName: 'Robert', lastName: 'Chen',
+    dateOfBirth: '1958-11-05', age: 67, gender: 'male',
+    activeConditions: [
+      { code: 'E11.9', display: 'Type 2 Diabetes Mellitus' },
+      { code: 'I25.10', display: 'Coronary Artery Disease' },
+    ],
+    riskScore: { id: 'rs-3', patientId: 'demo-p3', type: 'composite', score: 71, category: 'high', calculatedAt: subHours(now, 3).toISOString(), model: 'InHealth-Risk-v1', modelVersion: 'xgboost_v1', confidence: 85, features: [] },
+    openCareGaps: 1, lastContactDate: subHours(now, 168).toISOString(), alertStatus: 'warning', alertCount: 0, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p10', mrn: 'MRN010', firstName: 'Patricia', lastName: 'Miller',
+    dateOfBirth: '1948-01-29', age: 78, gender: 'female',
+    activeConditions: [
+      { code: 'E11.9', display: 'Type 2 Diabetes Mellitus' },
+      { code: 'I25.10', display: 'Coronary Artery Disease' },
+      { code: 'I50.9', display: 'Heart Failure' },
+    ],
+    riskScore: { id: 'rs-10', patientId: 'demo-p10', type: 'composite', score: 90, category: 'critical', calculatedAt: subHours(now, 1).toISOString(), model: 'InHealth-Risk-v1', modelVersion: 'xgboost_v1', confidence: 90, features: [] },
+    openCareGaps: 6, lastContactDate: subHours(now, 96).toISOString(), alertStatus: 'critical', alertCount: 2, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+]
 
 const DEMO_EXECUTIONS: AgentExecution[] = [
   { id: 'demo-e1', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'system', triggeredAt: subMinutes(now, 15).toISOString(), startedAt: subMinutes(now, 15).toISOString(), completedAt: subMinutes(now, 14).toISOString(), runtimeSeconds: 4.2 },
