@@ -252,9 +252,21 @@ class FHIRObservationViewSet(FHIRBaseViewSet):
         if params.get("patient"):
             qs = qs.filter(patient__fhir_id=params["patient"])
         if params.get("code"):
-            qs = qs.filter(code=params["code"])
+            codes = params["code"].split(",")
+            qs = qs.filter(code__in=codes) if len(codes) > 1 else qs.filter(code=codes[0])
         if params.get("date"):
-            qs = qs.filter(effective_datetime__date=params["date"])
+            date_val = params["date"]
+            # Support FHIR date prefixes: ge (>=), le (<=), gt (>), lt (<)
+            if date_val.startswith("ge"):
+                qs = qs.filter(effective_datetime__gte=date_val[2:])
+            elif date_val.startswith("le"):
+                qs = qs.filter(effective_datetime__lte=date_val[2:])
+            elif date_val.startswith("gt"):
+                qs = qs.filter(effective_datetime__gt=date_val[2:])
+            elif date_val.startswith("lt"):
+                qs = qs.filter(effective_datetime__lt=date_val[2:])
+            else:
+                qs = qs.filter(effective_datetime__date=date_val)
         return qs.order_by("-effective_datetime")
 
 

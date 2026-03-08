@@ -20,13 +20,13 @@ import {
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   ReferenceLine,
 } from 'recharts'
-import api from '@/services/api'
 import * as fhirService from '@/services/fhir'
 import { cn } from '@/lib/utils'
 import { useSimulatorStore } from '@/store/simulatorStore'
+import { usePatients } from '@/hooks/useFHIR'
 import EcgWaveform from '@/components/charts/EcgWaveform'
 import type { EcgRhythm } from '@/types/clinical'
-import type { FHIRObservation } from '@/types/fhir'
+import type { FHIRObservation, FHIRPatient } from '@/types/fhir'
 
 const CONTAINER = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } }
 const ITEM = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -145,20 +145,18 @@ function useVitalsWebSocket(patientId: string | null) {
 export default function VitalsPage() {
   const [selectedPatientId, setSelectedPatientId] = useState<string | null>(null)
 
-  const { data: patientsData } = useQuery({
-    queryKey: ['vitals-patients'],
-    queryFn: () => api.get('/patients/').then((r) => r.data),
-    placeholderData: {
-      results: [
-        { id: 'p1', name: 'Maria Garcia' },
-        { id: 'p2', name: 'James Wilson' },
-        { id: 'p3', name: 'Susan Chen' },
-        { id: 'p4', name: 'Robert Johnson' },
-      ] as Patient[],
-    },
-  })
-
-  const patients = patientsData?.results ?? []
+  // Use the same FHIR patient endpoint as the simulator so IDs match (fhir_id)
+  const { data: patientsResult } = usePatients({ _count: 50 })
+  const patients: Patient[] = useMemo(() => {
+    const entries = patientsResult?.entry ?? []
+    return entries.map((e) => {
+      const r = e.resource as FHIRPatient
+      const name = r.name?.[0]
+        ? `${r.name[0].given?.join(' ') ?? ''} ${r.name[0].family ?? ''}`.trim()
+        : (r as Record<string, unknown>).mrn as string ?? r.id
+      return { id: r.id, name: name || r.id }
+    })
+  }, [patientsResult])
 
   const { connected } = useVitalsWebSocket(selectedPatientId)
   const bgStore = useSimulatorStore()
