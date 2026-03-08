@@ -55,6 +55,7 @@ class ReconnectingWS {
   private maxDelay = 30000
   private stopped = false
   private reconnectTimer: ReturnType<typeof setTimeout> | null = null
+  private connectedAt = 0
 
   constructor(url: string) {
     this.url = url
@@ -64,7 +65,12 @@ class ReconnectingWS {
     if (this.stopped) return
 
     const token = useAuthStore.getState().token
-    const wsUrl = this.url + (token ? `?token=${encodeURIComponent(token)}` : '')
+    if (!token) {
+      // No token available — don't attempt connection, retry later
+      this.scheduleReconnect()
+      return
+    }
+    const wsUrl = this.url + `?token=${encodeURIComponent(token)}`
 
     try {
       this.ws = new WebSocket(wsUrl)
@@ -75,7 +81,9 @@ class ReconnectingWS {
 
     this.ws.onopen = () => {
       console.info(`[WS] Connected: ${this.url}`)
-      this.reconnectDelay = 2000
+      this.connectedAt = Date.now()
+      // Only reset delay if connection has been stable (>5s)
+      // — don't reset if server will immediately close (auth fail)
     }
 
     this.ws.onmessage = (event) => {
@@ -88,10 +96,24 @@ class ReconnectingWS {
     }
 
     this.ws.onclose = (event) => {
-      if (!this.stopped) {
-        console.warn(`[WS] Closed (${event.code}): ${this.url}`)
+      if (this.stopped) return
+
+      // 4001 = authentication required — don't reconnect, token is invalid
+      if (event.code === 4001) {
+        console.warn(`[WS] Auth failed (4001): ${this.url} — will retry when token refreshes`)
+        // Retry with a long delay — token may get refreshed
+        this.reconnectDelay = 15000
         this.scheduleReconnect()
+        return
       }
+
+      // If connection was stable (>5s), reset backoff
+      if (Date.now() - this.connectedAt > 5000) {
+        this.reconnectDelay = 2000
+      }
+
+      console.warn(`[WS] Closed (${event.code}): ${this.url}`)
+      this.scheduleReconnect()
     }
 
     this.ws.onerror = () => {
