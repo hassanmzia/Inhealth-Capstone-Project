@@ -9,15 +9,13 @@ import {
 } from 'lucide-react'
 import {
   BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  LineChart, Line, Legend, Cell,
+  LineChart, Line, Legend,
 } from 'recharts'
 import api from '@/services/api'
 import PopulationRiskPyramid from '@/components/charts/PopulationRiskPyramid'
 import AgentActivityTimeline from '@/components/charts/AgentActivityTimeline'
 import { useAgentStore } from '@/store/agentStore'
-import type { AgentExecution } from '@/types/agent'
 import { useMemo } from 'react'
-import { subHours, subMinutes } from 'date-fns'
 
 const CONTAINER = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } }
 const ITEM = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -26,20 +24,59 @@ const GRAFANA_URL = import.meta.env.VITE_GRAFANA_URL ?? ''
 
 export default function AnalyticsPage() {
   const executions = useAgentStore((state) => state.executions)
-  const executionSlice = useMemo(() => {
-    if (executions.length > 0) return executions.slice(0, 200)
-    return DEMO_EXECUTIONS
-  }, [executions])
+  const executionSlice = useMemo(() => executions.slice(0, 200), [executions])
 
-  const { data: populationDataRaw } = useQuery({
+  const { data: populationData } = useQuery({
     queryKey: ['population-metrics'],
     queryFn: () => api.get('/analytics/population/').then((r) => r.data),
   })
 
-  const d = useMemo(() => {
-    if (populationDataRaw && populationDataRaw.riskDistribution?.total > 0) return populationDataRaw
-    return DEMO_POPULATION_DATA
-  }, [populationDataRaw])
+  const { data: patientList } = useQuery({
+    queryKey: ['patients-list'],
+    queryFn: () => api.get('/patients/').then((r) => r.data),
+  })
+
+  const patientCount = useMemo(() => {
+    if (Array.isArray(patientList)) return patientList.length
+    if (patientList?.results) return patientList.results.length
+    if (patientList?.count != null) return patientList.count
+    return 0
+  }, [patientList])
+
+  const patients = useMemo(() => {
+    const list = Array.isArray(patientList) ? patientList : patientList?.results ?? []
+    return list as Array<{ riskScore?: { score: number; level: string }; activeConditions?: Array<{ display: string }> }>
+  }, [patientList])
+
+  // Build risk distribution from actual patients
+  const riskDistribution = useMemo(() => {
+    if (populationData?.riskDistribution?.total > 0) return populationData.riskDistribution
+    const dist = { critical: 0, high: 0, medium: 0, low: 0, total: patientCount }
+    for (const p of patients) {
+      const level = p.riskScore?.level?.toLowerCase()
+      if (level === 'critical') dist.critical++
+      else if (level === 'high') dist.high++
+      else if (level === 'medium') dist.medium++
+      else dist.low++
+    }
+    return dist
+  }, [populationData, patients, patientCount])
+
+  // Build disease prevalence from actual patients
+  const diseasePrevalence = useMemo(() => {
+    if (populationData?.diseasePrevalence?.length > 0) return populationData.diseasePrevalence
+    const counts: Record<string, number> = {}
+    for (const p of patients) {
+      for (const c of p.activeConditions ?? []) {
+        counts[c.display] = (counts[c.display] ?? 0) + 1
+      }
+    }
+    return Object.entries(counts)
+      .map(([condition, count]) => ({ condition, count, percentage: patientCount > 0 ? Math.round((count / patientCount) * 1000) / 10 : 0 }))
+      .sort((a, b) => b.count - a.count)
+  }, [populationData, patients, patientCount])
+
+  const d = populationData
 
   return (
     <motion.div variants={CONTAINER} initial="hidden" animate="show" className="space-y-6 max-w-7xl">
@@ -69,10 +106,10 @@ export default function AnalyticsPage() {
       {/* KPI row */}
       <motion.div variants={ITEM} className="grid grid-cols-2 sm:grid-cols-4 gap-4">
         {[
-          { label: 'Total Patients', value: d?.riskDistribution?.total?.toLocaleString() ?? '—', icon: Users, color: 'text-primary-500' },
-          { label: 'Avg Risk Score', value: '42%', icon: Activity, color: 'text-warning-500' },
-          { label: 'Med Adherence', value: '85%', icon: TrendingUp, color: 'text-secondary-500' },
-          { label: '30d Readmission', value: '8.2%', icon: BarChart3, color: 'text-danger-500' },
+          { label: 'Total Patients', value: patientCount > 0 ? patientCount.toLocaleString() : '—', icon: Users, color: 'text-primary-500' },
+          { label: 'Avg Risk Score', value: d?.avgRiskScore ?? '—', icon: Activity, color: 'text-warning-500' },
+          { label: 'Med Adherence', value: d?.medAdherence ?? '—', icon: TrendingUp, color: 'text-secondary-500' },
+          { label: '30d Readmission', value: d?.readmissionRate ?? '—', icon: BarChart3, color: 'text-danger-500' },
         ].map((kpi) => (
           <div key={kpi.label} className="clinical-card">
             <kpi.icon className={`w-5 h-5 mb-2 ${kpi.color}`} />
@@ -89,106 +126,129 @@ export default function AnalyticsPage() {
             <Users className="w-4 h-4 text-muted-foreground" />
             Population Risk Distribution
           </h2>
-          <PopulationRiskPyramid
-            data={d?.riskDistribution ?? { critical: 0, high: 0, medium: 0, low: 0, total: 0 }}
-            orientation="vertical"
-            height={220}
-          />
+          {riskDistribution.total > 0 ? (
+            <PopulationRiskPyramid
+              data={riskDistribution}
+              orientation="vertical"
+              height={220}
+            />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-10">No patient data available</p>
+          )}
         </motion.div>
 
         {/* Disease prevalence */}
         <motion.div variants={ITEM} className="clinical-card">
           <h2 className="text-sm font-bold text-foreground mb-4">Disease Prevalence</h2>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={d?.diseasePrevalence ?? []} layout="vertical" margin={{ left: 100, right: 40, top: 0, bottom: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" strokeOpacity={0.4} />
-                <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
-                <YAxis type="category" dataKey="condition" tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} tickLine={false} axisLine={false} width={96} />
-                <Tooltip
-                  formatter={(v: number) => [`${v} patients`, 'Count']}
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                />
-                <Bar dataKey="count" radius={[0, 4, 4, 0]} fill="#1d6fdb" />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {diseasePrevalence.length > 0 ? (
+            <div style={{ height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={diseasePrevalence} layout="vertical" margin={{ left: 100, right: 40, top: 0, bottom: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" horizontal={false} stroke="hsl(var(--border))" strokeOpacity={0.4} />
+                  <XAxis type="number" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                  <YAxis type="category" dataKey="condition" tick={{ fontSize: 10, fill: 'hsl(var(--foreground))' }} tickLine={false} axisLine={false} width={96} />
+                  <Tooltip
+                    formatter={(v: number) => [`${v} patients`, 'Count']}
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                  />
+                  <Bar dataKey="count" radius={[0, 4, 4, 0]} fill="#1d6fdb" />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-10">No patient data available</p>
+          )}
         </motion.div>
 
         {/* Care gap rates */}
         <motion.div variants={ITEM} className="clinical-card">
           <h2 className="text-sm font-bold text-foreground mb-4">Care Gap Closure Rates</h2>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={d?.careGapRates ?? []} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.4} />
-                <XAxis dataKey="category" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
-                <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} domain={[0, 100]} />
-                <Tooltip
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                />
-                <Legend wrapperStyle={{ fontSize: 11 }} />
-                <Bar dataKey="closureRate" name="Closure Rate %" fill="#16a34a" radius={[4, 4, 0, 0]} />
-                <Bar dataKey="openGaps" name="Open Gaps" fill="#e11d48" radius={[4, 4, 0, 0]} />
-              </BarChart>
-            </ResponsiveContainer>
-          </div>
+          {(d?.careGapRates ?? []).length > 0 ? (
+            <div style={{ height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={d.careGapRates} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="hsl(var(--border))" strokeOpacity={0.4} />
+                  <XAxis dataKey="category" tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                  <YAxis tick={{ fontSize: 10, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} domain={[0, 100]} />
+                  <Tooltip
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                  />
+                  <Legend wrapperStyle={{ fontSize: 11 }} />
+                  <Bar dataKey="closureRate" name="Closure Rate %" fill="#16a34a" radius={[4, 4, 0, 0]} />
+                  <Bar dataKey="openGaps" name="Open Gaps" fill="#e11d48" radius={[4, 4, 0, 0]} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-10">No care gap data available</p>
+          )}
         </motion.div>
 
         {/* Medication adherence trend */}
         <motion.div variants={ITEM} className="clinical-card">
           <h2 className="text-sm font-bold text-foreground mb-4">Medication Adherence Trend</h2>
-          <div style={{ height: 220 }}>
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={d?.adherenceTrend ?? []} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
-                <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
-                <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
-                <YAxis domain={[60, 100]} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
-                <Tooltip
-                  formatter={(v: number) => [`${v}%`, 'Adherence']}
-                  contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
-                />
-                <Line type="monotone" dataKey="adherence" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4, fill: '#16a34a' }} />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          {(d?.adherenceTrend ?? []).length > 0 ? (
+            <div style={{ height: 220 }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <LineChart data={d.adherenceTrend} margin={{ top: 0, right: 16, bottom: 0, left: 0 }}>
+                  <CartesianGrid strokeDasharray="3 3" stroke="hsl(var(--border))" strokeOpacity={0.4} />
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                  <YAxis domain={[60, 100]} tick={{ fontSize: 11, fill: 'hsl(var(--muted-foreground))' }} tickLine={false} axisLine={false} />
+                  <Tooltip
+                    formatter={(v: number) => [`${v}%`, 'Adherence']}
+                    contentStyle={{ background: 'hsl(var(--card))', border: '1px solid hsl(var(--border))', borderRadius: 8, fontSize: 12 }}
+                  />
+                  <Line type="monotone" dataKey="adherence" stroke="#16a34a" strokeWidth={2.5} dot={{ r: 4, fill: '#16a34a' }} />
+                </LineChart>
+              </ResponsiveContainer>
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-10">No adherence data available</p>
+          )}
         </motion.div>
 
         {/* Quality measures */}
         <motion.div variants={ITEM} className="clinical-card lg:col-span-2">
           <h2 className="text-sm font-bold text-foreground mb-4">HEDIS Quality Measures</h2>
-          <div className="space-y-3">
-            {(d?.qualityMeasures ?? []).map((measure: { measure: string; rate: number; benchmark: number }) => (
-              <div key={measure.measure}>
-                <div className="flex items-center justify-between mb-1 text-xs">
-                  <span className="font-medium text-foreground">{measure.measure}</span>
-                  <div className="flex items-center gap-3">
-                    <span className={`font-mono font-bold ${measure.rate >= measure.benchmark ? 'text-secondary-600 dark:text-secondary-400' : 'text-warning-600 dark:text-warning-400'}`}>
-                      {measure.rate}%
-                    </span>
-                    <span className="text-muted-foreground">Benchmark: {measure.benchmark}%</span>
+          {(d?.qualityMeasures ?? []).length > 0 ? (
+            <div className="space-y-3">
+              {d.qualityMeasures.map((measure: { measure: string; rate: number; benchmark: number }) => (
+                <div key={measure.measure}>
+                  <div className="flex items-center justify-between mb-1 text-xs">
+                    <span className="font-medium text-foreground">{measure.measure}</span>
+                    <div className="flex items-center gap-3">
+                      <span className={`font-mono font-bold ${measure.rate >= measure.benchmark ? 'text-secondary-600 dark:text-secondary-400' : 'text-warning-600 dark:text-warning-400'}`}>
+                        {measure.rate}%
+                      </span>
+                      <span className="text-muted-foreground">Benchmark: {measure.benchmark}%</span>
+                    </div>
+                  </div>
+                  <div className="relative h-2 bg-muted rounded-full overflow-hidden">
+                    <div
+                      className={`h-full rounded-full ${measure.rate >= measure.benchmark ? 'bg-secondary-500' : 'bg-warning-500'}`}
+                      style={{ width: `${measure.rate}%` }}
+                    />
+                    <div
+                      className="absolute top-0 bottom-0 w-0.5 bg-foreground/30"
+                      style={{ left: `${measure.benchmark}%` }}
+                    />
                   </div>
                 </div>
-                <div className="relative h-2 bg-muted rounded-full overflow-hidden">
-                  <div
-                    className={`h-full rounded-full ${measure.rate >= measure.benchmark ? 'bg-secondary-500' : 'bg-warning-500'}`}
-                    style={{ width: `${measure.rate}%` }}
-                  />
-                  {/* Benchmark line */}
-                  <div
-                    className="absolute top-0 bottom-0 w-0.5 bg-foreground/30"
-                    style={{ left: `${measure.benchmark}%` }}
-                  />
-                </div>
-              </div>
-            ))}
-          </div>
+              ))}
+            </div>
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-10">No quality measure data available</p>
+          )}
         </motion.div>
 
         {/* Agent performance */}
         <motion.div variants={ITEM} className="clinical-card lg:col-span-2">
           <h2 className="text-sm font-bold text-foreground mb-4">Agent Activity (24h)</h2>
-          <AgentActivityTimeline executions={executionSlice} height={300} />
+          {executionSlice.length > 0 ? (
+            <AgentActivityTimeline executions={executionSlice} height={300} />
+          ) : (
+            <p className="text-sm text-muted-foreground text-center py-10">No agent activity recorded yet</p>
+          )}
         </motion.div>
       </div>
 
@@ -211,56 +271,4 @@ export default function AnalyticsPage() {
       )}
     </motion.div>
   )
-}
-
-// ─── Demo Data ────────────────────────────────────────────────────────────────
-
-const _now = new Date()
-
-const DEMO_EXECUTIONS: AgentExecution[] = [
-  { id: 'demo-e1', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'system', triggeredAt: subMinutes(_now, 15).toISOString(), startedAt: subMinutes(_now, 15).toISOString(), completedAt: subMinutes(_now, 14).toISOString(), runtimeSeconds: 4.2 },
-  { id: 'demo-e2', agentId: 'risk_stratification_agent', agentName: 'Risk Stratification', tier: 'tier2_analysis', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subMinutes(_now, 45).toISOString(), startedAt: subMinutes(_now, 45).toISOString(), completedAt: subMinutes(_now, 43).toISOString(), runtimeSeconds: 12.8 },
-  { id: 'demo-e3', agentId: 'care_gap_detection_agent', agentName: 'Care Gap Detector', tier: 'tier3_clinical', status: 'completed', patientId: 'demo-p5', patientName: 'William Jackson', triggeredBy: 'system', triggeredAt: subHours(_now, 1).toISOString(), startedAt: subHours(_now, 1).toISOString(), completedAt: subMinutes(subHours(_now, 1), -2).toISOString(), runtimeSeconds: 8.1 },
-  { id: 'demo-e4', agentId: 'medication_adherence_agent', agentName: 'Medication Adherence', tier: 'tier3_clinical', status: 'completed', patientId: 'demo-p3', patientName: 'Robert Chen', triggeredBy: 'system', triggeredAt: subHours(_now, 2).toISOString(), startedAt: subHours(_now, 2).toISOString(), completedAt: subMinutes(subHours(_now, 2), -1).toISOString(), runtimeSeconds: 5.3 },
-  { id: 'demo-e5', agentId: 'fhir_ingestion_agent', agentName: 'FHIR Data Ingestion', tier: 'tier1_ingestion', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subHours(_now, 3).toISOString(), startedAt: subHours(_now, 3).toISOString(), completedAt: subMinutes(subHours(_now, 3), -5).toISOString(), runtimeSeconds: 31.4 },
-  { id: 'demo-e6', agentId: 'notification_agent', agentName: 'Patient Outreach', tier: 'tier5_engagement', status: 'pending_hitl', patientId: 'demo-p2', patientName: 'Maria Gonzalez', triggeredBy: 'care_gap_detection_agent', triggeredAt: subHours(_now, 4).toISOString(), startedAt: subHours(_now, 4).toISOString(), runtimeSeconds: 2.1 },
-  { id: 'demo-e7', agentId: 'ehr_sync_agent', agentName: 'EHR Sync', tier: 'tier1_ingestion', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subHours(_now, 6).toISOString(), startedAt: subHours(_now, 6).toISOString(), completedAt: subMinutes(subHours(_now, 6), -3).toISOString(), runtimeSeconds: 18.7 },
-  { id: 'demo-e8', agentId: 'predictive_analytics_agent', agentName: 'Readmission Predictor', tier: 'tier2_analysis', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'risk_stratification_agent', triggeredAt: subHours(_now, 8).toISOString(), startedAt: subHours(_now, 8).toISOString(), completedAt: subMinutes(subHours(_now, 8), -1).toISOString(), runtimeSeconds: 6.9 },
-  { id: 'demo-e9', agentId: 'population_health_agent', agentName: 'HEDIS Quality Measure', tier: 'tier2_analysis', status: 'failed', triggeredBy: 'scheduler', triggeredAt: subHours(_now, 10).toISOString(), startedAt: subHours(_now, 10).toISOString(), completedAt: subMinutes(subHours(_now, 10), -1).toISOString(), runtimeSeconds: 3.2, error: 'Timeout fetching external measure definitions' },
-  { id: 'demo-e10', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'running', patientId: 'demo-p4', patientName: 'Dorothy Williams', triggeredBy: 'system', triggeredAt: subMinutes(_now, 2).toISOString(), startedAt: subMinutes(_now, 2).toISOString() },
-]
-
-const DEMO_POPULATION_DATA = {
-  riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
-  diseasePrevalence: [
-    { condition: 'Type 2 Diabetes', count: 486, percentage: 37.8 },
-    { condition: 'Hypertension', count: 641, percentage: 49.9 },
-    { condition: 'Heart Failure', count: 127, percentage: 9.9 },
-    { condition: 'CKD', count: 198, percentage: 15.4 },
-    { condition: 'COPD', count: 89, percentage: 6.9 },
-    { condition: 'AFib', count: 112, percentage: 8.7 },
-  ],
-  careGapRates: [
-    { category: 'Preventive', openGaps: 312, closureRate: 68 },
-    { category: 'Screening', openGaps: 184, closureRate: 72 },
-    { category: 'Chronic Mgmt', openGaps: 247, closureRate: 61 },
-    { category: 'Medication', openGaps: 89, closureRate: 81 },
-    { category: 'Follow-up', openGaps: 156, closureRate: 74 },
-  ],
-  adherenceTrend: [
-    { month: 'Sep', adherence: 76 },
-    { month: 'Oct', adherence: 78 },
-    { month: 'Nov', adherence: 74 },
-    { month: 'Dec', adherence: 80 },
-    { month: 'Jan', adherence: 82 },
-    { month: 'Feb', adherence: 85 },
-  ],
-  qualityMeasures: [
-    { measure: 'HbA1c Control (<8%)', rate: 68, benchmark: 72 },
-    { measure: 'BP Control (<140/90)', rate: 71, benchmark: 68 },
-    { measure: 'Statin Therapy', rate: 84, benchmark: 80 },
-    { measure: 'Colorectal Screening', rate: 59, benchmark: 65 },
-    { measure: 'Breast Cancer Screen', rate: 72, benchmark: 70 },
-    { measure: 'Influenza Vaccine', rate: 81, benchmark: 75 },
-  ],
 }

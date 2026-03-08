@@ -16,16 +16,13 @@ import {
   Mail,
   MapPin,
   Calendar,
-  Archive,
-  ChevronDown,
-  ChevronUp,
   Search,
   ExternalLink,
   Loader2,
   Target,
   Settings2,
 } from 'lucide-react'
-import { format, subDays, subHours, subMinutes } from 'date-fns'
+import { format } from 'date-fns'
 import api from '@/services/api'
 import { useCarePlans, useVitalTargets, useUpdateVitalTarget, useInitializeVitalTargets } from '@/hooks/useFHIR'
 import type { FHIRCarePlan as FHIRCarePlanType } from '@/services/fhir'
@@ -40,161 +37,7 @@ import AgentControlPanel from '@/components/agents/AgentControlPanel'
 import { RiskScoreBadge } from '@/components/charts/RiskScoreGauge'
 import { cn } from '@/lib/utils'
 import { useSimulatorStore } from '@/store/simulatorStore'
-import type { PatientSummary, VitalSign, Medication, CareGap, EcgRhythm } from '@/types/clinical'
-import { ECG_RHYTHM_LABELS } from '@/types/clinical'
-
-// ─── Generate demo vitals when API returns empty ─────────────────────────────
-function generateDemoVitals(patientId: string): VitalSign[] {
-  const now = new Date()
-  const vitals: VitalSign[] = []
-  let id = 0
-
-  // Generate 24 hours of data at 30-minute intervals (48 points)
-  for (let i = 47; i >= 0; i--) {
-    const ts = subMinutes(now, i * 30).toISOString()
-    const jitter = () => (Math.random() - 0.5) * 2
-
-    // Heart Rate (60-100 normal)
-    const hr = Math.round(72 + Math.sin(i * 0.3) * 8 + jitter() * 5)
-    vitals.push({
-      id: String(++id), patientId, type: 'heart_rate', value: hr,
-      unit: 'bpm', timestamp: ts, status: hr > 100 || hr < 60 ? 'warning' : 'normal',
-      source: 'device', normalMin: 60, normalMax: 100,
-    })
-
-    // Systolic BP (90-140 normal)
-    const sys = Math.round(125 + Math.sin(i * 0.2) * 10 + jitter() * 6)
-    const dia = Math.round(78 + Math.sin(i * 0.2) * 6 + jitter() * 4)
-    vitals.push({
-      id: String(++id), patientId, type: 'blood_pressure_systolic', value: sys,
-      unit: 'mmHg', timestamp: ts, status: sys > 140 ? 'warning' : 'normal',
-      source: 'device', systolic: sys, diastolic: dia, normalMin: 90, normalMax: 140,
-    })
-    vitals.push({
-      id: String(++id), patientId, type: 'blood_pressure_diastolic', value: dia,
-      unit: 'mmHg', timestamp: ts, status: dia > 90 ? 'warning' : 'normal',
-      source: 'device', normalMin: 60, normalMax: 90,
-    })
-
-    // SpO2 (95-100 normal)
-    const spo2 = Math.min(100, Math.round(97 + Math.sin(i * 0.15) * 1.5 + jitter()))
-    vitals.push({
-      id: String(++id), patientId, type: 'spo2', value: spo2,
-      unit: '%', timestamp: ts, status: spo2 < 95 ? 'warning' : 'normal',
-      source: 'device', normalMin: 95, normalMax: 100,
-    })
-
-    // Temperature (36.1-37.2 °C normal)
-    const temp = parseFloat((36.6 + Math.sin(i * 0.25) * 0.4 + jitter() * 0.2).toFixed(1))
-    vitals.push({
-      id: String(++id), patientId, type: 'temperature', value: temp,
-      unit: '°C', timestamp: ts, status: temp > 37.5 ? 'warning' : 'normal',
-      source: 'device', normalMin: 36.1, normalMax: 37.2,
-    })
-
-    // Respiratory Rate (12-20 normal)
-    const rr = Math.round(16 + Math.sin(i * 0.35) * 3 + jitter() * 2)
-    vitals.push({
-      id: String(++id), patientId, type: 'respiratory_rate', value: rr,
-      unit: '/min', timestamp: ts, status: rr > 20 || rr < 12 ? 'warning' : 'normal',
-      source: 'device', normalMin: 12, normalMax: 20,
-    })
-
-    // Glucose (70-180 mg/dL normal) — every 2 hours (every 4th interval)
-    if (i % 4 === 0) {
-      const glucose = Math.round(112 + Math.sin(i * 0.4) * 35 + jitter() * 15)
-      vitals.push({
-        id: String(++id), patientId, type: 'glucose', value: glucose,
-        unit: 'mg/dL', timestamp: ts,
-        status: glucose > 180 ? 'warning' : glucose < 70 ? 'critical' : 'normal',
-        source: 'device', normalMin: 70, normalMax: 180,
-      })
-    }
-  }
-
-  // Add latest ECG observation
-  vitals.push({
-    id: String(++id), patientId, type: 'ecg', value: 72,
-    unit: 'bpm', timestamp: now.toISOString(), status: 'normal',
-    source: 'device', ecgRhythm: 'normal_sinus',
-  })
-
-  return vitals
-}
-
-// Generate archived vitals (older than 24h, up to 7 days)
-function generateArchivedVitals(patientId: string): VitalSign[] {
-  const now = new Date()
-  const vitals: VitalSign[] = []
-  let id = 10000
-
-  // Generate 7 days of data at 4-hour intervals (42 points)
-  for (let day = 7; day >= 1; day--) {
-    for (let h = 0; h < 24; h += 4) {
-      const ts = subHours(subDays(now, day), 24 - h).toISOString()
-      const jitter = () => (Math.random() - 0.5) * 2
-      const phase = day * 6 + h
-
-      vitals.push({
-        id: String(++id), patientId, type: 'heart_rate',
-        value: Math.round(74 + Math.sin(phase * 0.2) * 10 + jitter() * 4),
-        unit: 'bpm', timestamp: ts, status: 'normal', source: 'ehr',
-      })
-
-      const sys = Math.round(128 + Math.sin(phase * 0.15) * 12 + jitter() * 5)
-      const dia = Math.round(80 + Math.sin(phase * 0.15) * 6 + jitter() * 3)
-      vitals.push({
-        id: String(++id), patientId, type: 'blood_pressure_systolic',
-        value: sys, unit: 'mmHg', timestamp: ts,
-        status: sys > 140 ? 'warning' : 'normal', source: 'ehr',
-        systolic: sys, diastolic: dia,
-      })
-      vitals.push({
-        id: String(++id), patientId, type: 'blood_pressure_diastolic',
-        value: dia, unit: 'mmHg', timestamp: ts, status: 'normal', source: 'ehr',
-      })
-
-      vitals.push({
-        id: String(++id), patientId, type: 'spo2',
-        value: Math.min(100, Math.round(97 + jitter())),
-        unit: '%', timestamp: ts, status: 'normal', source: 'ehr',
-      })
-
-      vitals.push({
-        id: String(++id), patientId, type: 'temperature',
-        value: parseFloat((36.7 + Math.sin(phase * 0.3) * 0.3 + jitter() * 0.15).toFixed(1)),
-        unit: '°C', timestamp: ts, status: 'normal', source: 'ehr',
-      })
-
-      vitals.push({
-        id: String(++id), patientId, type: 'respiratory_rate',
-        value: Math.round(16 + Math.sin(phase * 0.25) * 2 + jitter()),
-        unit: '/min', timestamp: ts, status: 'normal', source: 'ehr',
-      })
-
-      if (h % 8 === 0) {
-        vitals.push({
-          id: String(++id), patientId, type: 'glucose',
-          value: Math.round(115 + Math.sin(phase * 0.3) * 30 + jitter() * 10),
-          unit: 'mg/dL', timestamp: ts, status: 'normal', source: 'ehr',
-        })
-      }
-
-      // ECG rhythm snapshot each interval
-      const ecgRhythms: EcgRhythm[] = ['normal_sinus', 'normal_sinus', 'normal_sinus', 'sinus_bradycardia', 'sinus_tachycardia']
-      const rhythm = ecgRhythms[Math.floor(Math.abs(Math.sin(phase * 0.7)) * ecgRhythms.length)] ?? 'normal_sinus'
-      const hr = Math.round(74 + Math.sin(phase * 0.2) * 10 + jitter() * 4)
-      vitals.push({
-        id: String(++id), patientId, type: 'ecg',
-        value: hr, unit: 'bpm', timestamp: ts,
-        status: rhythm === 'normal_sinus' ? 'normal' : 'warning',
-        source: 'ehr', ecgRhythm: rhythm,
-      })
-    }
-  }
-
-  return vitals
-}
+import type { PatientSummary, VitalSign, Medication, CareGap } from '@/types/clinical'
 
 const TABS = [
   { id: 'overview', label: 'Overview', icon: User },
@@ -387,10 +230,10 @@ export default function PatientDetailPage() {
           <VitalsTab vitals={vitals ?? []} patientId={patientId!} />
         )}
         {activeTab === 'medications' && (
-          <MedicationsTab medications={medications ?? []} patient={patient} />
+          <MedicationsTab medications={medications ?? []} />
         )}
         {activeTab === 'clinical' && (
-          <ClinicalTab careGaps={careGaps ?? []} patientId={patientId!} patient={patient} />
+          <ClinicalTab careGaps={careGaps ?? []} patientId={patientId!} />
         )}
         {activeTab === 'agents' && (
           <AgentsTab patientId={patientId!} patientName={`${patient.firstName} ${patient.lastName}`} recommendations={recommendations ?? []} refetchRecs={refetchRecs} />
@@ -418,21 +261,20 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
   recommendations: ReturnType<typeof Array.prototype.slice>
   refetchRecs: () => void
 }) {
-  const gaps = useMemo(() => {
-    if (careGaps.length > 0) return careGaps
-    return generateDemoCareGaps(patient)
-  }, [careGaps, patient])
-
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-4">
         <div className="clinical-card">
           <h3 className="text-sm font-bold text-foreground mb-3">Recent Vitals</h3>
-          <VitalsMonitor vitals={vitals} compact />
+          {vitals.length > 0 ? (
+            <VitalsMonitor vitals={vitals} compact />
+          ) : (
+            <p className="text-sm text-muted-foreground py-4">No vitals data available. Run the simulator to generate vitals.</p>
+          )}
         </div>
         <div className="clinical-card">
-          <h3 className="text-sm font-bold text-foreground mb-3">Care Gaps ({gaps.filter(g => g.status === 'open').length} open)</h3>
-          <CareGapList careGaps={gaps} patientId={patient.id} />
+          <h3 className="text-sm font-bold text-foreground mb-3">Care Gaps ({careGaps.filter(g => g.status === 'open').length} open)</h3>
+          <CareGapList careGaps={careGaps} patientId={patient.id} />
         </div>
         <CarePlansSection patientId={patient.id} />
         <VitalTargetsSection patientId={patient.id} />
@@ -445,22 +287,9 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
   )
 }
 
-function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: string }) {
-  const [showArchived, setShowArchived] = useState(false)
-
-  // Generate demo data when API returns empty
-  const activeVitals = useMemo(() => {
-    if (vitals.length > 0) return vitals
-    return generateDemoVitals(patientId)
-  }, [vitals, patientId])
-
-  const archivedVitals = useMemo(() => generateArchivedVitals(patientId), [patientId])
-
-  // Combine active + archived when showing all
-  const allVitals = useMemo(
-    () => (showArchived ? [...archivedVitals, ...activeVitals] : activeVitals),
-    [activeVitals, archivedVitals, showArchived],
-  )
+function VitalsTab({ vitals }: { vitals: VitalSign[]; patientId: string }) {
+  const activeVitals = vitals
+  const allVitals = activeVitals
 
   const bgStore = useSimulatorStore()
   const hasRealVitals = vitals.length > 0
@@ -489,6 +318,16 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
     { key: 'respiratory_rate', label: 'Resp Rate', unit: '/min', color: 'text-teal-500', bg: 'bg-teal-50 dark:bg-teal-900/10' },
     { key: 'glucose', label: 'Glucose', unit: 'mg/dL', color: 'text-purple-500', bg: 'bg-purple-50 dark:bg-purple-900/10' },
   ]
+
+  if (!hasRealVitals) {
+    return (
+      <div className="clinical-card text-center py-10">
+        <Activity className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+        <p className="text-sm font-medium text-foreground">No Vitals Data</p>
+        <p className="text-xs text-muted-foreground mt-1">Run the simulator to generate real-time vitals for this patient.</p>
+      </div>
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -534,74 +373,9 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
         </div>
       )}
 
-      {/* Archived ECG Recordings */}
-      {showArchived && (() => {
-        const ecgRecords = archivedVitals
-          .filter((v) => v.type === 'ecg' && v.ecgRhythm)
-          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
-        if (ecgRecords.length === 0) return null
-        return (
-          <div className="clinical-card">
-            <h3 className="text-sm font-bold text-foreground mb-4">
-              Archived ECG Recordings ({ecgRecords.length})
-            </h3>
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {ecgRecords.slice(0, 8).map((rec) => (
-                <div
-                  key={rec.id}
-                  className={cn(
-                    'border rounded-lg p-3 bg-card/50',
-                    rec.status === 'critical' ? 'border-red-300 dark:border-red-800' :
-                    rec.status === 'warning' ? 'border-yellow-300 dark:border-yellow-800' :
-                    'border-border',
-                  )}
-                >
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-[11px] font-medium text-muted-foreground">
-                      {format(new Date(rec.timestamp), 'MMM d, yyyy HH:mm')}
-                    </span>
-                    <span className={cn(
-                      'text-[10px] font-semibold px-1.5 py-0.5 rounded',
-                      rec.status === 'normal' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
-                      rec.status === 'warning' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
-                      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
-                    )}>
-                      {rec.ecgRhythm ? ECG_RHYTHM_LABELS[rec.ecgRhythm] : 'Unknown'}
-                    </span>
-                  </div>
-                  <EcgWaveform
-                    heartRate={rec.value}
-                    rhythm={rec.ecgRhythm ?? 'normal_sinus'}
-                    width={320}
-                    height={100}
-                    isLive={false}
-                    compact
-                  />
-                  <div className="mt-1 text-[10px] text-muted-foreground font-mono">
-                    HR: {rec.value} bpm · Source: {rec.source}
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-        )
-      })()}
-
-      {/* Vitals Trend Chart — all vitals active */}
+      {/* Vitals Trend Chart */}
       <div className="clinical-card">
-        <div className="flex items-center justify-between mb-4">
-          <h3 className="text-sm font-bold text-foreground">
-            Vitals Trend {showArchived ? '(7 days)' : '(24h)'}
-          </h3>
-          <button
-            onClick={() => setShowArchived(!showArchived)}
-            className="flex items-center gap-1.5 text-xs font-medium text-primary-600 dark:text-primary-400 hover:text-primary-700 transition-colors"
-          >
-            <Archive className="w-3.5 h-3.5" />
-            {showArchived ? 'Show 24h' : 'Show Archived (7d)'}
-            {showArchived ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />}
-          </button>
-        </div>
+        <h3 className="text-sm font-bold text-foreground mb-4">Vitals Trend (24h)</h3>
         <VitalsChart
           vitals={allVitals}
           height={360}
@@ -610,7 +384,7 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
           showSpO2
           showTemp
           showRR
-          timeRangeHours={showArchived ? 168 : 24}
+          timeRangeHours={24}
         />
       </div>
 
@@ -626,261 +400,17 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
           showTIR
         />
       </div>
-
-      {/* Archived Vitals Table */}
-      {showArchived && (
-        <div className="clinical-card">
-          <h3 className="text-sm font-bold text-foreground mb-4">Archived Vital Signs (Past 7 Days)</h3>
-          <div className="overflow-x-auto">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-border bg-muted/30">
-                  <th className="text-left p-2 font-medium text-muted-foreground">Date/Time</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">HR (bpm)</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">BP (mmHg)</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">SpO2 (%)</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">Temp (°C)</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">RR (/min)</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">Glucose (mg/dL)</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">ECG Rhythm</th>
-                  <th className="text-center p-2 font-medium text-muted-foreground">Source</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {(() => {
-                  // Group archived vitals by timestamp (rounded to nearest hour)
-                  const grouped = new Map<string, Record<string, VitalSign>>()
-                  for (const v of archivedVitals) {
-                    const key = format(new Date(v.timestamp), 'yyyy-MM-dd HH:00')
-                    if (!grouped.has(key)) grouped.set(key, {})
-                    grouped.get(key)![v.type] = v
-                  }
-                  const rows = Array.from(grouped.entries()).sort((a, b) => b[0].localeCompare(a[0]))
-                  return rows.map(([timeKey, vals]) => {
-                    const bp = vals['blood_pressure_systolic']
-                    return (
-                      <tr key={timeKey} className="hover:bg-muted/50 transition-colors">
-                        <td className="p-2 font-medium text-foreground whitespace-nowrap">
-                          {format(new Date(timeKey), 'MMM d, HH:mm')}
-                        </td>
-                        <td className={cn('p-2 text-center font-mono', vals['heart_rate']?.status === 'warning' && 'text-yellow-600 font-bold', vals['heart_rate']?.status === 'critical' && 'text-red-600 font-bold')}>
-                          {vals['heart_rate']?.value ?? '—'}
-                        </td>
-                        <td className={cn('p-2 text-center font-mono', bp?.status === 'warning' && 'text-yellow-600 font-bold')}>
-                          {bp ? `${bp.systolic ?? bp.value}/${bp.diastolic ?? vals['blood_pressure_diastolic']?.value ?? '-'}` : '—'}
-                        </td>
-                        <td className={cn('p-2 text-center font-mono', vals['spo2']?.status === 'warning' && 'text-yellow-600 font-bold')}>
-                          {vals['spo2']?.value ?? '—'}
-                        </td>
-                        <td className="p-2 text-center font-mono">
-                          {vals['temperature']?.value ?? '—'}
-                        </td>
-                        <td className="p-2 text-center font-mono">
-                          {vals['respiratory_rate']?.value ?? '—'}
-                        </td>
-                        <td className={cn('p-2 text-center font-mono', vals['glucose']?.status === 'warning' && 'text-yellow-600 font-bold')}>
-                          {vals['glucose']?.value ?? '—'}
-                        </td>
-                        <td className={cn('p-2 text-center text-[11px]', vals['ecg']?.status === 'warning' && 'text-yellow-600 font-semibold', vals['ecg']?.status === 'critical' && 'text-red-600 font-bold')}>
-                          {vals['ecg']?.ecgRhythm ? ECG_RHYTHM_LABELS[vals['ecg'].ecgRhythm] : '—'}
-                        </td>
-                        <td className="p-2 text-center">
-                          <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
-                            {vals['heart_rate']?.source ?? 'ehr'}
-                          </span>
-                        </td>
-                      </tr>
-                    )
-                  })
-                })()}
-              </tbody>
-            </table>
-          </div>
-        </div>
-      )}
     </div>
   )
 }
 
-function generateDemoCareGaps(patient: PatientSummary): CareGap[] {
-  const now = new Date()
-  const conditions = patient.activeConditions?.map((c) => c.display.toLowerCase()) ?? []
-  const gaps: CareGap[] = []
-  let id = 0
-
-  const add = (g: Partial<CareGap>) =>
-    gaps.push({
-      id: `demo-gap-${++id}`,
-      patientId: patient.id,
-      title: '',
-      description: '',
-      category: 'chronic_management',
-      priority: 'medium',
-      status: 'open',
-      openedAt: subDays(now, 30 + Math.floor(Math.random() * 60)).toISOString(),
-      ...g,
-    } as CareGap)
-
-  // Diabetes care gaps
-  if (conditions.some((c) => c.includes('diabet'))) {
-    add({
-      title: 'HbA1c Test Overdue',
-      description: 'Last HbA1c was > 90 days ago. Guideline recommends every 3 months for uncontrolled T2DM.',
-      category: 'chronic_management',
-      priority: 'high',
-      dueDate: subDays(now, 15).toISOString(),
-      measure: 'HEDIS CDC – HbA1c Testing',
-      aiRecommendation: 'Order HbA1c lab. Last result was 8.2% — consider medication adjustment if still elevated.',
-    })
-    add({
-      title: 'Diabetic Eye Exam Due',
-      description: 'No dilated eye exam documented in past 12 months.',
-      category: 'screening',
-      priority: 'medium',
-      dueDate: subDays(now, -30).toISOString(),
-      measure: 'HEDIS CDC – Eye Exam',
-      aiRecommendation: 'Refer to ophthalmology for annual dilated retinal exam.',
-    })
-    add({
-      title: 'Diabetic Foot Exam Needed',
-      description: 'Annual comprehensive foot exam not documented.',
-      category: 'preventive',
-      priority: 'medium',
-      dueDate: subDays(now, -14).toISOString(),
-      measure: 'ADA Standards of Care',
-    })
-  }
-
-  // Hypertension care gaps
-  if (conditions.some((c) => c.includes('hypertens') || c.includes('blood pressure'))) {
-    add({
-      title: 'Blood Pressure Not at Goal',
-      description: 'Last 3 BP readings above target (>140/90 mmHg).',
-      category: 'chronic_management',
-      priority: 'high',
-      dueDate: subDays(now, -7).toISOString(),
-      measure: 'HEDIS CBP – Controlling Blood Pressure',
-      aiRecommendation: 'Consider titrating antihypertensive therapy. Home BP monitoring may improve control.',
-    })
-  }
-
-  // Heart failure care gaps
-  if (conditions.some((c) => c.includes('heart failure'))) {
-    add({
-      title: 'Beta-Blocker Therapy Review',
-      description: 'Beta-blocker dose has not been optimized per HF guidelines.',
-      category: 'medication',
-      priority: 'high',
-      dueDate: subDays(now, -10).toISOString(),
-      measure: 'ACC/AHA HF Guidelines',
-      aiRecommendation: 'Patient on carvedilol 25mg BID — assess tolerability for up-titration to target dose.',
-    })
-    add({
-      title: 'Cardiology Follow-Up Needed',
-      description: 'No cardiology visit in the past 6 months for active HF management.',
-      category: 'referral',
-      priority: 'medium',
-      dueDate: subDays(now, -20).toISOString(),
-    })
-  }
-
-  // CKD care gaps
-  if (conditions.some((c) => c.includes('kidney') || c.includes('ckd') || c.includes('renal'))) {
-    add({
-      title: 'eGFR / Creatinine Monitoring Due',
-      description: 'CKD patients require renal function monitoring every 3–6 months.',
-      category: 'chronic_management',
-      priority: 'high',
-      dueDate: subDays(now, 5).toISOString(),
-      measure: 'KDIGO CKD Guidelines',
-      aiRecommendation: 'Order BMP with eGFR. Last eGFR was 38 mL/min — Stage 3b. Monitor for progression.',
-    })
-    add({
-      title: 'Nephrology Referral',
-      description: 'eGFR < 45 — specialist referral recommended per KDIGO guidelines.',
-      category: 'referral',
-      priority: 'medium',
-      dueDate: subDays(now, -30).toISOString(),
-    })
-  }
-
-  // COPD care gaps
-  if (conditions.some((c) => c.includes('copd') || c.includes('pulmonary'))) {
-    add({
-      title: 'Spirometry Follow-Up Due',
-      description: 'No spirometry performed in the past 12 months for COPD monitoring.',
-      category: 'screening',
-      priority: 'medium',
-      dueDate: subDays(now, -21).toISOString(),
-      measure: 'GOLD COPD Guidelines',
-    })
-    add({
-      title: 'Influenza Vaccination Due',
-      description: 'Annual influenza vaccination not documented for this season.',
-      category: 'immunization',
-      priority: 'high',
-      dueDate: subDays(now, -14).toISOString(),
-      aiRecommendation: 'COPD patients are at higher risk. Administer influenza vaccine today if no contraindications.',
-    })
-  }
-
-  // AFib
-  if (conditions.some((c) => c.includes('fibrillation') || c.includes('afib'))) {
-    add({
-      title: 'CHA₂DS₂-VASc Score Reassessment',
-      description: 'Stroke risk score should be reassessed annually.',
-      category: 'chronic_management',
-      priority: 'medium',
-      dueDate: subDays(now, -45).toISOString(),
-      measure: 'AHA/ACC AFib Guidelines',
-    })
-  }
-
-  // Universal preventive gaps
-  add({
-    title: 'Annual Wellness Visit',
-    description: 'No annual wellness visit documented in the current calendar year.',
-    category: 'preventive',
-    priority: 'low',
-    dueDate: subDays(now, -60).toISOString(),
-    measure: 'CMS AWV',
-  })
-
-  // Default if no conditions
-  if (gaps.length <= 1) {
-    add({
-      title: 'Medication Reconciliation',
-      description: 'Medication reconciliation not performed in the last 30 days.',
-      category: 'medication',
-      priority: 'medium',
-      dueDate: subDays(now, -10).toISOString(),
-      aiRecommendation: 'Review current medication list with the patient during the next visit.',
-    })
-    add({
-      title: 'Lipid Panel Screening',
-      description: 'No lipid panel on file in the past 12 months.',
-      category: 'screening',
-      priority: 'medium',
-      dueDate: subDays(now, -30).toISOString(),
-      measure: 'USPSTF Statin Use',
-    })
-  }
-
-  return gaps
-}
-
-function ClinicalTab({ careGaps, patientId, patient }: { careGaps: CareGap[]; patientId: string; patient: PatientSummary }) {
-  const gaps = useMemo(() => {
-    if (careGaps.length > 0) return careGaps
-    return generateDemoCareGaps(patient)
-  }, [careGaps, patient])
-
+function ClinicalTab({ careGaps, patientId }: { careGaps: CareGap[]; patientId: string }) {
   return (
     <div className="space-y-6">
       <CarePlansSection patientId={patientId} />
       <div className="clinical-card">
         <h3 className="text-sm font-bold text-foreground mb-4">Care Gaps & Quality Measures</h3>
-        <CareGapList careGaps={gaps} patientId={patientId} />
+        <CareGapList careGaps={careGaps} patientId={patientId} />
       </div>
     </div>
   )
@@ -1277,118 +807,8 @@ function AgentsTab({ patientId, patientName, recommendations, refetchRecs }: {
   )
 }
 
-// ─── Demo Medications ─────────────────────────────────────────────────────────
-
-function generateDemoMedications(patient: PatientSummary): Medication[] {
-  const now = new Date()
-  const conditions = patient.activeConditions?.map((c) => c.display.toLowerCase()) ?? []
-
-  const allMeds: Medication[] = []
-  let id = 0
-  const add = (m: Partial<Medication>) =>
-    allMeds.push({
-      id: `demo-med-${++id}`,
-      patientId: patient.id,
-      name: '',
-      dose: '',
-      doseUnit: 'mg',
-      frequency: 'once daily',
-      route: 'oral',
-      prescribedDate: subDays(now, 90 + Math.floor(Math.random() * 200)).toISOString(),
-      startDate: subDays(now, 90 + Math.floor(Math.random() * 200)).toISOString(),
-      status: 'active',
-      adherenceStatus: (['adherent', 'adherent', 'partial', 'adherent'] as const)[id % 4],
-      pdc: 0.75 + Math.random() * 0.2,
-      lastFillDate: subDays(now, Math.floor(Math.random() * 25)).toISOString(),
-      nextRefillDate: subDays(now, -Math.floor(Math.random() * 30)).toISOString(),
-      refillsRemaining: Math.floor(Math.random() * 6) + 1,
-      daysSupply: 90,
-      ...m,
-    } as Medication)
-
-  // Diabetes-related
-  if (conditions.some((c) => c.includes('diabet'))) {
-    add({ name: 'Metformin 500mg', genericName: 'Metformin', dose: '500', frequency: 'twice daily', indication: 'Type 2 Diabetes' })
-    add({ name: 'Empagliflozin 10mg', genericName: 'Empagliflozin', brandName: 'Jardiance', dose: '10', indication: 'Type 2 Diabetes', tierLevel: 2 })
-  }
-
-  // Hypertension-related
-  if (conditions.some((c) => c.includes('hypertens') || c.includes('blood pressure'))) {
-    add({ name: 'Lisinopril 10mg', genericName: 'Lisinopril', dose: '10', indication: 'Hypertension' })
-    add({ name: 'Amlodipine 5mg', genericName: 'Amlodipine', dose: '5', indication: 'Hypertension' })
-  }
-
-  // Heart failure
-  if (conditions.some((c) => c.includes('heart failure'))) {
-    add({ name: 'Carvedilol 25mg', genericName: 'Carvedilol', dose: '25', frequency: 'twice daily', indication: 'Heart Failure' })
-    add({ name: 'Furosemide 40mg', genericName: 'Furosemide', dose: '40', indication: 'Heart Failure' })
-  }
-
-  // CKD
-  if (conditions.some((c) => c.includes('kidney') || c.includes('ckd') || c.includes('renal'))) {
-    add({ name: 'Sodium Bicarbonate 650mg', genericName: 'Sodium Bicarbonate', dose: '650', frequency: 'three times daily', indication: 'CKD' })
-  }
-
-  // COPD / Asthma
-  if (conditions.some((c) => c.includes('copd') || c.includes('asthma') || c.includes('pulmonary'))) {
-    add({ name: 'Tiotropium 18mcg', genericName: 'Tiotropium', brandName: 'Spiriva', dose: '18', doseUnit: 'mcg', route: 'inhalation', indication: 'COPD' })
-  }
-
-  // Afib
-  if (conditions.some((c) => c.includes('fibrillation') || c.includes('afib'))) {
-    add({ name: 'Apixaban 5mg', genericName: 'Apixaban', brandName: 'Eliquis', dose: '5', frequency: 'twice daily', indication: 'Atrial Fibrillation', tierLevel: 3 })
-  }
-
-  // CAD / Cholesterol
-  if (conditions.some((c) => c.includes('coronary') || c.includes('cholesterol') || c.includes('hyperlipid'))) {
-    add({ name: 'Atorvastatin 40mg', genericName: 'Atorvastatin', dose: '40', indication: 'Hyperlipidemia' })
-    add({ name: 'Aspirin 81mg', genericName: 'Aspirin', dose: '81', indication: 'CAD prophylaxis' })
-  }
-
-  // Default if no conditions matched
-  if (allMeds.length === 0) {
-    add({ name: 'Metformin 500mg', genericName: 'Metformin', dose: '500', frequency: 'twice daily', indication: 'Type 2 Diabetes' })
-    add({ name: 'Lisinopril 10mg', genericName: 'Lisinopril', dose: '10', indication: 'Hypertension' })
-    add({ name: 'Atorvastatin 20mg', genericName: 'Atorvastatin', dose: '20', indication: 'Hyperlipidemia' })
-  }
-
-  // Add a discontinued med for realism
-  add({
-    name: 'Glipizide 5mg',
-    genericName: 'Glipizide',
-    dose: '5',
-    status: 'discontinued',
-    indication: 'Type 2 Diabetes (switched therapy)',
-    endDate: subDays(now, 45).toISOString(),
-    adherenceStatus: undefined,
-    pdc: undefined,
-    nextRefillDate: undefined,
-    refillsRemaining: undefined,
-  })
-
-  // Add one interaction example
-  if (allMeds.length >= 2) {
-    allMeds[0].interactions = [{
-      id: 'demo-int-1',
-      drug1: allMeds[0].name,
-      drug2: allMeds[1].name,
-      severity: 'moderate',
-      description: 'May increase risk of hypoglycemia when used together',
-      recommendation: 'Monitor blood glucose closely and adjust doses as needed',
-      source: 'DrugBank',
-    }]
-  }
-
-  return allMeds
-}
-
-function MedicationsTab({ medications, patient }: { medications: Medication[]; patient: PatientSummary }) {
-  const meds = useMemo(() => {
-    if (medications.length > 0) return medications
-    return generateDemoMedications(patient)
-  }, [medications, patient])
-
-  return <MedicationList medications={meds} />
+function MedicationsTab({ medications }: { medications: Medication[] }) {
+  return <MedicationList medications={medications} />
 }
 
 // ─── Research Tab ─────────────────────────────────────────────────────────────
