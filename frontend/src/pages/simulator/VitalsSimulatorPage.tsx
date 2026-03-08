@@ -1031,6 +1031,15 @@ export default function VitalsSimulatorPage() {
     bgStore.stop()
   }
 
+  // On mount: if background store is still running (user navigated away without stopping),
+  // reflect that in local state so the Stop button is visible
+  useEffect(() => {
+    if (bgStore.isRunning && !isRunning) {
+      setIsRunning(true)
+    }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
+
   // Cleanup on unmount — only stop the local timer, NOT the background store
   useEffect(() => {
     return () => {

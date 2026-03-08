@@ -286,11 +286,15 @@ export default function VitalsPage() {
           </p>
         </div>
         <div className="flex items-center gap-3">
-          {/* Background simulator indicator */}
+          {/* Background simulator indicator + stop button */}
           {bgStore.isRunning && (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-secondary-600 dark:text-secondary-400 animate-pulse">
-              <Radio className="w-3.5 h-3.5" /> Simulator active
-            </span>
+            <button
+              onClick={() => bgStore.stop()}
+              className="flex items-center gap-1.5 text-xs font-medium text-secondary-600 dark:text-secondary-400 hover:text-danger-500 transition-colors px-2 py-1 rounded-lg border border-secondary-500/30 hover:border-danger-500/30"
+              title="Stop background simulator"
+            >
+              <Radio className="w-3.5 h-3.5 animate-pulse" /> Simulator active — click to stop
+            </button>
           )}
 
           <span className={cn('flex items-center gap-1.5 text-xs font-medium', connected ? 'text-secondary-600 dark:text-secondary-400' : 'text-muted-foreground')}>
