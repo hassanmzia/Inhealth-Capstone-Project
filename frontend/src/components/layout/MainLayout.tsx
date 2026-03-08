@@ -20,13 +20,6 @@ function applyTheme(theme: Theme) {
   root.classList.toggle('dark', effectiveTheme === 'dark')
 }
 
-const pageVariants = {
-  initial: { opacity: 0, y: 8 },
-  in: { opacity: 1, y: 0 },
-  out: { opacity: 0, y: -8 },
-}
-const pageTransition = { type: 'tween' as const, ease: 'easeInOut', duration: 0.2 }
-
 export default function MainLayout() {
   const location = useLocation()
   const { user, updatePreferences } = useAuthStore()
@@ -156,19 +149,9 @@ export default function MainLayout() {
         {/* Page Content */}
         <main className="flex-1 overflow-y-auto overflow-x-hidden bg-background">
           <div className="h-full p-3 sm:p-4 md:p-6 lg:p-8">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={location.pathname}
-                initial="initial"
-                animate="in"
-                exit="out"
-                variants={pageVariants}
-                transition={pageTransition}
-                className="h-full"
-              >
-                <Outlet />
-              </motion.div>
-            </AnimatePresence>
+            <div key={location.pathname} className="h-full animate-fade-in">
+              <Outlet />
+            </div>
           </div>
         </main>
       </div>
