@@ -15,7 +15,9 @@ import api from '@/services/api'
 import PopulationRiskPyramid from '@/components/charts/PopulationRiskPyramid'
 import AgentActivityTimeline from '@/components/charts/AgentActivityTimeline'
 import { useAgentStore } from '@/store/agentStore'
+import type { AgentExecution } from '@/types/agent'
 import { useMemo } from 'react'
+import { subHours, subMinutes } from 'date-fns'
 
 const CONTAINER = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.08 } } }
 const ITEM = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0 } }
@@ -24,48 +26,20 @@ const GRAFANA_URL = import.meta.env.VITE_GRAFANA_URL ?? ''
 
 export default function AnalyticsPage() {
   const executions = useAgentStore((state) => state.executions)
-  const executionSlice = useMemo(() => executions.slice(0, 200), [executions])
+  const executionSlice = useMemo(() => {
+    if (executions.length > 0) return executions.slice(0, 200)
+    return DEMO_EXECUTIONS
+  }, [executions])
 
-  const { data: populationData } = useQuery({
+  const { data: populationDataRaw } = useQuery({
     queryKey: ['population-metrics'],
     queryFn: () => api.get('/analytics/population/').then((r) => r.data),
-    placeholderData: {
-      riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
-      diseasePrevalence: [
-        { condition: 'Type 2 Diabetes', count: 486, percentage: 37.8 },
-        { condition: 'Hypertension', count: 641, percentage: 49.9 },
-        { condition: 'Heart Failure', count: 127, percentage: 9.9 },
-        { condition: 'CKD', count: 198, percentage: 15.4 },
-        { condition: 'COPD', count: 89, percentage: 6.9 },
-        { condition: 'AFib', count: 112, percentage: 8.7 },
-      ],
-      careGapRates: [
-        { category: 'Preventive', openGaps: 312, closureRate: 68 },
-        { category: 'Screening', openGaps: 184, closureRate: 72 },
-        { category: 'Chronic Mgmt', openGaps: 247, closureRate: 61 },
-        { category: 'Medication', openGaps: 89, closureRate: 81 },
-        { category: 'Follow-up', openGaps: 156, closureRate: 74 },
-      ],
-      adherenceTrend: [
-        { month: 'Sep', adherence: 76 },
-        { month: 'Oct', adherence: 78 },
-        { month: 'Nov', adherence: 74 },
-        { month: 'Dec', adherence: 80 },
-        { month: 'Jan', adherence: 82 },
-        { month: 'Feb', adherence: 85 },
-      ],
-      qualityMeasures: [
-        { measure: 'HbA1c Control (<8%)', rate: 68, benchmark: 72 },
-        { measure: 'BP Control (<140/90)', rate: 71, benchmark: 68 },
-        { measure: 'Statin Therapy', rate: 84, benchmark: 80 },
-        { measure: 'Colorectal Screening', rate: 59, benchmark: 65 },
-        { measure: 'Breast Cancer Screen', rate: 72, benchmark: 70 },
-        { measure: 'Influenza Vaccine', rate: 81, benchmark: 75 },
-      ],
-    },
   })
 
-  const d = populationData
+  const d = useMemo(() => {
+    if (populationDataRaw && populationDataRaw.riskDistribution?.total > 0) return populationDataRaw
+    return DEMO_POPULATION_DATA
+  }, [populationDataRaw])
 
   return (
     <motion.div variants={CONTAINER} initial="hidden" animate="show" className="space-y-6 max-w-7xl">
@@ -237,4 +211,56 @@ export default function AnalyticsPage() {
       )}
     </motion.div>
   )
+}
+
+// ─── Demo Data ────────────────────────────────────────────────────────────────
+
+const _now = new Date()
+
+const DEMO_EXECUTIONS: AgentExecution[] = [
+  { id: 'demo-e1', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'system', triggeredAt: subMinutes(_now, 15).toISOString(), startedAt: subMinutes(_now, 15).toISOString(), completedAt: subMinutes(_now, 14).toISOString(), runtimeSeconds: 4.2 },
+  { id: 'demo-e2', agentId: 'risk_stratification_agent', agentName: 'Risk Stratification', tier: 'tier2_analysis', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subMinutes(_now, 45).toISOString(), startedAt: subMinutes(_now, 45).toISOString(), completedAt: subMinutes(_now, 43).toISOString(), runtimeSeconds: 12.8 },
+  { id: 'demo-e3', agentId: 'care_gap_detection_agent', agentName: 'Care Gap Detector', tier: 'tier3_clinical', status: 'completed', patientId: 'demo-p5', patientName: 'William Jackson', triggeredBy: 'system', triggeredAt: subHours(_now, 1).toISOString(), startedAt: subHours(_now, 1).toISOString(), completedAt: subMinutes(subHours(_now, 1), -2).toISOString(), runtimeSeconds: 8.1 },
+  { id: 'demo-e4', agentId: 'medication_adherence_agent', agentName: 'Medication Adherence', tier: 'tier3_clinical', status: 'completed', patientId: 'demo-p3', patientName: 'Robert Chen', triggeredBy: 'system', triggeredAt: subHours(_now, 2).toISOString(), startedAt: subHours(_now, 2).toISOString(), completedAt: subMinutes(subHours(_now, 2), -1).toISOString(), runtimeSeconds: 5.3 },
+  { id: 'demo-e5', agentId: 'fhir_ingestion_agent', agentName: 'FHIR Data Ingestion', tier: 'tier1_ingestion', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subHours(_now, 3).toISOString(), startedAt: subHours(_now, 3).toISOString(), completedAt: subMinutes(subHours(_now, 3), -5).toISOString(), runtimeSeconds: 31.4 },
+  { id: 'demo-e6', agentId: 'notification_agent', agentName: 'Patient Outreach', tier: 'tier5_engagement', status: 'pending_hitl', patientId: 'demo-p2', patientName: 'Maria Gonzalez', triggeredBy: 'care_gap_detection_agent', triggeredAt: subHours(_now, 4).toISOString(), startedAt: subHours(_now, 4).toISOString(), runtimeSeconds: 2.1 },
+  { id: 'demo-e7', agentId: 'ehr_sync_agent', agentName: 'EHR Sync', tier: 'tier1_ingestion', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subHours(_now, 6).toISOString(), startedAt: subHours(_now, 6).toISOString(), completedAt: subMinutes(subHours(_now, 6), -3).toISOString(), runtimeSeconds: 18.7 },
+  { id: 'demo-e8', agentId: 'predictive_analytics_agent', agentName: 'Readmission Predictor', tier: 'tier2_analysis', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'risk_stratification_agent', triggeredAt: subHours(_now, 8).toISOString(), startedAt: subHours(_now, 8).toISOString(), completedAt: subMinutes(subHours(_now, 8), -1).toISOString(), runtimeSeconds: 6.9 },
+  { id: 'demo-e9', agentId: 'population_health_agent', agentName: 'HEDIS Quality Measure', tier: 'tier2_analysis', status: 'failed', triggeredBy: 'scheduler', triggeredAt: subHours(_now, 10).toISOString(), startedAt: subHours(_now, 10).toISOString(), completedAt: subMinutes(subHours(_now, 10), -1).toISOString(), runtimeSeconds: 3.2, error: 'Timeout fetching external measure definitions' },
+  { id: 'demo-e10', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'running', patientId: 'demo-p4', patientName: 'Dorothy Williams', triggeredBy: 'system', triggeredAt: subMinutes(_now, 2).toISOString(), startedAt: subMinutes(_now, 2).toISOString() },
+]
+
+const DEMO_POPULATION_DATA = {
+  riskDistribution: { critical: 47, high: 183, medium: 521, low: 533, total: 1284 },
+  diseasePrevalence: [
+    { condition: 'Type 2 Diabetes', count: 486, percentage: 37.8 },
+    { condition: 'Hypertension', count: 641, percentage: 49.9 },
+    { condition: 'Heart Failure', count: 127, percentage: 9.9 },
+    { condition: 'CKD', count: 198, percentage: 15.4 },
+    { condition: 'COPD', count: 89, percentage: 6.9 },
+    { condition: 'AFib', count: 112, percentage: 8.7 },
+  ],
+  careGapRates: [
+    { category: 'Preventive', openGaps: 312, closureRate: 68 },
+    { category: 'Screening', openGaps: 184, closureRate: 72 },
+    { category: 'Chronic Mgmt', openGaps: 247, closureRate: 61 },
+    { category: 'Medication', openGaps: 89, closureRate: 81 },
+    { category: 'Follow-up', openGaps: 156, closureRate: 74 },
+  ],
+  adherenceTrend: [
+    { month: 'Sep', adherence: 76 },
+    { month: 'Oct', adherence: 78 },
+    { month: 'Nov', adherence: 74 },
+    { month: 'Dec', adherence: 80 },
+    { month: 'Jan', adherence: 82 },
+    { month: 'Feb', adherence: 85 },
+  ],
+  qualityMeasures: [
+    { measure: 'HbA1c Control (<8%)', rate: 68, benchmark: 72 },
+    { measure: 'BP Control (<140/90)', rate: 71, benchmark: 68 },
+    { measure: 'Statin Therapy', rate: 84, benchmark: 80 },
+    { measure: 'Colorectal Screening', rate: 59, benchmark: 65 },
+    { measure: 'Breast Cancer Screen', rate: 72, benchmark: 70 },
+    { measure: 'Influenza Vaccine', rate: 81, benchmark: 75 },
+  ],
 }
