@@ -22,9 +22,13 @@ import {
   Search,
   ExternalLink,
   Loader2,
+  Target,
+  Settings2,
 } from 'lucide-react'
 import { format, subDays, subHours, subMinutes } from 'date-fns'
 import api from '@/services/api'
+import { useCarePlans, useVitalTargets, useUpdateVitalTarget, useInitializeVitalTargets } from '@/hooks/useFHIR'
+import type { FHIRCarePlan as FHIRCarePlanType } from '@/services/fhir'
 import VitalsMonitor from '@/components/clinical/VitalsMonitor'
 import VitalsChart from '@/components/charts/VitalsChart'
 import GlucoseChart from '@/components/charts/GlucoseChart'
@@ -412,6 +416,8 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
           <h3 className="text-sm font-bold text-foreground mb-3">Care Gaps ({careGaps.filter(g => g.status === 'open').length} open)</h3>
           <CareGapList careGaps={careGaps} patientId={patient.id} />
         </div>
+        <CarePlansSection patientId={patient.id} />
+        <VitalTargetsSection patientId={patient.id} />
       </div>
       <div className="clinical-card">
         <h3 className="text-sm font-bold text-foreground mb-3">AI Recommendations</h3>
@@ -792,9 +798,346 @@ function ClinicalTab({ careGaps, patientId, patient }: { careGaps: CareGap[]; pa
   }, [careGaps, patient])
 
   return (
+    <div className="space-y-6">
+      <CarePlansSection patientId={patientId} />
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4">Care Gaps & Quality Measures</h3>
+        <CareGapList careGaps={gaps} patientId={patientId} />
+      </div>
+    </div>
+  )
+}
+
+function CarePlansSection({ patientId }: { patientId: string }) {
+  const { data: carePlansResult, isLoading } = useCarePlans(patientId)
+  const carePlans = carePlansResult?.entry?.map((e: { resource: FHIRCarePlanType }) => e.resource) ?? []
+
+  if (isLoading) {
+    return (
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4">Care Plans</h3>
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading care plans...
+        </div>
+      </div>
+    )
+  }
+
+  if (carePlans.length === 0) {
+    return (
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4">Care Plans</h3>
+        <p className="text-muted-foreground text-sm">
+          No care plans yet. Approve an AI recommendation to auto-generate one.
+        </p>
+      </div>
+    )
+  }
+
+  const statusColors: Record<string, string> = {
+    active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    draft: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    completed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    revoked: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    'on-hold': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
+  }
+
+  return (
     <div className="clinical-card">
-      <h3 className="text-sm font-bold text-foreground mb-4">Care Gaps & Quality Measures</h3>
-      <CareGapList careGaps={gaps} patientId={patientId} />
+      <h3 className="text-sm font-bold text-foreground mb-4">
+        Care Plans ({carePlans.length})
+      </h3>
+      <div className="space-y-3">
+        {carePlans.map((plan: FHIRCarePlanType) => (
+          <div
+            key={plan.id || plan.fhir_id}
+            className="border border-border rounded-lg p-4 bg-card/50"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <ClipboardList className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                  <h4 className="text-sm font-semibold text-foreground truncate">{plan.title}</h4>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{plan.description}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {plan.ai_generated && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                    <BrainCircuit className="w-3 h-3" /> AI
+                  </span>
+                )}
+                <span className={cn(
+                  'px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase',
+                  statusColors[plan.status] ?? statusColors.draft,
+                )}>
+                  {plan.status}
+                </span>
+              </div>
+            </div>
+            {/* Goals with outcome tracking */}
+            {plan.goals?.length > 0 && (
+              <div className="mt-3 space-y-2">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Goals</p>
+                {plan.goals.map((goal: { description: string; status: string; priority: string; outcome?: string; pre_avg?: number | null; post_avg?: number | null; in_normal_range?: boolean; last_evaluated?: string }, i: number) => (
+                  <div key={i} className="space-y-1">
+                    <div className="flex items-center gap-2 text-xs text-foreground">
+                      <span className={cn(
+                        'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                        goal.status === 'in-progress' ? 'bg-blue-500' :
+                        goal.status === 'achieved' ? 'bg-green-500' :
+                        goal.status === 'at-risk' ? 'bg-red-500' : 'bg-gray-400',
+                      )} />
+                      <span className="flex-1">{goal.description}</span>
+                      {goal.outcome && (
+                        <span className={cn(
+                          'px-1.5 py-0.5 rounded text-[10px] font-semibold',
+                          goal.outcome === 'improved' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                          goal.outcome === 'worsened' ? 'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300' :
+                          'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+                        )}>
+                          {goal.outcome === 'improved' ? 'Improving' : goal.outcome === 'worsened' ? 'Worsening' : 'Stable'}
+                        </span>
+                      )}
+                    </div>
+                    {/* Outcome vitals comparison */}
+                    {goal.post_avg != null && (
+                      <div className="ml-3.5 flex items-center gap-3 text-[10px] text-muted-foreground">
+                        {goal.pre_avg != null && (
+                          <span>Before: <span className="font-mono font-semibold text-foreground">{goal.pre_avg}</span></span>
+                        )}
+                        <span>Current: <span className={cn(
+                          'font-mono font-semibold',
+                          goal.in_normal_range ? 'text-green-600 dark:text-green-400' : 'text-orange-600 dark:text-orange-400',
+                        )}>{goal.post_avg}</span></span>
+                        {goal.in_normal_range && <span className="text-green-600 dark:text-green-400">In range</span>}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Activities */}
+            {plan.activities?.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Activities</p>
+                {plan.activities.map((act: { detail: string; status: string; evidence_level?: string }, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <span className={cn(
+                      'mt-1 w-1.5 h-1.5 rounded-full flex-shrink-0',
+                      act.status === 'completed' ? 'bg-green-500' :
+                      act.status === 'needs-escalation' ? 'bg-red-500' :
+                      act.status === 'in-progress' ? 'bg-blue-400' : 'bg-primary-400',
+                    )} />
+                    <span className="flex-1">{act.detail}</span>
+                    <div className="flex items-center gap-1">
+                      {act.status === 'needs-escalation' && (
+                        <span className="text-[10px] font-semibold text-red-600 dark:text-red-400">Escalated</span>
+                      )}
+                      {act.status === 'completed' && (
+                        <span className="text-[10px] font-semibold text-green-600 dark:text-green-400">Done</span>
+                      )}
+                      {act.evidence_level && (
+                        <span className="text-[10px] font-mono text-primary-600">Lv.{act.evidence_level}</span>
+                      )}
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Period + feedback indicator */}
+            <div className="mt-2 flex items-center justify-between">
+              <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
+                {plan.period_start && <span>Start: {plan.period_start}</span>}
+                {plan.period_end && <span>End: {plan.period_end}</span>}
+                {plan.created && <span>Created: {format(new Date(plan.created), 'MMM d, yyyy')}</span>}
+              </div>
+              {plan.status === 'active' && plan.ai_generated && (
+                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">
+                  Monitoring vitals...
+                </span>
+              )}
+              {plan.status === 'completed' && (
+                <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">
+                  Goals achieved
+                </span>
+              )}
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+interface VitalTarget {
+  id: string
+  loinc_code: string
+  vital_name: string
+  unit: string
+  target_low: number
+  target_high: number
+  source: string
+  source_guideline: string
+  rationale: string
+  adherence_rate: number | null
+  times_evaluated: number
+  times_in_range: number
+  is_active: boolean
+}
+
+function VitalTargetsSection({ patientId }: { patientId: string }) {
+  const { data: targetsData, isLoading } = useVitalTargets(patientId)
+  const initTargets = useInitializeVitalTargets()
+  const updateTarget = useUpdateVitalTarget()
+  const [editingId, setEditingId] = useState<string | null>(null)
+  const [editLow, setEditLow] = useState('')
+  const [editHigh, setEditHigh] = useState('')
+
+  const targets: VitalTarget[] = targetsData?.results ?? targetsData ?? []
+
+  if (isLoading) {
+    return (
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+          <Target className="w-4 h-4 text-primary-500" /> Vital Target Policies
+        </h3>
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading targets...
+        </div>
+      </div>
+    )
+  }
+
+  if (targets.length === 0) {
+    return (
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+          <Target className="w-4 h-4 text-primary-500" /> Vital Target Policies
+        </h3>
+        <p className="text-muted-foreground text-sm mb-3">
+          No personalized vital targets set. The feedback loop will use evidence-based defaults.
+        </p>
+        <button
+          onClick={() => initTargets.mutate(patientId)}
+          disabled={initTargets.isPending}
+          className="text-xs px-3 py-1.5 rounded-md bg-primary-500 text-white hover:bg-primary-600 disabled:opacity-50"
+        >
+          {initTargets.isPending ? 'Creating...' : 'Initialize Default Targets'}
+        </button>
+      </div>
+    )
+  }
+
+  const sourceColors: Record<string, string> = {
+    clinician: 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-300',
+    guideline: 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300',
+    ai_suggested: 'bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300',
+    care_plan: 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300',
+  }
+
+  const handleEdit = (target: VitalTarget) => {
+    setEditingId(target.id)
+    setEditLow(String(target.target_low))
+    setEditHigh(String(target.target_high))
+  }
+
+  const handleSave = (targetId: string) => {
+    updateTarget.mutate({
+      id: targetId,
+      data: {
+        target_low: parseFloat(editLow),
+        target_high: parseFloat(editHigh),
+        source: 'clinician',
+      },
+    })
+    setEditingId(null)
+  }
+
+  return (
+    <div className="clinical-card">
+      <h3 className="text-sm font-bold text-foreground mb-4 flex items-center gap-2">
+        <Target className="w-4 h-4 text-primary-500" />
+        Vital Target Policies ({targets.length})
+      </h3>
+      <div className="space-y-2">
+        {targets.map((target: VitalTarget) => (
+          <div
+            key={target.id}
+            className="border border-border rounded-lg p-3 bg-card/50"
+          >
+            <div className="flex items-center justify-between gap-2">
+              <div className="flex items-center gap-2">
+                <span className="text-sm font-semibold text-foreground">{target.vital_name}</span>
+                <span className={cn(
+                  'px-1.5 py-0.5 rounded text-[10px] font-medium',
+                  sourceColors[target.source] ?? sourceColors.guideline,
+                )}>
+                  {target.source === 'clinician' ? 'Clinician' :
+                   target.source === 'ai_suggested' ? 'AI' :
+                   target.source === 'care_plan' ? 'Care Plan' : 'Guideline'}
+                </span>
+              </div>
+              <button
+                onClick={() => editingId === target.id ? handleSave(target.id) : handleEdit(target)}
+                className="text-[10px] text-primary-500 hover:text-primary-600 font-medium flex items-center gap-1"
+              >
+                <Settings2 className="w-3 h-3" />
+                {editingId === target.id ? 'Save' : 'Edit'}
+              </button>
+            </div>
+
+            {editingId === target.id ? (
+              <div className="mt-2 flex items-center gap-2 text-xs">
+                <span className="text-muted-foreground">Target:</span>
+                <input
+                  type="number"
+                  value={editLow}
+                  onChange={(e) => setEditLow(e.target.value)}
+                  className="w-16 px-1.5 py-1 rounded border border-border bg-background text-foreground text-xs"
+                  step="0.1"
+                />
+                <span className="text-muted-foreground">-</span>
+                <input
+                  type="number"
+                  value={editHigh}
+                  onChange={(e) => setEditHigh(e.target.value)}
+                  className="w-16 px-1.5 py-1 rounded border border-border bg-background text-foreground text-xs"
+                  step="0.1"
+                />
+                <span className="text-muted-foreground">{target.unit}</span>
+                <button
+                  onClick={() => setEditingId(null)}
+                  className="text-[10px] text-muted-foreground hover:text-foreground ml-2"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <div className="mt-1.5 flex items-center gap-4 text-xs">
+                <span className="text-muted-foreground">
+                  Target: <span className="font-mono font-semibold text-foreground">{target.target_low}-{target.target_high}</span> {target.unit}
+                </span>
+                {target.adherence_rate != null && (
+                  <span className="text-muted-foreground">
+                    Adherence: <span className={cn(
+                      'font-semibold',
+                      target.adherence_rate >= 70 ? 'text-green-600 dark:text-green-400' :
+                      target.adherence_rate >= 40 ? 'text-yellow-600 dark:text-yellow-400' :
+                      'text-red-600 dark:text-red-400',
+                    )}>{target.adherence_rate}%</span>
+                    <span className="text-[10px] ml-1">({target.times_in_range}/{target.times_evaluated})</span>
+                  </span>
+                )}
+              </div>
+            )}
+
+            {target.source_guideline && (
+              <p className="mt-1 text-[10px] text-muted-foreground">{target.source_guideline}</p>
+            )}
+          </div>
+        ))}
+      </div>
     </div>
   )
 }

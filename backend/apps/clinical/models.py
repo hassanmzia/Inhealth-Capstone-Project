@@ -205,3 +205,116 @@ class SmartOrderSet(models.Model):
 
     def __str__(self):
         return f"Order Set: {self.name} ({self.condition})"
+
+
+class VitalTargetPolicy(models.Model):
+    """
+    Per-patient vital sign target policy.
+
+    Clinicians set personalized target ranges for each vital sign.
+    The feedback loop uses these instead of global defaults when evaluating
+    care plan outcomes. If no patient-specific policy exists, the system
+    falls back to evidence-based population defaults.
+    """
+
+    class Source(models.TextChoices):
+        CLINICIAN = "clinician", "Clinician-Set"
+        GUIDELINE = "guideline", "Evidence-Based Guideline"
+        AI_SUGGESTED = "ai_suggested", "AI-Suggested"
+        CARE_PLAN = "care_plan", "Auto-Created from Care Plan"
+
+    id = models.UUIDField(primary_key=True, default=uuid.uuid4, editable=False)
+    tenant = models.ForeignKey("tenants.Organization", on_delete=models.CASCADE, db_index=True)
+    patient = models.ForeignKey("fhir.FHIRPatient", on_delete=models.CASCADE, related_name="vital_targets")
+    set_by = models.ForeignKey(
+        "accounts.User",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="vital_target_policies",
+        help_text="Clinician who set or approved this target",
+    )
+
+    # Vital identification
+    loinc_code = models.CharField(
+        max_length=20,
+        db_index=True,
+        help_text="LOINC code for the vital sign (e.g., 8480-6 for Systolic BP)",
+    )
+    vital_name = models.CharField(max_length=100, help_text="Human-readable vital sign name")
+    unit = models.CharField(max_length=20, help_text="Measurement unit (e.g., mmHg, bpm)")
+
+    # Target range
+    target_low = models.FloatField(help_text="Lower bound of target range (inclusive)")
+    target_high = models.FloatField(help_text="Upper bound of target range (inclusive)")
+
+    # Clinical context
+    source = models.CharField(max_length=20, choices=Source.choices, default=Source.GUIDELINE)
+    source_guideline = models.CharField(
+        max_length=255,
+        blank=True,
+        default="",
+        help_text="Clinical guideline reference (e.g., ACC/AHA 2023)",
+    )
+    rationale = models.TextField(
+        blank=True,
+        default="",
+        help_text="Why this target was chosen for this patient",
+    )
+    care_plan = models.ForeignKey(
+        "fhir.FHIRCarePlan",
+        on_delete=models.SET_NULL,
+        null=True,
+        blank=True,
+        related_name="vital_targets",
+        help_text="Care plan that triggered this target policy",
+    )
+
+    # Effectiveness tracking
+    times_evaluated = models.PositiveIntegerField(default=0)
+    times_in_range = models.PositiveIntegerField(default=0)
+
+    is_active = models.BooleanField(default=True, db_index=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ["vital_name"]
+        # One active target per vital per patient
+        constraints = [
+            models.UniqueConstraint(
+                fields=["patient", "loinc_code"],
+                condition=models.Q(is_active=True),
+                name="unique_active_vital_target_per_patient",
+            ),
+        ]
+        indexes = [
+            models.Index(fields=["patient", "is_active"]),
+            models.Index(fields=["tenant", "loinc_code"]),
+        ]
+
+    def __str__(self):
+        return f"{self.vital_name} target for {self.patient}: {self.target_low}-{self.target_high} {self.unit}"
+
+    @property
+    def adherence_rate(self):
+        """Percentage of evaluations where vitals were in target range."""
+        if self.times_evaluated == 0:
+            return None
+        return round(self.times_in_range / self.times_evaluated * 100, 1)
+
+    @classmethod
+    def get_patient_targets(cls, patient):
+        """Get all active vital targets for a patient as a dict keyed by LOINC code."""
+        targets = cls.objects.filter(patient=patient, is_active=True)
+        return {
+            t.loinc_code: {
+                "name": t.vital_name,
+                "normal_low": t.target_low,
+                "normal_high": t.target_high,
+                "unit": t.unit,
+                "source": t.source,
+                "policy_id": str(t.id),
+            }
+            for t in targets
+        }

@@ -9,8 +9,11 @@ from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.permissions import CanAccessPHI, IsClinician
 
-from .models import CareGap, Encounter, SmartOrderSet
-from .serializers import CareGapSerializer, EncounterSerializer, SmartOrderSetSerializer
+from .models import CareGap, Encounter, SmartOrderSet, VitalTargetPolicy
+from .serializers import (
+    CareGapSerializer, EncounterSerializer, SmartOrderSetSerializer,
+    VitalTargetPolicySerializer,
+)
 
 logger = logging.getLogger("apps.clinical")
 
@@ -105,3 +108,130 @@ class SmartOrderSetViewSet(ModelViewSet):
             return Response({"error": "condition parameter required"}, status=status.HTTP_400_BAD_REQUEST)
         order_sets = self.get_queryset().filter(condition=condition)
         return Response(SmartOrderSetSerializer(order_sets, many=True).data)
+
+
+class VitalTargetPolicyViewSet(ModelViewSet):
+    """
+    Per-patient vital target policies.
+
+    Clinicians set personalized vital sign target ranges.
+    The feedback loop uses these to evaluate care plan outcomes.
+    """
+
+    serializer_class = VitalTargetPolicySerializer
+    permission_classes = [IsClinician]
+    filterset_fields = ["patient", "loinc_code", "is_active", "source"]
+    ordering = ["vital_name"]
+
+    def get_queryset(self):
+        return VitalTargetPolicy.objects.filter(
+            tenant=(getattr(self.request, "tenant", None) or self.request.user.tenant),
+        ).select_related("patient", "set_by", "care_plan")
+
+    def perform_create(self, serializer):
+        tenant = getattr(self.request, "tenant", None) or self.request.user.tenant
+        # Deactivate existing active target for same vital + patient
+        patient = serializer.validated_data.get("patient")
+        loinc_code = serializer.validated_data.get("loinc_code")
+        if patient and loinc_code:
+            VitalTargetPolicy.objects.filter(
+                patient=patient, loinc_code=loinc_code, is_active=True,
+            ).update(is_active=False)
+        serializer.save(tenant=tenant, set_by=self.request.user)
+
+    @action(detail=False, methods=["post"], url_path="initialize-defaults")
+    def initialize_defaults(self, request):
+        """Create default evidence-based vital targets for a patient."""
+        patient_id = request.data.get("patient_id")
+        if not patient_id:
+            return Response({"error": "patient_id required"}, status=status.HTTP_400_BAD_REQUEST)
+
+        from apps.fhir.models import FHIRPatient
+        try:
+            patient = FHIRPatient.objects.get(id=patient_id)
+        except FHIRPatient.DoesNotExist:
+            return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        tenant = getattr(request, "tenant", None) or request.user.tenant
+        created = _create_default_vital_targets(patient, tenant, request.user)
+        return Response({
+            "message": f"Created {len(created)} default vital target policies",
+            "targets": VitalTargetPolicySerializer(created, many=True).data,
+        })
+
+
+# Evidence-based default vital targets
+DEFAULT_VITAL_TARGETS = [
+    {
+        "loinc_code": "8867-4",
+        "vital_name": "Heart Rate",
+        "unit": "bpm",
+        "target_low": 60,
+        "target_high": 100,
+        "source_guideline": "ACC/AHA 2023",
+    },
+    {
+        "loinc_code": "8480-6",
+        "vital_name": "Systolic BP",
+        "unit": "mmHg",
+        "target_low": 90,
+        "target_high": 130,
+        "source_guideline": "ACC/AHA 2023 Hypertension Guidelines",
+    },
+    {
+        "loinc_code": "8462-4",
+        "vital_name": "Diastolic BP",
+        "unit": "mmHg",
+        "target_low": 60,
+        "target_high": 80,
+        "source_guideline": "ACC/AHA 2023 Hypertension Guidelines",
+    },
+    {
+        "loinc_code": "59408-5",
+        "vital_name": "SpO2",
+        "unit": "%",
+        "target_low": 95,
+        "target_high": 100,
+        "source_guideline": "ATS/ERS 2024 Guidelines",
+    },
+    {
+        "loinc_code": "8310-5",
+        "vital_name": "Temperature",
+        "unit": "°C",
+        "target_low": 36.1,
+        "target_high": 37.2,
+        "source_guideline": "Standard clinical reference range",
+    },
+    {
+        "loinc_code": "2339-0",
+        "vital_name": "Glucose",
+        "unit": "mg/dL",
+        "target_low": 70,
+        "target_high": 180,
+        "source_guideline": "ADA Standards of Care 2024",
+    },
+]
+
+
+def _create_default_vital_targets(patient, tenant, set_by=None):
+    """Create default vital targets for a patient (skip vitals that already have active targets)."""
+    existing = set(
+        VitalTargetPolicy.objects.filter(
+            patient=patient, is_active=True,
+        ).values_list("loinc_code", flat=True)
+    )
+
+    created = []
+    for defaults in DEFAULT_VITAL_TARGETS:
+        if defaults["loinc_code"] in existing:
+            continue
+        target = VitalTargetPolicy.objects.create(
+            tenant=tenant,
+            patient=patient,
+            set_by=set_by,
+            source=VitalTargetPolicy.Source.GUIDELINE,
+            rationale="Default evidence-based target range",
+            **defaults,
+        )
+        created.append(target)
+    return created

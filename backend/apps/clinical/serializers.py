@@ -2,7 +2,7 @@
 
 from rest_framework import serializers
 
-from .models import CareGap, Encounter, SmartOrderSet
+from .models import CareGap, Encounter, SmartOrderSet, VitalTargetPolicy
 
 
 class EncounterSerializer(serializers.ModelSerializer):
@@ -42,3 +42,27 @@ class SmartOrderSetSerializer(serializers.ModelSerializer):
         model = SmartOrderSet
         fields = "__all__"
         read_only_fields = ["id", "created_at", "updated_at"]
+
+
+class VitalTargetPolicySerializer(serializers.ModelSerializer):
+    adherence_rate = serializers.FloatField(read_only=True)
+    set_by_name = serializers.SerializerMethodField()
+
+    class Meta:
+        model = VitalTargetPolicy
+        fields = "__all__"
+        read_only_fields = [
+            "id", "tenant", "set_by", "times_evaluated", "times_in_range",
+            "created_at", "updated_at", "adherence_rate", "set_by_name",
+        ]
+
+    def get_set_by_name(self, obj):
+        if obj.set_by:
+            return obj.set_by.get_full_name()
+        return None
+
+    def create(self, validated_data):
+        request = self.context["request"]
+        validated_data["tenant"] = getattr(request, "tenant", None) or request.user.tenant
+        validated_data["set_by"] = request.user
+        return super().create(validated_data)

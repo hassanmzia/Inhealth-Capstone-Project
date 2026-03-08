@@ -162,14 +162,17 @@ class FHIRAppointmentSerializer(serializers.ModelSerializer):
 
 class FHIRCarePlanSerializer(serializers.ModelSerializer):
     resourceType = serializers.SerializerMethodField()
+    id = serializers.CharField(source="fhir_id", read_only=True)
+    patient_fhir_id = serializers.CharField(source="patient.fhir_id", read_only=True)
 
     class Meta:
         model = FHIRCarePlan
         fields = [
-            "resourceType", "fhir_id", "status", "intent",
+            "resourceType", "id", "fhir_id", "patient_fhir_id",
+            "status", "intent",
             "title", "description", "category",
             "goals", "activities", "period_start", "period_end",
-            "created", "ai_generated", "note",
+            "created", "ai_generated", "ai_model_used", "author_id", "note",
             "meta_version_id", "meta_last_updated",
         ]
 

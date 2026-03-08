@@ -1,4 +1,4 @@
-import { useMutation } from '@tanstack/react-query'
+import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
   Sparkles,
@@ -78,6 +78,7 @@ function RecommendationCard({
   onDecision?: () => void
   showHITL: boolean
 }) {
+  const queryClient = useQueryClient()
   const tierColors = getTierColor(rec.agentId.split('_').slice(0, -1).join('_') as AgentTier || 'tier3_clinical')
   const evidenceConfig = EVIDENCE_CONFIG[rec.evidenceLevel] ?? EVIDENCE_CONFIG.D
   const priorityConfig = PRIORITY_CONFIG[rec.priority] ?? PRIORITY_CONFIG.routine
@@ -85,7 +86,10 @@ function RecommendationCard({
   const approveMutation = useMutation({
     mutationFn: () => approveRecommendation(rec.id),
     onSuccess: () => {
-      toast.success('Recommendation approved')
+      toast.success('Recommendation approved — care plan created')
+      // Invalidate care plans so the new one appears immediately
+      queryClient.invalidateQueries({ queryKey: ['fhir', 'care-plans'] })
+      queryClient.invalidateQueries({ queryKey: ['care-gaps'] })
       onDecision?.()
     },
     onError: () => toast.error('Failed to approve'),
