@@ -392,26 +392,19 @@ export default function VitalsPage() {
             )}
           </h2>
 
-          {ecgObs.length > 0 ? (
+          {bgStore.isRunning ? (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* ECG waveform — animates only while simulator is running */}
+              {/* ECG waveform — only shown while simulator is actively running */}
               <div className="rounded-lg bg-gray-950 p-3 relative">
                 <EcgWaveform
                   heartRate={latestEcgHR ?? 72}
                   rhythm={latestEcgRhythm}
                   width={500}
                   height={160}
-                  isLive={bgStore.isRunning}
+                  isLive
                   showOverlay
                   color="#22c55e"
                 />
-                {!bgStore.isRunning && (
-                  <div className="absolute inset-0 flex items-center justify-center bg-gray-950/60 rounded-lg">
-                    <span className="text-xs text-muted-foreground bg-gray-900/80 px-3 py-1.5 rounded-full">
-                      Simulator stopped — showing last known rhythm
-                    </span>
-                  </div>
-                )}
               </div>
 
               {/* ECG history table */}
@@ -444,6 +437,10 @@ export default function VitalsPage() {
                 </table>
               </div>
             </div>
+          ) : ecgObs.length > 0 ? (
+            <p className="text-xs text-muted-foreground">
+              Simulator stopped. {ecgObs.length} ECG readings recorded in the last 24h.
+            </p>
           ) : (
             <p className="text-xs text-muted-foreground">No ECG data available. Run the simulator with ECG enabled to generate readings.</p>
           )}
