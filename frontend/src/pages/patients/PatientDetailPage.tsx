@@ -283,8 +283,8 @@ function VitalsTab({ vitals }: { vitals: VitalSign[] }) {
         <h3 className="text-sm font-bold text-foreground mb-4">Glucose Trend</h3>
         <GlucoseChart
           readings={vitals
-            .filter((v) => v.type === 'heart_rate')
-            .map((v) => ({ timestamp: v.timestamp, value: v.value + 40 }))}
+            .filter((v) => v.type === 'glucose')
+            .map((v) => ({ timestamp: v.timestamp, value: v.value }))}
           height={280}
           showPrediction
           showTIR

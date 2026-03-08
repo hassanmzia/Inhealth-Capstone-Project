@@ -79,7 +79,12 @@ export default function VitalsChart({
 }: VitalsChartProps) {
   const chartData = useMemo<ChartDataPoint[]>(() => {
     const cutoff = Date.now() - timeRangeHours * 60 * 60 * 1000
-    const filtered = vitals.filter((v) => new Date(v.timestamp).getTime() > cutoff)
+    let filtered = vitals.filter((v) => new Date(v.timestamp).getTime() > cutoff)
+
+    // If no data within the time range, show all available data
+    if (filtered.length === 0 && vitals.length > 0) {
+      filtered = vitals
+    }
 
     // Group by timestamp (rounded to minute)
     const byTime = new Map<number, ChartDataPoint>()

@@ -67,6 +67,7 @@ export const VITAL_RANGES: Record<VitalType, { normal: [number, number]; critica
   bmi: { normal: [18.5, 24.9], critical: [10, 50], unit: 'kg/m²' },
   respiratory_rate: { normal: [12, 20], critical: [8, 30], unit: '/min' },
   pain_score: { normal: [0, 3], critical: [7, 10], unit: '/10' },
+  glucose: { normal: [70, 180], critical: [54, 400], unit: 'mg/dL' },
 }
 
 // ─── Lab Results ──────────────────────────────────────────────────────────────

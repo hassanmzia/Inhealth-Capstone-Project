@@ -99,9 +99,15 @@ class PatientViewSet(ModelViewSet):
             observations = (
                 FHIRObservation.objects
                 .filter(patient_id=pk, tenant=self._tenant(), code__in=_LOINC_TO_VITAL_TYPE)
+                .exclude(effective_datetime__isnull=True)
                 .order_by("-effective_datetime")[:200]
             )
-            data = [self._obs_to_vital(obs) for obs in observations]
+            data = []
+            for obs in observations:
+                try:
+                    data.append(self._obs_to_vital(obs))
+                except Exception:
+                    continue
         except Exception:
             data = []
         return Response(data)
