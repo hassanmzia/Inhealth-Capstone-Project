@@ -63,15 +63,22 @@ class FHIRBaseViewSet(GenericViewSet):
         """FHIR search — GET /fhir/{ResourceType}"""
         qs = self.get_queryset()
         service = self.get_fhir_service()
+        serializer = self.get_serializer(qs, many=True)
         from django.conf import settings
-        resources = [r for r in qs]
-        bundle = service.build_fhir_bundle(
-            self.resource_type,
-            resources,
-            len(resources),
-            f"{settings.FHIR_BASE_URL}",
-        )
-        return Response(bundle)
+        base_url = f"{settings.FHIR_BASE_URL}"
+        entries = []
+        for resource_data, obj in zip(serializer.data, qs):
+            entries.append({
+                "fullUrl": f"{base_url}/{self.resource_type}/{obj.fhir_id}",
+                "resource": resource_data,
+            })
+        return Response({
+            "resourceType": "Bundle",
+            "type": "searchset",
+            "total": len(entries),
+            "link": [{"relation": "self", "url": f"{base_url}/{self.resource_type}"}],
+            "entry": entries,
+        })
 
     def retrieve(self, request, pk=None):
         """FHIR read — GET /fhir/{ResourceType}/{id}"""
@@ -103,16 +110,18 @@ class FHIRBaseViewSet(GenericViewSet):
     def create(self, request):
         """FHIR create — POST /fhir/{ResourceType}"""
         service = self.get_fhir_service()
-        try:
-            service.validate(self.resource_type, request.data)
-        except FHIRValidationError as e:
-            return Response(
-                service.build_operation_outcome(
-                    "error", "invalid",
-                    "; ".join(f"{err['path']}: {err['message']}" for err in e.errors)
-                ),
-                status=status.HTTP_422_UNPROCESSABLE_ENTITY,
-            )
+        # Only run FHIR R4 validation on standard FHIR JSON payloads
+        if request.data.get("resourceType"):
+            try:
+                service.validate(self.resource_type, request.data)
+            except FHIRValidationError as e:
+                return Response(
+                    service.build_operation_outcome(
+                        "error", "invalid",
+                        "; ".join(f"{err['path']}: {err['message']}" for err in e.errors)
+                    ),
+                    status=status.HTTP_422_UNPROCESSABLE_ENTITY,
+                )
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)

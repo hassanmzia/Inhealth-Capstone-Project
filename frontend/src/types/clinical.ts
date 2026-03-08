@@ -14,6 +14,7 @@ export type VitalType =
   | 'bmi'
   | 'respiratory_rate'
   | 'pain_score'
+  | 'glucose'
 
 export type VitalStatus = 'normal' | 'warning' | 'critical' | 'unknown'
 
