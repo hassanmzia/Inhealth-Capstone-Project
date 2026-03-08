@@ -1015,9 +1015,12 @@ export default function VitalsSimulatorPage() {
     tick()
     timerRef.current = setInterval(tick, intervalMs)
 
-    // Also start background store so data keeps flowing if user navigates away
+    // Always mark the store as running so VitalsPage ECG knows we're active.
+    // Only start the background data timer when "Keep alive" is enabled.
     if (bgStore.backgroundEnabled && selectedPatientId) {
       bgStore.startBackground(selectedPatientId, intervalMs)
+    } else {
+      bgStore.setRunning(true)
     }
   }
 
@@ -1040,11 +1043,17 @@ export default function VitalsSimulatorPage() {
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  // Cleanup on unmount — only stop the local timer, NOT the background store
+  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (timerRef.current) clearInterval(timerRef.current)
+      // If background timer is NOT running (no "Keep alive"), clear the running flag
+      // so VitalsPage ECG stops. If background IS running, leave it active.
+      if (!bgStore.backgroundEnabled) {
+        bgStore.setRunning(false)
+      }
     }
+  // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   // Restart interval when intervalMs changes during running

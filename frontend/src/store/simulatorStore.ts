@@ -55,6 +55,9 @@ interface SimulatorState {
   tickCount: number
 
   // Actions
+  /** Mark the simulator as running (for UI state) without starting a background data timer */
+  setRunning: (running: boolean) => void
+  /** Start both the running flag AND a background data-posting timer */
   startBackground: (patientId: string, intervalMs?: number) => void
   stop: () => void
   setBackgroundEnabled: (enabled: boolean) => void
@@ -70,6 +73,19 @@ export const useSimulatorStore = create<SimulatorState>((set, get) => ({
   tickCount: 0,
 
   setBackgroundEnabled: (enabled) => set({ backgroundEnabled: enabled }),
+
+  setRunning: (running) => {
+    if (running) {
+      set({ isRunning: true })
+    } else {
+      // Also clear background timer if any
+      if (bgTimer) {
+        clearInterval(bgTimer)
+        bgTimer = null
+      }
+      set({ isRunning: false, tickCount: 0 })
+    }
+  },
 
   startBackground: (patientId, intervalMs = 2000) => {
     // Clear any existing timer
