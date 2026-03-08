@@ -148,9 +148,16 @@ class AgentRecommendationActionView(APIView):
                 "status": "approved" if log.was_accepted else "rejected",
             }
 
-            # On approval the post_save signal triggers care plan creation.
-            # Reload to include care_plan_id if it was created synchronously.
+            # Create care plan synchronously so the response includes it and
+            # the frontend can refetch immediately.  The post_save signal's
+            # guard (`_care_plan_created`) prevents duplicate creation.
             if log.was_accepted:
+                try:
+                    from apps.fhir.tasks import _process_approved_recommendation_sync
+                    _process_approved_recommendation_sync(action_log_id=str(log.id))
+                except Exception:
+                    logger.exception("Synchronous care-plan creation failed for %s", log.id)
+
                 log.refresh_from_db()
                 output = log.output or {}
                 if output.get("care_plan_id"):

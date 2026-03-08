@@ -390,6 +390,11 @@ def _process_approved_recommendation_sync(action_log_id: str):
 
     org = log.tenant
     output = log.output or {}
+
+    # Guard against duplicate creation (signal + direct call race)
+    if output.get("_care_plan_created"):
+        return
+
     title = output.get("title", "AI Recommendation")
     recommendation = output.get("recommendation", "")
     category = output.get("category", "assess-plan")
