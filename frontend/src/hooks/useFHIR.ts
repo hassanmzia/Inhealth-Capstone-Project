@@ -192,6 +192,50 @@ export function useCarePlans(patientId: string | undefined, status?: string) {
   })
 }
 
+// ─── Vital Target Policies ──────────────────────────────────────────────────
+
+export function useVitalTargets(patientId: string | undefined) {
+  return useQuery({
+    queryKey: ['clinical', 'vital-targets', patientId],
+    queryFn: async () => {
+      const { getVitalTargets } = await import('@/services/clinical')
+      return getVitalTargets({ patient: patientId, is_active: true })
+    },
+    enabled: !!patientId,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
+export function useUpdateVitalTarget() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Record<string, unknown> }) => {
+      const { updateVitalTarget } = await import('@/services/clinical')
+      return updateVitalTarget(id, data)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clinical', 'vital-targets'] })
+      toast.success('Vital target updated')
+    },
+    onError: () => toast.error('Failed to update vital target'),
+  })
+}
+
+export function useInitializeVitalTargets() {
+  const queryClient = useQueryClient()
+  return useMutation({
+    mutationFn: async (patientId: string) => {
+      const { initializeVitalTargetDefaults } = await import('@/services/clinical')
+      return initializeVitalTargetDefaults(patientId)
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['clinical', 'vital-targets'] })
+      toast.success('Default vital targets created')
+    },
+    onError: () => toast.error('Failed to initialize targets'),
+  })
+}
+
 // ─── Patient Everything ───────────────────────────────────────────────────────
 
 export function usePatientEverything(patientId: string | undefined) {

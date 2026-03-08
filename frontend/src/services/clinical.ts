@@ -103,6 +103,23 @@ export async function createOrderSet(data: Record<string, unknown>) {
   return res.data
 }
 
+// ─── Vital Target Policies ──────────────────────────────────────────────────
+
+export async function getVitalTargets(params?: Record<string, unknown>) {
+  const res = await api.get('/clinical/vital-targets/', { params })
+  return res.data
+}
+
+export async function updateVitalTarget(id: string, data: Record<string, unknown>) {
+  const res = await api.patch(`/clinical/vital-targets/${id}/`, data)
+  return res.data
+}
+
+export async function initializeVitalTargetDefaults(patientId: string) {
+  const res = await api.post('/clinical/vital-targets/initialize-defaults/', { patient_id: patientId })
+  return res.data
+}
+
 // ─── Notifications ───────────────────────────────────────────────────────────
 
 export async function getNotifications(params?: Record<string, unknown>) {

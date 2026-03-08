@@ -11,6 +11,7 @@ import uuid
 from datetime import date, timedelta
 
 from celery import shared_task
+from django.db import models
 from django.utils import timezone
 
 logger = logging.getLogger("apps.fhir.tasks")
@@ -442,7 +443,10 @@ def _process_approved_recommendation_sync(action_log_id: str):
     output["care_plan_fhir_id"] = care_plan.fhir_id
     AgentActionLog.objects.filter(id=log.id).update(output=output)
 
-    # 5. Create audit trail entry
+    # 5. Ensure patient has vital target policies (auto-create from guidelines)
+    _ensure_vital_targets(patient, org, care_plan, log)
+
+    # 6. Create audit trail entry
     AgentActionLog.objects.create(
         tenant=org,
         patient=patient,
@@ -458,6 +462,29 @@ def _process_approved_recommendation_sync(action_log_id: str):
         output={"care_plan_fhir_id": care_plan.fhir_id, "title": care_plan.title},
         model_used=log.model_used or "",
     )
+
+
+def _ensure_vital_targets(patient, org, care_plan, source_log):
+    """Ensure the patient has vital target policies. Auto-create defaults if missing."""
+    from apps.clinical.models import VitalTargetPolicy
+    from apps.clinical.views import _create_default_vital_targets
+
+    existing_count = VitalTargetPolicy.objects.filter(
+        patient=patient, is_active=True,
+    ).count()
+
+    if existing_count == 0:
+        created = _create_default_vital_targets(patient, org)
+        # Link to care plan and mark source
+        for target in created:
+            target.care_plan = care_plan
+            target.source = VitalTargetPolicy.Source.CARE_PLAN
+            target.save(update_fields=["care_plan", "source"])
+        if created:
+            logger.info(
+                "Auto-created %d default vital targets for patient %s (from care plan %s)",
+                len(created), patient.id, care_plan.id,
+            )
 
 
 def _close_related_care_gaps(patient, category, org):
@@ -569,6 +596,7 @@ def _evaluate_care_plan_outcomes_sync():
     6. If improved and sustained → complete the care plan
     7. Track effectiveness on the original recommendation
     """
+    from apps.clinical.models import VitalTargetPolicy
     from apps.fhir.models import AgentActionLog, FHIRCarePlan, FHIRObservation
 
     now = timezone.now()
@@ -626,7 +654,12 @@ def _evaluate_care_plan_outcomes_sync():
         if not loinc_code:
             continue
 
-        thresholds = OUTCOME_THRESHOLDS.get(loinc_code)
+        # Patient-specific targets take priority over global defaults
+        patient_targets = VitalTargetPolicy.get_patient_targets(patient)
+        if loinc_code in patient_targets:
+            thresholds = patient_targets[loinc_code]
+        else:
+            thresholds = OUTCOME_THRESHOLDS.get(loinc_code)
         if not thresholds:
             continue
 
@@ -766,6 +799,14 @@ def _evaluate_care_plan_outcomes_sync():
         plan.goals = updated_goals
         plan.activities = updated_activities
         plan.save(update_fields=["status", "goals", "activities", "note"])
+
+        # Update adherence stats on the patient's vital target policy
+        policy_id = thresholds.get("policy_id")
+        if policy_id:
+            VitalTargetPolicy.objects.filter(id=policy_id).update(
+                times_evaluated=models.F("times_evaluated") + 1,
+                times_in_range=models.F("times_in_range") + (1 if post_in_range else 0),
+            )
 
     logger.info(
         "Feedback loop: evaluated=%d, completed=%d, escalated=%d",
