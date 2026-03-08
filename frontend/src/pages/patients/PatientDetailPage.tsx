@@ -945,6 +945,32 @@ function CarePlansSection({ patientId }: { patientId: string }) {
                 ))}
               </div>
             )}
+            {/* Feedback loop monitoring log */}
+            {plan.note && plan.ai_generated && (() => {
+              const logEntries = plan.note.split('\n').filter((l: string) => l.match(/^\[.*\] (COMPLETED|ESCALATION|MONITORING):/))
+              if (logEntries.length === 0) return null
+              return (
+                <div className="mt-3 border-t border-border pt-2">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">Feedback Loop</p>
+                  <div className="space-y-1 max-h-24 overflow-y-auto">
+                    {logEntries.slice(-5).map((entry: string, i: number) => {
+                      const isCompleted = entry.includes('COMPLETED')
+                      const isEscalation = entry.includes('ESCALATION')
+                      return (
+                        <div key={i} className={cn(
+                          'text-[10px] px-2 py-1 rounded',
+                          isCompleted ? 'bg-green-50 text-green-700 dark:bg-green-900/20 dark:text-green-300' :
+                          isEscalation ? 'bg-red-50 text-red-700 dark:bg-red-900/20 dark:text-red-300' :
+                          'bg-blue-50 text-blue-700 dark:bg-blue-900/20 dark:text-blue-300',
+                        )}>
+                          {entry.trim()}
+                        </div>
+                      )
+                    })}
+                  </div>
+                </div>
+              )
+            })()}
             {/* Period + feedback indicator */}
             <div className="mt-2 flex items-center justify-between">
               <div className="flex items-center gap-3 text-[10px] text-muted-foreground">
@@ -952,16 +978,23 @@ function CarePlansSection({ patientId }: { patientId: string }) {
                 {plan.period_end && <span>End: {plan.period_end}</span>}
                 {plan.created && <span>Created: {format(new Date(plan.created), 'MMM d, yyyy')}</span>}
               </div>
-              {plan.status === 'active' && plan.ai_generated && (
-                <span className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">
-                  Monitoring vitals...
-                </span>
-              )}
-              {plan.status === 'completed' && (
-                <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">
-                  Goals achieved
-                </span>
-              )}
+              <div className="flex items-center gap-2">
+                {plan.goals?.some((g: { last_evaluated?: string }) => g.last_evaluated) && (
+                  <span className="text-[10px] text-muted-foreground">
+                    Last checked: {format(new Date(plan.goals.find((g: { last_evaluated?: string }) => g.last_evaluated)!.last_evaluated!), 'MMM d, h:mm a')}
+                  </span>
+                )}
+                {plan.status === 'active' && plan.ai_generated && (
+                  <span className="text-[10px] text-blue-500 dark:text-blue-400 font-medium">
+                    Monitoring vitals...
+                  </span>
+                )}
+                {plan.status === 'completed' && (
+                  <span className="text-[10px] text-green-600 dark:text-green-400 font-semibold">
+                    Goals achieved
+                  </span>
+                )}
+              </div>
             </div>
           </div>
         ))}
@@ -1149,15 +1182,19 @@ function AgentsTab({ patientId, patientName, recommendations, refetchRecs }: {
   refetchRecs: () => void
 }) {
   return (
-    <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <div className="clinical-card">
-        <h3 className="text-sm font-bold text-foreground mb-4">Agent Control</h3>
-        <AgentControlPanel patientId={patientId} patientName={patientName} onHITLDecision={refetchRecs} />
+    <div className="space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div className="clinical-card">
+          <h3 className="text-sm font-bold text-foreground mb-4">Agent Control</h3>
+          <AgentControlPanel patientId={patientId} patientName={patientName} onHITLDecision={refetchRecs} />
+        </div>
+        <div className="clinical-card">
+          <h3 className="text-sm font-bold text-foreground mb-4">AI Recommendations</h3>
+          <AIRecommendationPanel recommendations={recommendations} onDecision={refetchRecs} showHITL />
+        </div>
       </div>
-      <div className="clinical-card">
-        <h3 className="text-sm font-bold text-foreground mb-4">AI Recommendations</h3>
-        <AIRecommendationPanel recommendations={recommendations} onDecision={refetchRecs} showHITL />
-      </div>
+      {/* Care plans created from approved recommendations */}
+      <CarePlansSection patientId={patientId} />
     </div>
   )
 }

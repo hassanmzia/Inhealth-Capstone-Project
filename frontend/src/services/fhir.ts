@@ -254,6 +254,11 @@ export interface FHIRCarePlan {
     priority: string
     status: string
     start_date?: string
+    outcome?: 'improved' | 'stable' | 'worsened'
+    pre_avg?: number | null
+    post_avg?: number | null
+    in_normal_range?: boolean
+    last_evaluated?: string
   }>
   activities: Array<{
     detail: string
