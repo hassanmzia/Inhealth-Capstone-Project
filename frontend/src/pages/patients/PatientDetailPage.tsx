@@ -525,6 +525,59 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
         </div>
       </div>
 
+      {/* Archived ECG Recordings */}
+      {showArchived && (() => {
+        const ecgRecords = archivedVitals
+          .filter((v) => v.type === 'ecg' && v.ecgRhythm)
+          .sort((a, b) => new Date(b.timestamp).getTime() - new Date(a.timestamp).getTime())
+        if (ecgRecords.length === 0) return null
+        return (
+          <div className="clinical-card">
+            <h3 className="text-sm font-bold text-foreground mb-4">
+              Archived ECG Recordings ({ecgRecords.length})
+            </h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {ecgRecords.slice(0, 8).map((rec) => (
+                <div
+                  key={rec.id}
+                  className={cn(
+                    'border rounded-lg p-3 bg-card/50',
+                    rec.status === 'critical' ? 'border-red-300 dark:border-red-800' :
+                    rec.status === 'warning' ? 'border-yellow-300 dark:border-yellow-800' :
+                    'border-border',
+                  )}
+                >
+                  <div className="flex items-center justify-between mb-2">
+                    <span className="text-[11px] font-medium text-muted-foreground">
+                      {format(new Date(rec.timestamp), 'MMM d, yyyy HH:mm')}
+                    </span>
+                    <span className={cn(
+                      'text-[10px] font-semibold px-1.5 py-0.5 rounded',
+                      rec.status === 'normal' ? 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-300' :
+                      rec.status === 'warning' ? 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-300' :
+                      'bg-red-100 text-red-700 dark:bg-red-900/30 dark:text-red-300',
+                    )}>
+                      {rec.ecgRhythm ? ECG_RHYTHM_LABELS[rec.ecgRhythm] : 'Unknown'}
+                    </span>
+                  </div>
+                  <EcgWaveform
+                    heartRate={rec.value}
+                    rhythm={rec.ecgRhythm ?? 'normal_sinus'}
+                    width={320}
+                    height={100}
+                    isLive={false}
+                    compact
+                  />
+                  <div className="mt-1 text-[10px] text-muted-foreground font-mono">
+                    HR: {rec.value} bpm · Source: {rec.source}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )
+      })()}
+
       {/* Vitals Trend Chart — all vitals active */}
       <div className="clinical-card">
         <div className="flex items-center justify-between mb-4">
