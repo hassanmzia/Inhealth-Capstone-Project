@@ -954,8 +954,8 @@ export default function VitalsSimulatorPage() {
         interpretation,
         device_type: 'simulator',
         patient_fhir_id: patientId,
-      } as Record<string, unknown>).catch(() => {
-        // Silently ignore persistence errors to not disrupt simulation
+      } as Record<string, unknown>).catch((err) => {
+        console.warn(`[Simulator] Failed to persist ${key} observation:`, err?.response?.data ?? err.message)
       })
     }
 
@@ -975,7 +975,9 @@ export default function VitalsSimulatorPage() {
       interpretation: rhythmCode === 'normal_sinus' ? 'NSR' : rhythmCode.toUpperCase().slice(0, 4),
       device_type: 'simulator',
       patient_fhir_id: patientId,
-    } as Record<string, unknown>).catch(() => {})
+    } as Record<string, unknown>).catch((err) => {
+      console.warn('[Simulator] Failed to persist ECG observation:', err?.response?.data ?? err.message)
+    })
   }, [])
 
   const tick = useCallback(() => {
@@ -1288,7 +1290,7 @@ export default function VitalsSimulatorPage() {
             rhythm={ecgRhythm}
             width={Math.min(900, typeof window !== 'undefined' ? window.innerWidth - 100 : 800)}
             height={180}
-            isLive={isRunning || true}
+            isLive={isRunning}
             showOverlay
           />
         </div>

@@ -203,16 +203,19 @@ export default function EcgWaveform({
     color ??
     (status === 'critical' ? '#e11d48' : status === 'warning' ? '#d97706' : '#22c55e')
 
-  // Generate or use provided signal
+  // Generate or use provided signal — only when live or when waveform data is provided
   useEffect(() => {
     if (waveformData && waveformData.length > 0) {
       signalRef.current = waveformData
-    } else {
+    } else if (isLive) {
       // Generate enough signal for looping (2x duration for smooth wrap)
       signalRef.current = generateEcgSignal(heartRate, rhythm, duration * 2)
+    } else {
+      // Not live and no external data — clear the signal (shows flatline)
+      signalRef.current = []
     }
     offsetRef.current = 0
-  }, [heartRate, rhythm, duration, waveformData])
+  }, [heartRate, rhythm, duration, waveformData, isLive])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -221,15 +224,35 @@ export default function EcgWaveform({
     const ctx = canvas.getContext('2d')
     if (!ctx) return
 
-    const signal = signalRef.current
-    if (signal.length === 0) return
-
     const dpr = window.devicePixelRatio || 1
     const w = canvas.width / dpr
     const h = canvas.height / dpr
 
     // Clear
     ctx.clearRect(0, 0, canvas.width, canvas.height)
+
+    const signal = signalRef.current
+
+    // When not live and no waveform data, draw a flatline (monitor off)
+    if (!isLive && signal.length === 0) {
+      // Draw grid
+      ctx.strokeStyle = 'rgba(128, 128, 128, 0.08)'
+      ctx.lineWidth = 0.5 * dpr
+      const gs = compact ? 15 : 20
+      for (let x = 0; x < w; x += gs) { ctx.beginPath(); ctx.moveTo(x * dpr, 0); ctx.lineTo(x * dpr, canvas.height); ctx.stroke() }
+      for (let y = 0; y < h; y += gs) { ctx.beginPath(); ctx.moveTo(0, y * dpr); ctx.lineTo(canvas.width, y * dpr); ctx.stroke() }
+
+      // Flatline
+      ctx.beginPath()
+      ctx.strokeStyle = 'rgba(100, 100, 100, 0.4)'
+      ctx.lineWidth = 1.5 * dpr
+      ctx.moveTo(0, h * dpr / 2)
+      ctx.lineTo(canvas.width, h * dpr / 2)
+      ctx.stroke()
+      return
+    }
+
+    if (signal.length === 0) return
 
     // Background grid (subtle)
     ctx.strokeStyle = 'rgba(128, 128, 128, 0.08)'
@@ -333,7 +356,14 @@ export default function EcgWaveform({
       />
 
       {/* Overlay: rhythm label + heart rate */}
-      {showOverlay && (
+      {showOverlay && !isLive && (
+        <div className="absolute inset-0 flex items-center justify-center">
+          <span className="text-sm font-mono text-gray-600">
+            Start simulator to display ECG
+          </span>
+        </div>
+      )}
+      {showOverlay && isLive && (
         <>
           {/* Top-left: Lead label */}
           <div className="absolute top-2 left-3 text-[10px] font-mono text-gray-500">
@@ -342,9 +372,7 @@ export default function EcgWaveform({
 
           {/* Top-right: Heart rate */}
           <div className="absolute top-2 right-3 flex items-center gap-1.5">
-            {isLive && (
-              <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
-            )}
+            <span className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
             <span
               className={cn(
                 'text-lg font-bold font-mono tabular-nums',
