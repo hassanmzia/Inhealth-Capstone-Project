@@ -438,8 +438,8 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
   const hasRealVitals = vitals.length > 0
   const latestEcg = activeVitals.find((v) => v.type === 'ecg')
   const latestHr = activeVitals.find((v) => v.type === 'heart_rate')
-  // Only animate ECG when real data exists from API/device
-  const ecgIsLive = hasRealVitals && !!latestEcg
+  // Animate ECG when real heart rate or ECG data exists from API/device
+  const ecgIsLive = hasRealVitals && !!(latestEcg || latestHr)
 
   // Latest values for summary cards
   const latestByType = useMemo(() => {
