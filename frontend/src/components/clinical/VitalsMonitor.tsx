@@ -9,9 +9,10 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  HeartPulse,
 } from 'lucide-react'
 import type { VitalSign, VitalType } from '@/types/clinical'
-import { VITAL_RANGES } from '@/types/clinical'
+import { VITAL_RANGES, ECG_RHYTHM_LABELS } from '@/types/clinical'
 import { cn } from '@/lib/utils'
 import { formatDistanceToNow } from 'date-fns'
 
@@ -78,6 +79,14 @@ const VITAL_DISPLAYS: VitalDisplay[] = [
     unit: 'kg',
     getValue: (vitals) => vitals.find((v) => v.type === 'weight'),
     format: (v) => `${v.value.toFixed(1)}`,
+  },
+  {
+    type: 'ecg',
+    label: 'ECG',
+    icon: HeartPulse,
+    unit: 'bpm',
+    getValue: (vitals) => vitals.find((v) => v.type === 'ecg'),
+    format: (v) => v.ecgRhythm ? ECG_RHYTHM_LABELS[v.ecgRhythm] ?? `${Math.round(v.value)}` : `${Math.round(v.value)}`,
   },
 ]
 

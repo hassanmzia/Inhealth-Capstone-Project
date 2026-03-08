@@ -47,6 +47,8 @@ _LOINC_TO_VITAL_TYPE = {
     "9279-1": "respiratory_rate",
     "72514-3": "pain_score",
     "2339-0": "glucose",
+    "8601-7": "ecg",           # EKG study
+    "131328": "ecg",           # ECG panel
 }
 
 _INTERP_TO_STATUS = {
@@ -54,6 +56,37 @@ _INTERP_TO_STATUS = {
     "H": "warning", "L": "warning", "A": "warning",
     "HH": "critical", "LL": "critical", "AA": "critical",
 }
+
+# ECG rhythm interpretation codes → frontend rhythm enum
+_ECG_RHYTHM_MAP = {
+    "NSR": "normal_sinus",
+    "normal_sinus": "normal_sinus",
+    "SB": "sinus_bradycardia",
+    "sinus_bradycardia": "sinus_bradycardia",
+    "ST": "sinus_tachycardia",
+    "sinus_tachycardia": "sinus_tachycardia",
+    "AFIB": "atrial_fibrillation",
+    "atrial_fibrillation": "atrial_fibrillation",
+    "AFL": "atrial_flutter",
+    "atrial_flutter": "atrial_flutter",
+    "VT": "ventricular_tachycardia",
+    "ventricular_tachycardia": "ventricular_tachycardia",
+    "VF": "ventricular_fibrillation",
+    "ventricular_fibrillation": "ventricular_fibrillation",
+}
+
+
+def _interpret_ecg_rhythm(interpretation: str, heart_rate: float | None) -> str:
+    """Derive ECG rhythm from interpretation code or heart rate."""
+    if interpretation and interpretation in _ECG_RHYTHM_MAP:
+        return _ECG_RHYTHM_MAP[interpretation]
+    # Fallback: infer from heart rate
+    if heart_rate is not None:
+        if heart_rate < 60:
+            return "sinus_bradycardia"
+        if heart_rate > 100:
+            return "sinus_tachycardia"
+    return "normal_sinus"
 
 
 class PatientViewSet(ModelViewSet):
@@ -99,9 +132,15 @@ class PatientViewSet(ModelViewSet):
             observations = (
                 FHIRObservation.objects
                 .filter(patient_id=pk, tenant=self._tenant(), code__in=_LOINC_TO_VITAL_TYPE)
+                .exclude(effective_datetime__isnull=True)
                 .order_by("-effective_datetime")[:200]
             )
-            data = [self._obs_to_vital(obs) for obs in observations]
+            data = []
+            for obs in observations:
+                try:
+                    data.append(self._obs_to_vital(obs))
+                except Exception:
+                    continue
         except Exception:
             data = []
         return Response(data)
@@ -136,10 +175,11 @@ class PatientViewSet(ModelViewSet):
     @staticmethod
     def _obs_to_vital(obs: FHIRObservation) -> dict:
         interp = (obs.interpretation or "").strip()
-        return {
+        vital_type = _LOINC_TO_VITAL_TYPE.get(obs.code, "heart_rate")
+        result = {
             "id": str(obs.id),
             "patientId": str(obs.patient_id),
-            "type": _LOINC_TO_VITAL_TYPE.get(obs.code, "heart_rate"),
+            "type": vital_type,
             "value": obs.value_quantity if obs.value_quantity is not None else 0,
             "unit": obs.value_unit,
             "timestamp": obs.effective_datetime.isoformat(),
@@ -150,6 +190,11 @@ class PatientViewSet(ModelViewSet):
             "normalMin": obs.reference_range_low,
             "normalMax": obs.reference_range_high,
         }
+        # For ECG observations, include rhythm from the interpretation/notes
+        if vital_type == "ecg":
+            ecg_rhythm = _interpret_ecg_rhythm(interp, obs.value_quantity)
+            result["ecgRhythm"] = ecg_rhythm
+        return result
 
     @staticmethod
     def _med_to_dict(med: FHIRMedicationRequest) -> dict:
