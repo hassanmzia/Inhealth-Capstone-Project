@@ -72,6 +72,7 @@ class FHIRObservationSerializer(serializers.ModelSerializer):
         ]
         extra_kwargs = {
             "patient": {"required": False, "read_only": True},
+            "fhir_id": {"required": False},  # auto-generated in model.save()
         }
 
     def get_resourceType(self, obj):

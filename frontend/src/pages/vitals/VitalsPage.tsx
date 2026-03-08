@@ -53,31 +53,54 @@ const VITAL_DEFS: VitalDef[] = [
   { code: '8310-5', label: 'Temperature', unit: '°F', icon: Thermometer, color: 'text-orange-500', chartColor: '#f97316', normalLow: 97.8, normalHigh: 99.1, normalRange: '97.8-99.1°F' },
   { code: '9279-1', label: 'Resp. Rate', unit: 'br/min', icon: Wind, color: 'text-teal-500', chartColor: '#14b8a6', normalLow: 12, normalHigh: 20, normalRange: '12-20 br/min' },
   { code: '2339-0', label: 'Blood Glucose', unit: 'mg/dL', icon: Droplets, color: 'text-purple-500', chartColor: '#8b5cf6', normalLow: 70, normalHigh: 140, normalRange: '70-140 mg/dL' },
+  { code: '8601-7', label: 'ECG Heart Rate', unit: 'bpm', icon: HeartPulse, color: 'text-rose-500', chartColor: '#f43f5e', normalLow: 60, normalHigh: 100, normalRange: '60-100 bpm' },
 ]
 
 const ECG_LOINC = '8601-7'
 
 // ─── Helpers ────────────────────────────────────────────────────────────────
+// The backend serializer returns flat Django model fields (code, value_quantity,
+// effective_datetime, interpretation) NOT nested FHIR structures. We handle both.
+
+function getObsCode(obs: FHIRObservation): string | undefined {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = obs as any
+  // Flat serializer format: code is a plain LOINC string like "8867-4"
+  if (typeof raw.code === 'string') return raw.code
+  // FHIR format: code is a CodeableConcept with coding array
+  if (raw.code?.coding?.[0]?.code) return raw.code.coding[0].code
+  return undefined
+}
 
 function getObsValue(obs: FHIRObservation): number | null {
-  if (obs.valueQuantity?.value != null) return obs.valueQuantity.value
-  if ((obs as Record<string, unknown>).value_quantity != null) return (obs as Record<string, unknown>).value_quantity as number
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = obs as any
+  // Flat: value_quantity is a number
+  if (raw.value_quantity != null) return Number(raw.value_quantity)
+  // FHIR: valueQuantity is an object with .value
+  if (raw.valueQuantity?.value != null) return Number(raw.valueQuantity.value)
   return null
 }
 
 function getObsTime(obs: FHIRObservation): string {
-  const dt = obs.effectiveDateTime ?? (obs as Record<string, unknown>).effective_datetime as string | undefined
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = obs as any
+  const dt = raw.effective_datetime ?? raw.effectiveDateTime
   if (!dt) return ''
   try {
     return new Date(dt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
   } catch {
-    return dt.slice(11, 16)
+    return String(dt).slice(11, 16)
   }
 }
 
 function getObsInterpretation(obs: FHIRObservation): string {
-  if (obs.interpretation?.[0]?.coding?.[0]?.code) return obs.interpretation[0].coding[0].code
-  if ((obs as Record<string, unknown>).interpretation) return (obs as Record<string, unknown>).interpretation as string
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const raw = obs as any
+  // Flat: interpretation is a plain string like "NSR", "N", "H"
+  if (typeof raw.interpretation === 'string') return raw.interpretation
+  // FHIR: interpretation is an array of CodeableConcepts
+  if (raw.interpretation?.[0]?.coding?.[0]?.code) return raw.interpretation[0].coding[0].code
   return 'N'
 }
 
@@ -182,6 +205,15 @@ export default function VitalsPage() {
   // Group observations by LOINC code
   const { vitalGroups, ecgObs } = useMemo(() => {
     const entries = observationsData?.entry ?? []
+    // Debug: log total observations and their codes
+    if (entries.length > 0) {
+      const codeCounts: Record<string, number> = {}
+      for (const e of entries) {
+        const c = getObsCode(e.resource as FHIRObservation) ?? 'unknown'
+        codeCounts[c] = (codeCounts[c] ?? 0) + 1
+      }
+      console.log('[VitalsPage] Observations by LOINC code:', codeCounts, `(${entries.length} total)`)
+    }
     const groups: Record<string, { values: { time: string; value: number }[]; latest: number | null; latestStatus: 'normal' | 'warning' | 'critical' }> = {}
 
     for (const def of VITAL_DEFS) {
@@ -192,15 +224,15 @@ export default function VitalsPage() {
 
     for (const entry of entries) {
       const obs = entry.resource as FHIRObservation
-      const code = obs.code?.coding?.[0]?.code ?? (obs as Record<string, unknown>).code as string | undefined
+      const code = getObsCode(obs)
       if (!code) continue
 
       const value = getObsValue(obs)
       if (value == null) continue
 
+      // ECG observations go to both the ecgList (for waveform/table) AND vitalGroups (for trend chart)
       if (code === ECG_LOINC) {
         ecgList.push(obs)
-        continue
       }
 
       if (groups[code]) {
@@ -238,7 +270,7 @@ export default function VitalsPage() {
   }, [ecgObs])
 
   const latestEcgHR = ecgObs.length > 0 ? getObsValue(ecgObs[0]) : null
-  const hasData = Object.values(vitalGroups).some((g) => g.values.length > 0)
+  const hasData = Object.values(vitalGroups).some((g) => g.values.length > 0) || ecgObs.length > 0
 
   return (
     <motion.div variants={CONTAINER} initial="hidden" animate="show" className="space-y-6 max-w-7xl">
