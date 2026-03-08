@@ -1,4 +1,3 @@
-import { useMemo } from 'react'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
 import {
@@ -13,7 +12,7 @@ import {
   Sparkles,
   CheckCircle2,
 } from 'lucide-react'
-import { format, subDays } from 'date-fns'
+import { format } from 'date-fns'
 import { useAuthStore } from '@/store/authStore'
 import api from '@/services/api'
 import { cn } from '@/lib/utils'
@@ -27,16 +26,9 @@ export default function PatientDashboard() {
   const { data: healthData } = useQuery({
     queryKey: ['patient-health-summary'],
     queryFn: () => api.get('/patient/health-summary/').then((r) => r.data),
-    placeholderData: DEMO_HEALTH_DATA,
   })
 
-  // Use demo data when API returns empty/minimal data
-  const h = useMemo(() => {
-    if (!healthData || (healthData.goals?.length === 0 && healthData.adherenceCalendar?.length === 0)) {
-      return DEMO_HEALTH_DATA
-    }
-    return healthData
-  }, [healthData])
+  const h = healthData ?? null
   const scoreColor = (h?.healthScore ?? 0) >= 80 ? '#22c55e' : (h?.healthScore ?? 0) >= 60 ? '#3b82f6' : (h?.healthScore ?? 0) >= 40 ? '#f59e0b' : '#e11d48'
 
   return (
@@ -297,40 +289,3 @@ function AdherenceCalendar({ data }: { data: Array<{ date: string; taken: boolea
   )
 }
 
-// ─── Demo Data ────────────────────────────────────────────────────────────────
-
-// Seeded pseudo-random for stable adherence calendar across renders
-const DEMO_ADHERENCE = Array.from({ length: 30 }, (_, i) => ({
-  date: subDays(new Date(), 29 - i).toISOString(),
-  taken: !([3, 11, 22].includes(i)),  // missed 3 specific days for realism
-}))
-
-const DEMO_HEALTH_DATA = {
-  healthScore: 78,
-  streakDays: 12,
-  medicationAdherence: 92,
-  nextAppointment: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000).toISOString(),
-  goals: [
-    { title: 'Walk 7,000 steps/day', progress: 68, unit: 'steps', current: 4760, target: 7000, category: 'activity' },
-    { title: 'Blood sugar in range', progress: 82, unit: '%', current: 82, target: 100, category: 'glucose' },
-    { title: 'Take medications on time', progress: 92, unit: '%', current: 92, target: 100, category: 'medication' },
-    { title: 'Weight goal', progress: 45, unit: 'kg', current: 88, target: 82, category: 'weight' },
-  ],
-  badges: ['7-Day Streak', 'Medication Star', 'Step Champion'],
-  todayVitals: {
-    bloodPressure: '128/82',
-    heartRate: 74,
-    glucose: 118,
-    weight: 88.2,
-  },
-  tips: [
-    { icon: 'heart', text: 'Your blood pressure is slightly elevated today. Try deep breathing exercises for 5 minutes.' },
-    { icon: 'activity', text: 'You\'re 40% to your step goal! A 15-minute walk will make a big difference.' },
-    { icon: 'pill', text: 'Metformin due in 2 hours. Take it with your meal for best results.' },
-  ],
-  adherenceCalendar: DEMO_ADHERENCE,
-  messages: [
-    { from: 'Dr. Johnson', time: '2 hours ago', preview: 'Your lab results look great! HbA1c improved to 7.1%.' },
-    { from: 'Nurse Sarah', time: 'Yesterday', preview: 'Reminder: Please log your morning glucose reading.' },
-  ],
-}
