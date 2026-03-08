@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -19,6 +19,9 @@ import {
   Archive,
   ChevronDown,
   ChevronUp,
+  Search,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react'
 import { format, subDays, subHours, subMinutes } from 'date-fns'
 import api from '@/services/api'
@@ -367,7 +370,7 @@ export default function PatientDetailPage() {
           <VitalsTab vitals={vitals ?? []} patientId={patientId!} />
         )}
         {activeTab === 'medications' && (
-          <MedicationList medications={medications ?? []} />
+          <MedicationsTab medications={medications ?? []} patient={patient} />
         )}
         {activeTab === 'clinical' && (
           <ClinicalTab careGaps={careGaps ?? []} patientId={patientId!} />
@@ -376,7 +379,7 @@ export default function PatientDetailPage() {
           <AgentsTab patientId={patientId!} patientName={`${patient.firstName} ${patient.lastName}`} recommendations={recommendations ?? []} refetchRecs={refetchRecs} />
         )}
         {activeTab === 'research' && (
-          <ResearchTabSimple />
+          <ResearchTab patient={patient} />
         )}
         {activeTab === 'sdoh' && (
           <SDOHTab />
@@ -644,14 +647,312 @@ function AgentsTab({ patientId, patientName, recommendations, refetchRecs }: {
   )
 }
 
-function ResearchTabSimple() {
+// ─── Demo Medications ─────────────────────────────────────────────────────────
+
+function generateDemoMedications(patient: PatientSummary): Medication[] {
+  const now = new Date()
+  const conditions = patient.activeConditions?.map((c) => c.display.toLowerCase()) ?? []
+
+  const allMeds: Medication[] = []
+  let id = 0
+  const add = (m: Partial<Medication>) =>
+    allMeds.push({
+      id: `demo-med-${++id}`,
+      patientId: patient.id,
+      name: '',
+      dose: '',
+      doseUnit: 'mg',
+      frequency: 'once daily',
+      route: 'oral',
+      prescribedDate: subDays(now, 90 + Math.floor(Math.random() * 200)).toISOString(),
+      startDate: subDays(now, 90 + Math.floor(Math.random() * 200)).toISOString(),
+      status: 'active',
+      adherenceStatus: (['adherent', 'adherent', 'partial', 'adherent'] as const)[id % 4],
+      pdc: 0.75 + Math.random() * 0.2,
+      lastFillDate: subDays(now, Math.floor(Math.random() * 25)).toISOString(),
+      nextRefillDate: subDays(now, -Math.floor(Math.random() * 30)).toISOString(),
+      refillsRemaining: Math.floor(Math.random() * 6) + 1,
+      daysSupply: 90,
+      ...m,
+    } as Medication)
+
+  // Diabetes-related
+  if (conditions.some((c) => c.includes('diabet'))) {
+    add({ name: 'Metformin 500mg', genericName: 'Metformin', dose: '500', frequency: 'twice daily', indication: 'Type 2 Diabetes' })
+    add({ name: 'Empagliflozin 10mg', genericName: 'Empagliflozin', brandName: 'Jardiance', dose: '10', indication: 'Type 2 Diabetes', tierLevel: 2 })
+  }
+
+  // Hypertension-related
+  if (conditions.some((c) => c.includes('hypertens') || c.includes('blood pressure'))) {
+    add({ name: 'Lisinopril 10mg', genericName: 'Lisinopril', dose: '10', indication: 'Hypertension' })
+    add({ name: 'Amlodipine 5mg', genericName: 'Amlodipine', dose: '5', indication: 'Hypertension' })
+  }
+
+  // Heart failure
+  if (conditions.some((c) => c.includes('heart failure'))) {
+    add({ name: 'Carvedilol 25mg', genericName: 'Carvedilol', dose: '25', frequency: 'twice daily', indication: 'Heart Failure' })
+    add({ name: 'Furosemide 40mg', genericName: 'Furosemide', dose: '40', indication: 'Heart Failure' })
+  }
+
+  // CKD
+  if (conditions.some((c) => c.includes('kidney') || c.includes('ckd') || c.includes('renal'))) {
+    add({ name: 'Sodium Bicarbonate 650mg', genericName: 'Sodium Bicarbonate', dose: '650', frequency: 'three times daily', indication: 'CKD' })
+  }
+
+  // COPD / Asthma
+  if (conditions.some((c) => c.includes('copd') || c.includes('asthma') || c.includes('pulmonary'))) {
+    add({ name: 'Tiotropium 18mcg', genericName: 'Tiotropium', brandName: 'Spiriva', dose: '18', doseUnit: 'mcg', route: 'inhalation', indication: 'COPD' })
+  }
+
+  // Afib
+  if (conditions.some((c) => c.includes('fibrillation') || c.includes('afib'))) {
+    add({ name: 'Apixaban 5mg', genericName: 'Apixaban', brandName: 'Eliquis', dose: '5', frequency: 'twice daily', indication: 'Atrial Fibrillation', tierLevel: 3 })
+  }
+
+  // CAD / Cholesterol
+  if (conditions.some((c) => c.includes('coronary') || c.includes('cholesterol') || c.includes('hyperlipid'))) {
+    add({ name: 'Atorvastatin 40mg', genericName: 'Atorvastatin', dose: '40', indication: 'Hyperlipidemia' })
+    add({ name: 'Aspirin 81mg', genericName: 'Aspirin', dose: '81', indication: 'CAD prophylaxis' })
+  }
+
+  // Default if no conditions matched
+  if (allMeds.length === 0) {
+    add({ name: 'Metformin 500mg', genericName: 'Metformin', dose: '500', frequency: 'twice daily', indication: 'Type 2 Diabetes' })
+    add({ name: 'Lisinopril 10mg', genericName: 'Lisinopril', dose: '10', indication: 'Hypertension' })
+    add({ name: 'Atorvastatin 20mg', genericName: 'Atorvastatin', dose: '20', indication: 'Hyperlipidemia' })
+  }
+
+  // Add a discontinued med for realism
+  add({
+    name: 'Glipizide 5mg',
+    genericName: 'Glipizide',
+    dose: '5',
+    status: 'discontinued',
+    indication: 'Type 2 Diabetes (switched therapy)',
+    endDate: subDays(now, 45).toISOString(),
+    adherenceStatus: undefined,
+    pdc: undefined,
+    nextRefillDate: undefined,
+    refillsRemaining: undefined,
+  })
+
+  // Add one interaction example
+  if (allMeds.length >= 2) {
+    allMeds[0].interactions = [{
+      id: 'demo-int-1',
+      drug1: allMeds[0].name,
+      drug2: allMeds[1].name,
+      severity: 'moderate',
+      description: 'May increase risk of hypoglycemia when used together',
+      recommendation: 'Monitor blood glucose closely and adjust doses as needed',
+      source: 'DrugBank',
+    }]
+  }
+
+  return allMeds
+}
+
+function MedicationsTab({ medications, patient }: { medications: Medication[]; patient: PatientSummary }) {
+  const meds = useMemo(() => {
+    if (medications.length > 0) return medications
+    return generateDemoMedications(patient)
+  }, [medications, patient])
+
+  return <MedicationList medications={meds} />
+}
+
+// ─── Research Tab ─────────────────────────────────────────────────────────────
+
+interface TrialResult {
+  id: string
+  title: string
+  abstract?: string
+  source: string
+  url?: string
+  relevanceScore?: number
+  trialStatus?: string
+  phase?: string
+}
+
+function ResearchTab({ patient }: { patient: PatientSummary }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<TrialResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searched, setSearched] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const conditions = patient.activeConditions?.map((c) => c.display) ?? []
+
+  const searchTrials = useCallback(
+    async (searchQuery: string) => {
+      if (!searchQuery.trim()) return
+      setLoading(true)
+      setSearched(true)
+      try {
+        const res = await api.post('/research/search/', {
+          query: searchQuery,
+          type: 'trials',
+        })
+        setResults(res.data?.results ?? [])
+      } catch {
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [],
+  )
+
+  const handleConditionClick = (condition: string) => {
+    setQuery(condition)
+    searchTrials(condition)
+  }
+
+  const statusColor = (s?: string) => {
+    if (!s) return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+    const lower = s.toLowerCase()
+    if (lower.includes('recruiting')) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+    if (lower.includes('active')) return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+    if (lower.includes('completed')) return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+    return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+  }
+
   return (
-    <div className="clinical-card text-center py-12">
-      <FlaskConical className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-      <p className="text-sm font-medium text-foreground">Clinical Trial Matching</p>
-      <p className="text-xs text-muted-foreground mt-1">
-        Visit the Research page to find clinical trials for this patient
-      </p>
+    <div className="space-y-4">
+      {/* Patient conditions as quick-search chips */}
+      {conditions.length > 0 && (
+        <div className="clinical-card">
+          <p className="text-xs font-medium text-muted-foreground mb-2">
+            Match trials for active conditions:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {conditions.map((c) => (
+              <button
+                key={c}
+                onClick={() => handleConditionClick(c)}
+                className={cn(
+                  'text-xs px-3 py-1.5 rounded-full border transition-colors',
+                  query === c
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted/50 text-foreground border-border hover:bg-muted',
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search bar */}
+      <div className="clinical-card">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            searchTrials(query)
+          }}
+          className="flex gap-2"
+        >
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search clinical trials (e.g., diabetes, hypertension)..."
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+          </button>
+        </form>
+      </div>
+
+      {/* Results */}
+      {loading && (
+        <div className="clinical-card text-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">Searching ClinicalTrials.gov...</p>
+        </div>
+      )}
+
+      {!loading && searched && results.length === 0 && (
+        <div className="clinical-card text-center py-8">
+          <FlaskConical className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">No matching trials found. Try a different search term.</p>
+        </div>
+      )}
+
+      {!loading && results.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground px-1">
+            {results.length} trial{results.length !== 1 ? 's' : ''} found
+          </p>
+          {results.map((trial) => (
+            <div
+              key={trial.id}
+              className="clinical-card cursor-pointer hover:ring-1 hover:ring-primary/20 transition-all"
+              onClick={() => setExpandedId(expandedId === trial.id ? null : trial.id)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground leading-snug">{trial.title}</p>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {trial.trialStatus && (
+                      <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', statusColor(trial.trialStatus))}>
+                        {trial.trialStatus}
+                      </span>
+                    )}
+                    {trial.phase && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                        {trial.phase}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">{trial.source}</span>
+                    {trial.relevanceScore != null && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {Math.round(trial.relevanceScore * 100)}% match
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {trial.url && (
+                  <a
+                    href={trial.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="shrink-0 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+              {expandedId === trial.id && trial.abstract && (
+                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border leading-relaxed">
+                  {trial.abstract}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty state — no search yet */}
+      {!searched && conditions.length === 0 && (
+        <div className="clinical-card text-center py-10">
+          <FlaskConical className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm font-medium text-foreground">Clinical Trial Matching</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Search for clinical trials relevant to this patient
+          </p>
+        </div>
+      )}
     </div>
   )
 }
