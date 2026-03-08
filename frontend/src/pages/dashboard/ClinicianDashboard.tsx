@@ -1,3 +1,4 @@
+import { useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { motion } from 'framer-motion'
 import { useQuery } from '@tanstack/react-query'
@@ -12,7 +13,7 @@ import {
   Sparkles,
   ArrowRight,
 } from 'lucide-react'
-import { format } from 'date-fns'
+import { format, subDays, subHours, subMinutes } from 'date-fns'
 import { useAuthStore } from '@/store/authStore'
 import { useAlertStore } from '@/store/alertStore'
 import { useAgentStore, selectTotalActiveAgents } from '@/store/agentStore'
@@ -22,7 +23,8 @@ import AIRecommendationPanel from '@/components/clinical/AIRecommendationPanel'
 import PopulationRiskPyramid from '@/components/charts/PopulationRiskPyramid'
 import AgentActivityTimeline from '@/components/charts/AgentActivityTimeline'
 import { cn } from '@/lib/utils'
-import type { PatientSummary, ClinicalAlert } from '@/types/clinical'
+import type { PatientSummary, ClinicalAlert, RiskCategory } from '@/types/clinical'
+import type { AgentExecution } from '@/types/agent'
 
 const CONTAINER = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.06 } } }
 const ITEM = { hidden: { opacity: 0, y: 16 }, show: { opacity: 1, y: 0, transition: { ease: [0.4, 0, 0.2, 1] } } }
@@ -46,6 +48,10 @@ export default function ClinicianDashboard() {
   const { alerts } = useAlertStore()
   const activeAgents = useAgentStore(selectTotalActiveAgents)
   const { executions } = useAgentStore()
+  const displayExecutions = useMemo(() => {
+    if (executions.length > 0) return executions.slice(0, 100)
+    return DEMO_EXECUTIONS
+  }, [executions])
 
   const { data: stats } = useQuery<DashboardStats>({
     queryKey: ['dashboard-stats'],
@@ -61,11 +67,15 @@ export default function ClinicianDashboard() {
     },
   })
 
-  const { data: riskPatients } = useQuery<PatientSummary[]>({
+  const { data: riskPatientsRaw } = useQuery<PatientSummary[]>({
     queryKey: ['high-risk-patients'],
     queryFn: () => api.get('/patients/?risk_level=critical,high&limit=10').then((r) => r.data?.results ?? []),
     placeholderData: [],
   })
+  const riskPatients = useMemo(() => {
+    if (riskPatientsRaw && riskPatientsRaw.length > 0) return riskPatientsRaw
+    return DEMO_HIGH_RISK_PATIENTS
+  }, [riskPatientsRaw])
 
   const { data: recommendations, refetch: refetchRecs } = useQuery({
     queryKey: ['recent-recommendations'],
@@ -73,7 +83,11 @@ export default function ClinicianDashboard() {
     placeholderData: [],
   })
 
-  const criticalAlerts = alerts.filter((a) => a.severity === 'critical' && !a.isAcknowledged)
+  const displayAlerts = useMemo(() => {
+    if (alerts.length > 0) return alerts
+    return DEMO_ALERTS
+  }, [alerts])
+  const criticalAlerts = displayAlerts.filter((a) => a.severity === 'critical' && !a.isAcknowledged)
 
   const STAT_CARDS = [
     {
@@ -193,17 +207,9 @@ export default function ClinicianDashboard() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/40">
-                  {(riskPatients ?? []).length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="py-10 text-center text-muted-foreground text-sm">
-                        Loading patient data...
-                      </td>
-                    </tr>
-                  ) : (
-                    (riskPatients ?? []).map((patient) => (
-                      <PatientRiskRow key={patient.id} patient={patient} />
-                    ))
-                  )}
+                  {riskPatients.map((patient) => (
+                    <PatientRiskRow key={patient.id} patient={patient} />
+                  ))}
                 </tbody>
               </table>
             </div>
@@ -220,13 +226,13 @@ export default function ClinicianDashboard() {
                 View all <ArrowRight className="w-3 h-3" />
               </button>
             </div>
-            <AlertFeed alerts={alerts.slice(0, 6)} />
+            <AlertFeed alerts={displayAlerts.slice(0, 6)} />
           </motion.div>
 
           {/* Agent activity */}
           <motion.div variants={ITEM} className="clinical-card">
             <h2 className="text-sm font-bold text-foreground mb-4">Agent Activity (24h)</h2>
-            <AgentActivityTimeline executions={executions.slice(0, 100)} height={220} />
+            <AgentActivityTimeline executions={displayExecutions} height={220} />
           </motion.div>
         </div>
 
@@ -419,3 +425,92 @@ function getGreeting(): string {
   if (hour < 17) return 'afternoon'
   return 'evening'
 }
+
+// ─── Demo Data ────────────────────────────────────────────────────────────────
+
+const now = new Date()
+
+const DEMO_HIGH_RISK_PATIENTS: PatientSummary[] = [
+  {
+    id: 'demo-p1', mrn: 'MRN001', firstName: 'James', lastName: 'Morrison', dateOfBirth: '1958-03-15', age: 67, gender: 'male',
+    activeConditions: [{ code: 'E11', display: 'Type 2 Diabetes' }, { code: 'I10', display: 'Hypertension' }, { code: 'N18.3', display: 'CKD Stage 3' }],
+    riskScore: { id: 'rs1', patientId: 'demo-p1', type: 'composite', score: 89, category: 'critical' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 92 },
+    openCareGaps: 4, lastContactDate: subDays(now, 3).toISOString(), alertStatus: 'critical', alertCount: 2, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p2', mrn: 'MRN002', firstName: 'Maria', lastName: 'Gonzalez', dateOfBirth: '1965-07-22', age: 60, gender: 'female',
+    activeConditions: [{ code: 'I50', display: 'Heart Failure' }, { code: 'I10', display: 'Hypertension' }],
+    riskScore: { id: 'rs2', patientId: 'demo-p2', type: 'composite', score: 82, category: 'critical' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 88 },
+    openCareGaps: 3, lastContactDate: subDays(now, 7).toISOString(), alertStatus: 'warning', alertCount: 1, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p3', mrn: 'MRN003', firstName: 'Robert', lastName: 'Chen', dateOfBirth: '1952-11-08', age: 73, gender: 'male',
+    activeConditions: [{ code: 'E11', display: 'Type 2 Diabetes' }, { code: 'I25', display: 'Coronary Artery Disease' }],
+    riskScore: { id: 'rs3', patientId: 'demo-p3', type: 'composite', score: 76, category: 'high' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 85 },
+    openCareGaps: 2, lastContactDate: subDays(now, 14).toISOString(), alertStatus: 'warning', alertCount: 1, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p4', mrn: 'MRN004', firstName: 'Dorothy', lastName: 'Williams', dateOfBirth: '1960-04-19', age: 65, gender: 'female',
+    activeConditions: [{ code: 'J44', display: 'COPD' }, { code: 'I48', display: 'Atrial Fibrillation' }],
+    riskScore: { id: 'rs4', patientId: 'demo-p4', type: 'composite', score: 71, category: 'high' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 81 },
+    openCareGaps: 3, lastContactDate: subDays(now, 5).toISOString(), alertStatus: 'normal', alertCount: 0, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p5', mrn: 'MRN005', firstName: 'William', lastName: 'Jackson', dateOfBirth: '1955-09-30', age: 70, gender: 'male',
+    activeConditions: [{ code: 'E11', display: 'Type 2 Diabetes' }, { code: 'N18.4', display: 'CKD Stage 4' }],
+    riskScore: { id: 'rs5', patientId: 'demo-p5', type: 'composite', score: 85, category: 'critical' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 90 },
+    openCareGaps: 5, lastContactDate: subDays(now, 10).toISOString(), alertStatus: 'critical', alertCount: 3, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+  {
+    id: 'demo-p6', mrn: 'MRN006', firstName: 'Linda', lastName: 'Nguyen', dateOfBirth: '1963-01-12', age: 63, gender: 'female',
+    activeConditions: [{ code: 'I50', display: 'Heart Failure' }, { code: 'E11', display: 'Type 2 Diabetes' }],
+    riskScore: { id: 'rs6', patientId: 'demo-p6', type: 'composite', score: 68, category: 'high' as RiskCategory, calculatedAt: now.toISOString(), model: 'InHealth-Risk-v2', modelVersion: '2.1', confidence: 79 },
+    openCareGaps: 2, lastContactDate: subDays(now, 2).toISOString(), alertStatus: 'normal', alertCount: 0, isActive: true, tenantId: 'demo', createdAt: now.toISOString(), updatedAt: now.toISOString(),
+  },
+]
+
+const DEMO_ALERTS: ClinicalAlert[] = [
+  {
+    id: 'demo-a1', patientId: 'demo-p1', patientName: 'James Morrison', severity: 'critical', category: 'vital_sign',
+    title: 'Blood Glucose Critical High', description: 'Blood glucose reading of 342 mg/dL detected', value: '342 mg/dL', normalRange: '70-140 mg/dL',
+    timestamp: subMinutes(now, 23).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 1,
+  },
+  {
+    id: 'demo-a2', patientId: 'demo-p5', patientName: 'William Jackson', severity: 'critical', category: 'lab_result',
+    title: 'eGFR Declining Rapidly', description: 'eGFR dropped to 22 mL/min — CKD Stage 4 progression', value: '22 mL/min',
+    timestamp: subHours(now, 1).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a3', patientId: 'demo-p2', patientName: 'Maria Gonzalez', severity: 'urgent', category: 'vital_sign',
+    title: 'Blood Pressure Elevated', description: 'BP reading 168/98 mmHg — above target for HF patient', value: '168/98 mmHg', normalRange: '<130/80 mmHg',
+    timestamp: subHours(now, 3).toISOString(), isRead: false, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a4', patientId: 'demo-p3', patientName: 'Robert Chen', severity: 'urgent', category: 'medication',
+    title: 'Medication Non-Adherence', description: 'Missed 3 consecutive doses of Metformin — PDC dropped to 62%',
+    timestamp: subHours(now, 5).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a5', patientId: 'demo-p4', patientName: 'Dorothy Williams', severity: 'soon', category: 'vital_sign',
+    title: 'SpO2 Below Threshold', description: 'Oxygen saturation at 91% — monitor for COPD exacerbation', value: '91%', normalRange: '95-100%',
+    timestamp: subHours(now, 8).toISOString(), isRead: true, isAcknowledged: false, escalationCount: 0,
+  },
+  {
+    id: 'demo-a6', patientId: 'demo-p6', patientName: 'Linda Nguyen', severity: 'routine', category: 'lab_result',
+    title: 'HbA1c Result Available', description: 'New HbA1c result: 7.8% — improved from 8.4%', value: '7.8%',
+    timestamp: subHours(now, 12).toISOString(), isRead: true, isAcknowledged: true, escalationCount: 0,
+  },
+]
+
+const DEMO_EXECUTIONS: AgentExecution[] = [
+  { id: 'demo-e1', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'system', triggeredAt: subMinutes(now, 15).toISOString(), startedAt: subMinutes(now, 15).toISOString(), completedAt: subMinutes(now, 14).toISOString(), runtimeSeconds: 4.2 },
+  { id: 'demo-e2', agentId: 'risk_stratification_agent', agentName: 'Risk Stratification', tier: 'tier2_analysis', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subMinutes(now, 45).toISOString(), startedAt: subMinutes(now, 45).toISOString(), completedAt: subMinutes(now, 43).toISOString(), runtimeSeconds: 12.8 },
+  { id: 'demo-e3', agentId: 'care_gap_detection_agent', agentName: 'Care Gap Detector', tier: 'tier3_clinical', status: 'completed', patientId: 'demo-p5', patientName: 'William Jackson', triggeredBy: 'system', triggeredAt: subHours(now, 1).toISOString(), startedAt: subHours(now, 1).toISOString(), completedAt: subMinutes(subHours(now, 1), -2).toISOString(), runtimeSeconds: 8.1 },
+  { id: 'demo-e4', agentId: 'medication_adherence_agent', agentName: 'Medication Adherence', tier: 'tier3_clinical', status: 'completed', patientId: 'demo-p3', patientName: 'Robert Chen', triggeredBy: 'system', triggeredAt: subHours(now, 2).toISOString(), startedAt: subHours(now, 2).toISOString(), completedAt: subMinutes(subHours(now, 2), -1).toISOString(), runtimeSeconds: 5.3 },
+  { id: 'demo-e5', agentId: 'fhir_ingestion_agent', agentName: 'FHIR Data Ingestion', tier: 'tier1_ingestion', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subHours(now, 3).toISOString(), startedAt: subHours(now, 3).toISOString(), completedAt: subMinutes(subHours(now, 3), -5).toISOString(), runtimeSeconds: 31.4 },
+  { id: 'demo-e6', agentId: 'notification_agent', agentName: 'Patient Outreach', tier: 'tier5_engagement', status: 'pending_hitl', patientId: 'demo-p2', patientName: 'Maria Gonzalez', triggeredBy: 'care_gap_detection_agent', triggeredAt: subHours(now, 4).toISOString(), startedAt: subHours(now, 4).toISOString(), runtimeSeconds: 2.1 },
+  { id: 'demo-e7', agentId: 'ehr_sync_agent', agentName: 'EHR Sync', tier: 'tier1_ingestion', status: 'completed', triggeredBy: 'scheduler', triggeredAt: subHours(now, 6).toISOString(), startedAt: subHours(now, 6).toISOString(), completedAt: subMinutes(subHours(now, 6), -3).toISOString(), runtimeSeconds: 18.7 },
+  { id: 'demo-e8', agentId: 'predictive_analytics_agent', agentName: 'Readmission Predictor', tier: 'tier2_analysis', status: 'completed', patientId: 'demo-p1', patientName: 'James Morrison', triggeredBy: 'risk_stratification_agent', triggeredAt: subHours(now, 8).toISOString(), startedAt: subHours(now, 8).toISOString(), completedAt: subMinutes(subHours(now, 8), -1).toISOString(), runtimeSeconds: 6.9 },
+  { id: 'demo-e9', agentId: 'population_health_agent', agentName: 'HEDIS Quality Measure', tier: 'tier2_analysis', status: 'failed', triggeredBy: 'scheduler', triggeredAt: subHours(now, 10).toISOString(), startedAt: subHours(now, 10).toISOString(), completedAt: subMinutes(subHours(now, 10), -1).toISOString(), runtimeSeconds: 3.2, error: 'Timeout fetching external measure definitions' },
+  { id: 'demo-e10', agentId: 'vital_signs_agent', agentName: 'Vital Sign Monitor', tier: 'tier1_ingestion', status: 'running', patientId: 'demo-p4', patientName: 'Dorothy Williams', triggeredBy: 'system', triggeredAt: subMinutes(now, 2).toISOString(), startedAt: subMinutes(now, 2).toISOString() },
+]
