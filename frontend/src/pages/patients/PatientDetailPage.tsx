@@ -435,8 +435,11 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
     [activeVitals, archivedVitals, showArchived],
   )
 
+  const hasRealVitals = vitals.length > 0
   const latestEcg = activeVitals.find((v) => v.type === 'ecg')
   const latestHr = activeVitals.find((v) => v.type === 'heart_rate')
+  // Only animate ECG when real data exists from API/device
+  const ecgIsLive = hasRealVitals && !!latestEcg
 
   // Latest values for summary cards
   const latestByType = useMemo(() => {
@@ -495,7 +498,7 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
             rhythm={latestEcg?.ecgRhythm ?? 'normal_sinus'}
             width={Math.min(720, typeof window !== 'undefined' ? window.innerWidth - 120 : 600)}
             height={200}
-            isLive
+            isLive={ecgIsLive}
             showOverlay
           />
         </div>
