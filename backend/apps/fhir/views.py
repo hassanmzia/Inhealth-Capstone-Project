@@ -109,7 +109,15 @@ class FHIRBaseViewSet(GenericViewSet):
 
     def create(self, request):
         """FHIR create — POST /fhir/{ResourceType}"""
-        service = self.get_fhir_service()
+        try:
+            service = self.get_fhir_service()
+        except Exception:
+            logger.exception("Failed to initialize FHIR service for create")
+            return Response(
+                {"error": "Unable to resolve tenant context"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
         # Only run FHIR R4 validation on standard FHIR JSON payloads
         if request.data.get("resourceType"):
             try:
@@ -125,7 +133,20 @@ class FHIRBaseViewSet(GenericViewSet):
 
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        instance = serializer.save(tenant=self.get_tenant())
+        try:
+            instance = serializer.save(tenant=self.get_tenant())
+        except Exception:
+            logger.exception(
+                "Failed to save %s resource: %s",
+                self.resource_type, serializer.validated_data,
+            )
+            return Response(
+                service.build_operation_outcome(
+                    "error", "exception",
+                    f"Failed to create {self.resource_type} resource",
+                ),
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            )
         headers = self.get_success_headers(serializer.data)
         return Response(
             serializer.data,
