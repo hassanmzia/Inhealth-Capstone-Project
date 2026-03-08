@@ -181,6 +181,17 @@ export function useCreateAppointment() {
   })
 }
 
+// ─── Care Plans ──────────────────────────────────────────────────────────────
+
+export function useCarePlans(patientId: string | undefined, status?: string) {
+  return useQuery({
+    queryKey: ['fhir', 'care-plans', patientId, status],
+    queryFn: () => fhirService.getCarePlans(patientId!, status),
+    enabled: !!patientId,
+    staleTime: 1000 * 60 * 2,
+  })
+}
+
 // ─── Patient Everything ───────────────────────────────────────────────────────
 
 export function usePatientEverything(patientId: string | undefined) {

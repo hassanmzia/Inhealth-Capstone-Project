@@ -142,10 +142,22 @@ class AgentRecommendationActionView(APIView):
             log.was_accepted = (action == "approve")
             log.reviewed_at = tz.now()
             log.save(update_fields=["reviewed_by_id", "was_accepted", "reviewed_at"])
-            return Response({
+
+            response_data = {
                 "id": str(log.id),
                 "status": "approved" if log.was_accepted else "rejected",
-            })
+            }
+
+            # On approval the post_save signal triggers care plan creation.
+            # Reload to include care_plan_id if it was created synchronously.
+            if log.was_accepted:
+                log.refresh_from_db()
+                output = log.output or {}
+                if output.get("care_plan_id"):
+                    response_data["carePlanId"] = output["care_plan_id"]
+                    response_data["carePlanFhirId"] = output.get("care_plan_fhir_id", "")
+
+            return Response(response_data)
         except Exception as e:
             logger.debug("recommendation action failed: %s", e)
             return Response({"error": str(e)}, status=status.HTTP_400_BAD_REQUEST)

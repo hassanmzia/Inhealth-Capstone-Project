@@ -237,6 +237,54 @@ export async function getAllergies(
   return response.data
 }
 
+// ─── Care Plans ──────────────────────────────────────────────────────────────
+
+export interface FHIRCarePlan {
+  resourceType: 'CarePlan'
+  id: string
+  fhir_id: string
+  patient_fhir_id?: string
+  status: 'draft' | 'active' | 'on-hold' | 'revoked' | 'completed'
+  intent: 'proposal' | 'plan' | 'order' | 'option'
+  title: string
+  description: string
+  category: string
+  goals: Array<{
+    description: string
+    priority: string
+    status: string
+    start_date?: string
+  }>
+  activities: Array<{
+    detail: string
+    status: string
+    source?: string
+    evidence_level?: string
+    created_from_recommendation?: string
+  }>
+  period_start?: string
+  period_end?: string
+  created: string
+  ai_generated: boolean
+  ai_model_used?: string
+  author_id?: string
+  note?: string
+}
+
+export async function getCarePlans(
+  patientId: string,
+  status?: string,
+): Promise<FHIRSearchResult<FHIRCarePlan>> {
+  const response = await fhirApi.get<FHIRSearchResult<FHIRCarePlan>>('/CarePlan', {
+    params: {
+      patient: patientId,
+      ...(status ? { status } : {}),
+      _count: 50,
+    },
+  })
+  return response.data
+}
+
 // ─── Patient Summary (everything bundle) ──────────────────────────────────────
 
 export async function getPatientEverything(

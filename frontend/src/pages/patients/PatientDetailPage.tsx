@@ -25,6 +25,8 @@ import {
 } from 'lucide-react'
 import { format, subDays, subHours, subMinutes } from 'date-fns'
 import api from '@/services/api'
+import { useCarePlans } from '@/hooks/useFHIR'
+import type { FHIRCarePlan as FHIRCarePlanType } from '@/services/fhir'
 import VitalsMonitor from '@/components/clinical/VitalsMonitor'
 import VitalsChart from '@/components/charts/VitalsChart'
 import GlucoseChart from '@/components/charts/GlucoseChart'
@@ -412,6 +414,7 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
           <h3 className="text-sm font-bold text-foreground mb-3">Care Gaps ({careGaps.filter(g => g.status === 'open').length} open)</h3>
           <CareGapList careGaps={careGaps} patientId={patient.id} />
         </div>
+        <CarePlansSection patientId={patient.id} />
       </div>
       <div className="clinical-card">
         <h3 className="text-sm font-bold text-foreground mb-3">AI Recommendations</h3>
@@ -792,9 +795,123 @@ function ClinicalTab({ careGaps, patientId, patient }: { careGaps: CareGap[]; pa
   }, [careGaps, patient])
 
   return (
+    <div className="space-y-6">
+      <CarePlansSection patientId={patientId} />
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4">Care Gaps & Quality Measures</h3>
+        <CareGapList careGaps={gaps} patientId={patientId} />
+      </div>
+    </div>
+  )
+}
+
+function CarePlansSection({ patientId }: { patientId: string }) {
+  const { data: carePlansResult, isLoading } = useCarePlans(patientId)
+  const carePlans = carePlansResult?.entry?.map((e: { resource: FHIRCarePlanType }) => e.resource) ?? []
+
+  if (isLoading) {
+    return (
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4">Care Plans</h3>
+        <div className="flex items-center gap-2 text-muted-foreground text-sm">
+          <Loader2 className="w-4 h-4 animate-spin" /> Loading care plans...
+        </div>
+      </div>
+    )
+  }
+
+  if (carePlans.length === 0) {
+    return (
+      <div className="clinical-card">
+        <h3 className="text-sm font-bold text-foreground mb-4">Care Plans</h3>
+        <p className="text-muted-foreground text-sm">
+          No care plans yet. Approve an AI recommendation to auto-generate one.
+        </p>
+      </div>
+    )
+  }
+
+  const statusColors: Record<string, string> = {
+    active: 'bg-green-100 text-green-800 dark:bg-green-900/30 dark:text-green-300',
+    draft: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900/30 dark:text-yellow-300',
+    completed: 'bg-blue-100 text-blue-800 dark:bg-blue-900/30 dark:text-blue-300',
+    revoked: 'bg-red-100 text-red-800 dark:bg-red-900/30 dark:text-red-300',
+    'on-hold': 'bg-gray-100 text-gray-800 dark:bg-gray-900/30 dark:text-gray-300',
+  }
+
+  return (
     <div className="clinical-card">
-      <h3 className="text-sm font-bold text-foreground mb-4">Care Gaps & Quality Measures</h3>
-      <CareGapList careGaps={gaps} patientId={patientId} />
+      <h3 className="text-sm font-bold text-foreground mb-4">
+        Care Plans ({carePlans.length})
+      </h3>
+      <div className="space-y-3">
+        {carePlans.map((plan: FHIRCarePlanType) => (
+          <div
+            key={plan.id || plan.fhir_id}
+            className="border border-border rounded-lg p-4 bg-card/50"
+          >
+            <div className="flex items-start justify-between gap-3">
+              <div className="flex-1 min-w-0">
+                <div className="flex items-center gap-2 mb-1">
+                  <ClipboardList className="w-4 h-4 text-primary-500 flex-shrink-0" />
+                  <h4 className="text-sm font-semibold text-foreground truncate">{plan.title}</h4>
+                </div>
+                <p className="text-xs text-muted-foreground line-clamp-2 mt-1">{plan.description}</p>
+              </div>
+              <div className="flex items-center gap-2 flex-shrink-0">
+                {plan.ai_generated && (
+                  <span className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-300">
+                    <BrainCircuit className="w-3 h-3" /> AI
+                  </span>
+                )}
+                <span className={cn(
+                  'px-2 py-0.5 rounded-full text-[10px] font-semibold uppercase',
+                  statusColors[plan.status] ?? statusColors.draft,
+                )}>
+                  {plan.status}
+                </span>
+              </div>
+            </div>
+            {/* Goals */}
+            {plan.goals?.length > 0 && (
+              <div className="mt-3 space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Goals</p>
+                {plan.goals.map((goal: { description: string; status: string; priority: string }, i: number) => (
+                  <div key={i} className="flex items-center gap-2 text-xs text-foreground">
+                    <span className={cn(
+                      'w-1.5 h-1.5 rounded-full flex-shrink-0',
+                      goal.status === 'in-progress' ? 'bg-blue-500' :
+                      goal.status === 'achieved' ? 'bg-green-500' : 'bg-gray-400',
+                    )} />
+                    {goal.description}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Activities */}
+            {plan.activities?.length > 0 && (
+              <div className="mt-2 space-y-1">
+                <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">Activities</p>
+                {plan.activities.map((act: { detail: string; status: string; evidence_level?: string }, i: number) => (
+                  <div key={i} className="flex items-start gap-2 text-xs text-muted-foreground">
+                    <span className="mt-1 w-1.5 h-1.5 rounded-full bg-primary-400 flex-shrink-0" />
+                    <span className="flex-1">{act.detail}</span>
+                    {act.evidence_level && (
+                      <span className="text-[10px] font-mono text-primary-600">Lv.{act.evidence_level}</span>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+            {/* Period */}
+            <div className="mt-2 flex items-center gap-3 text-[10px] text-muted-foreground">
+              {plan.period_start && <span>Start: {plan.period_start}</span>}
+              {plan.period_end && <span>End: {plan.period_end}</span>}
+              {plan.created && <span>Created: {format(new Date(plan.created), 'MMM d, yyyy')}</span>}
+            </div>
+          </div>
+        ))}
+      </div>
     </div>
   )
 }
