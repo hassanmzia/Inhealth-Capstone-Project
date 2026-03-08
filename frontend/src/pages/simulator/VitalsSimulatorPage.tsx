@@ -1138,11 +1138,20 @@ export default function VitalsSimulatorPage() {
             Keep alive
           </label>
 
-          {/* Background running indicator (visible when bg store is running but local isn't) */}
+          {/* Background running indicator + stop button (visible when bg store is running but local isn't) */}
           {bgRunning && !isRunning && (
-            <span className="flex items-center gap-1.5 text-xs font-medium text-secondary-600 animate-pulse">
-              <Radio className="w-3.5 h-3.5" /> Background active ({bgStore.tickCount} ticks)
-            </span>
+            <div className="flex items-center gap-2">
+              <span className="flex items-center gap-1.5 text-xs font-medium text-secondary-600 animate-pulse">
+                <Radio className="w-3.5 h-3.5" /> Background active ({bgStore.tickCount} ticks)
+              </span>
+              <button
+                onClick={() => bgStore.stop()}
+                className="flex items-center gap-1.5 px-3 py-1.5 bg-danger-600 text-white rounded-lg hover:bg-danger-700 transition-colors text-xs font-medium"
+                title="Stop background simulator"
+              >
+                <Square className="w-3.5 h-3.5" /> Stop
+              </button>
+            </div>
           )}
 
           {/* Start/Stop */}
