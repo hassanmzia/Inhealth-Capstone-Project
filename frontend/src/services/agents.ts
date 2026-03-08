@@ -244,6 +244,8 @@ export interface AIRecommendation {
     direction: 'positive' | 'negative'
   }>
   hitlRequestId?: string
+  feedbackRating?: 1 | 2 | null
+  feedbackComment?: string
 }
 
 export async function getRecommendations(
@@ -275,6 +277,18 @@ export async function rejectRecommendation(
   const response = await api.post<AIRecommendation>(
     `/agents/recommendations/${recommendationId}/reject/`,
     { reason },
+  )
+  return response.data
+}
+
+export async function submitRecommendationFeedback(
+  recommendationId: string,
+  rating: 1 | 2,
+  comment?: string,
+): Promise<{ id: string; feedback_rating: number; feedback_comment: string }> {
+  const response = await api.post(
+    `/agents/recommendations/${recommendationId}/feedback/`,
+    { rating, comment },
   )
   return response.data
 }

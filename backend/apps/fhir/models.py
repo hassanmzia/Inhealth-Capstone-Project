@@ -738,6 +738,15 @@ class AgentActionLog(models.Model):
     reviewed_at = models.DateTimeField(null=True, blank=True)
     was_accepted = models.BooleanField(null=True, blank=True)
 
+    # Clinician feedback on recommendation quality
+    feedback_rating = models.SmallIntegerField(
+        null=True,
+        blank=True,
+        help_text="Clinician quality rating: 1 (not helpful) or 2 (helpful)",
+    )
+    feedback_comment = models.TextField(blank=True, default="")
+    feedback_at = models.DateTimeField(null=True, blank=True)
+
     class Meta:
         ordering = ["-created_at"]
         indexes = [

@@ -8,6 +8,7 @@ from .views import (
     AgentHITLView,
     AgentPauseView,
     AgentRecommendationActionView,
+    AgentRecommendationFeedbackView,
     AgentRecommendationsView,
     AgentResumeView,
     AgentSingleStatusView,
@@ -35,6 +36,7 @@ urlpatterns = [
     path("recommendations/", AgentRecommendationsView.as_view(), name="agent-recommendations"),
     path("recommendations/<uuid:pk>/approve/", AgentRecommendationActionView.as_view(), {"action": "approve"}, name="recommendation-approve"),
     path("recommendations/<uuid:pk>/reject/", AgentRecommendationActionView.as_view(), {"action": "reject"}, name="recommendation-reject"),
+    path("recommendations/<uuid:pk>/feedback/", AgentRecommendationFeedbackView.as_view(), name="recommendation-feedback"),
     # Monitoring controls (patient-level) — must come before <str:agent_id> wildcard
     path("monitoring/pause/", MonitoringPauseView.as_view(), name="monitoring-pause"),
     path("monitoring/resume/", MonitoringResumeView.as_view(), name="monitoring-resume"),
