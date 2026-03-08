@@ -382,30 +382,6 @@ with schema_context(org.schema_name):
                     requester_id=physician.id,
                 )
 
-        # ---- Standard vitals (last 24h, hourly) ----
-        STANDARD_VITALS = [
-            {"loinc": "8867-4",  "name": "Heart Rate",     "unit": "bpm",         "lo": 62, "hi": 98,  "ref_lo": 60,   "ref_hi": 100,  "integer": True},
-            {"loinc": "8480-6",  "name": "Systolic BP",    "unit": "mmHg",        "lo": 110,"hi": 155, "ref_lo": 90,   "ref_hi": 120,  "integer": True},
-            {"loinc": "8462-4",  "name": "Diastolic BP",   "unit": "mmHg",        "lo": 62, "hi": 92,  "ref_lo": 60,   "ref_hi": 80,   "integer": True},
-            {"loinc": "59408-5", "name": "SpO2",           "unit": "%",           "lo": 93, "hi": 100, "ref_lo": 95,   "ref_hi": 100,  "integer": True},
-            {"loinc": "8310-5",  "name": "Temperature",    "unit": "°F",          "lo": 97.0,"hi":99.6,"ref_lo": 97.0, "ref_hi": 99.0, "integer": False},
-            {"loinc": "9279-1",  "name": "Respiratory Rate","unit": "breaths/min","lo": 14, "hi": 22,  "ref_lo": 12,   "ref_hi": 20,   "integer": True},
-        ]
-        for vdef in STANDARD_VITALS:
-            for hours_ago in range(24):
-                eff = timezone.now() - datetime.timedelta(hours=hours_ago, minutes=random.randint(0,15))
-                val = rnd_float(vdef["lo"], vdef["hi"])
-                if vdef.get("integer"):
-                    val = round(val)
-                interp = "H" if val > vdef["ref_hi"] else ("L" if val < vdef["ref_lo"] else "N")
-                FHIRObservation.objects.create(
-                    tenant=org, fhir_id=str(uuid.uuid4()), patient=patient,
-                    status="final", code=vdef["loinc"], display=vdef["name"],
-                    value_quantity=val, value_unit=vdef["unit"],
-                    reference_range_low=vdef["ref_lo"], reference_range_high=vdef["ref_hi"],
-                    interpretation=interp, effective_datetime=eff,
-                )
-
         # ---- Risk scores ----
         score_lo, score_hi = RISK_SCORE_MAP[p["risk"]]
         for score_type in SCORE_TYPES:
