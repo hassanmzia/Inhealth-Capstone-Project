@@ -418,6 +418,11 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
   recommendations: ReturnType<typeof Array.prototype.slice>
   refetchRecs: () => void
 }) {
+  const gaps = useMemo(() => {
+    if (careGaps.length > 0) return careGaps
+    return generateDemoCareGaps(patient)
+  }, [careGaps, patient])
+
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       <div className="space-y-4">
@@ -426,8 +431,8 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
           <VitalsMonitor vitals={vitals} compact />
         </div>
         <div className="clinical-card">
-          <h3 className="text-sm font-bold text-foreground mb-3">Care Gaps ({careGaps.filter(g => g.status === 'open').length} open)</h3>
-          <CareGapList careGaps={careGaps} patientId={patient.id} />
+          <h3 className="text-sm font-bold text-foreground mb-3">Care Gaps ({gaps.filter(g => g.status === 'open').length} open)</h3>
+          <CareGapList careGaps={gaps} patientId={patient.id} />
         </div>
         <CarePlansSection patientId={patient.id} />
         <VitalTargetsSection patientId={patient.id} />
