@@ -381,8 +381,8 @@ export default function VitalsPage() {
         </motion.div>
       )}
 
-      {/* ECG Section */}
-      {hasData && (
+      {/* ECG Section — only visible while the simulator is actively running */}
+      {bgStore.isRunning && hasData && (
         <motion.div variants={ITEM} className="clinical-card">
           <h2 className="text-sm font-bold text-foreground mb-3 flex items-center gap-2">
             <HeartPulse className="w-4 h-4 text-danger-500" />
@@ -392,58 +392,50 @@ export default function VitalsPage() {
             )}
           </h2>
 
-          {bgStore.isRunning ? (
-            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-              {/* ECG waveform — only shown while simulator is actively running */}
-              <div className="rounded-lg bg-gray-950 p-3 relative">
-                <EcgWaveform
-                  heartRate={latestEcgHR ?? 72}
-                  rhythm={latestEcgRhythm}
-                  width={500}
-                  height={160}
-                  isLive
-                  showOverlay
-                  color="#22c55e"
-                />
-              </div>
-
-              {/* ECG history table */}
-              <div className="overflow-auto max-h-52">
-                <table className="w-full text-xs">
-                  <thead>
-                    <tr className="border-b border-border text-muted-foreground">
-                      <th className="text-left py-1.5 px-2 font-medium">Time</th>
-                      <th className="text-left py-1.5 px-2 font-medium">HR (bpm)</th>
-                      <th className="text-left py-1.5 px-2 font-medium">Rhythm</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {ecgObs.slice(0, 20).map((obs, i) => {
-                      const hr = getObsValue(obs)
-                      const interp = getObsInterpretation(obs)
-                      const rhythmLabel = interp === 'NSR' ? 'Normal Sinus' : interp
-                      const isAbnormal = interp !== 'NSR' && interp !== 'N'
-                      return (
-                        <tr key={i} className="border-b border-border/50">
-                          <td className="py-1 px-2 text-muted-foreground">{getObsTime(obs)}</td>
-                          <td className="py-1 px-2 font-mono font-medium text-foreground">{hr != null ? Math.round(hr) : '—'}</td>
-                          <td className={cn('py-1 px-2', isAbnormal ? 'text-danger-500 font-medium' : 'text-secondary-600')}>
-                            {rhythmLabel}
-                          </td>
-                        </tr>
-                      )
-                    })}
-                  </tbody>
-                </table>
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+            {/* ECG waveform */}
+            <div className="rounded-lg bg-gray-950 p-3 relative">
+              <EcgWaveform
+                heartRate={latestEcgHR ?? 72}
+                rhythm={latestEcgRhythm}
+                width={500}
+                height={160}
+                isLive
+                showOverlay
+                color="#22c55e"
+              />
             </div>
-          ) : ecgObs.length > 0 ? (
-            <p className="text-xs text-muted-foreground">
-              Simulator stopped. {ecgObs.length} ECG readings recorded in the last 24h.
-            </p>
-          ) : (
-            <p className="text-xs text-muted-foreground">No ECG data available. Run the simulator with ECG enabled to generate readings.</p>
-          )}
+
+            {/* ECG history table */}
+            <div className="overflow-auto max-h-52">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-border text-muted-foreground">
+                    <th className="text-left py-1.5 px-2 font-medium">Time</th>
+                    <th className="text-left py-1.5 px-2 font-medium">HR (bpm)</th>
+                    <th className="text-left py-1.5 px-2 font-medium">Rhythm</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {ecgObs.slice(0, 20).map((obs, i) => {
+                    const hr = getObsValue(obs)
+                    const interp = getObsInterpretation(obs)
+                    const rhythmLabel = interp === 'NSR' ? 'Normal Sinus' : interp
+                    const isAbnormal = interp !== 'NSR' && interp !== 'N'
+                    return (
+                      <tr key={i} className="border-b border-border/50">
+                        <td className="py-1 px-2 text-muted-foreground">{getObsTime(obs)}</td>
+                        <td className="py-1 px-2 font-mono font-medium text-foreground">{hr != null ? Math.round(hr) : '—'}</td>
+                        <td className={cn('py-1 px-2', isAbnormal ? 'text-danger-500 font-medium' : 'text-secondary-600')}>
+                          {rhythmLabel}
+                        </td>
+                      </tr>
+                    )
+                  })}
+                </tbody>
+              </table>
+            </div>
+          </div>
         </motion.div>
       )}
 
