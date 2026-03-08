@@ -190,6 +190,17 @@ const VITAL_CONFIGS: VitalConfig[] = [
   { key: 'glucose', label: 'Blood Glucose', unit: 'mg/dL', icon: Droplets, color: 'text-purple-500', chartColor: '#8b5cf6', min: 30, max: 500, normalLow: 70, normalHigh: 140, step: 1, defaultBaseline: 110 },
 ]
 
+// ─── LOINC Code Mapping ──────────────────────────────────────────────────────
+const VITAL_KEY_TO_LOINC: Record<string, { code: string; display: string }> = {
+  heartRate: { code: '8867-4', display: 'Heart rate' },
+  systolicBP: { code: '8480-6', display: 'Systolic blood pressure' },
+  diastolicBP: { code: '8462-4', display: 'Diastolic blood pressure' },
+  spo2: { code: '59408-5', display: 'Oxygen saturation' },
+  temperature: { code: '8310-5', display: 'Body temperature' },
+  respRate: { code: '9279-1', display: 'Respiratory rate' },
+  glucose: { code: '2339-0', display: 'Blood glucose' },
+}
+
 // ─── Simulation Profiles ─────────────────────────────────────────────────────
 
 interface SimulationProfile {
@@ -881,11 +892,51 @@ export default function VitalsSimulatorPage() {
   paramsRef.current = params
   const intervalMsRef = useRef(intervalMs)
   intervalMsRef.current = intervalMs
+  const selectedPatientIdRef = useRef(selectedPatientId)
+  selectedPatientIdRef.current = selectedPatientId
+
+  // Persist generated readings to the backend as FHIR Observations
+  const persistReading = useCallback((reading: GeneratedReading) => {
+    const patientId = selectedPatientIdRef.current
+    if (!patientId) return
+
+    const now = new Date().toISOString()
+    for (const [key, value] of Object.entries(reading.values)) {
+      const loinc = VITAL_KEY_TO_LOINC[key]
+      if (!loinc) continue
+      const config = VITAL_CONFIGS.find((c) => c.key === key)
+      if (!config) continue
+
+      // Determine interpretation
+      let interpretation = 'N'
+      if (value > config.normalHigh) interpretation = value > config.normalHigh * 1.2 ? 'HH' : 'H'
+      else if (value < config.normalLow) interpretation = value < config.normalLow * 0.8 ? 'LL' : 'L'
+
+      fhirService.createObservation({
+        status: 'final',
+        code: loinc.code,
+        display: loinc.display,
+        value_quantity: value,
+        value_unit: config.unit,
+        effective_datetime: now,
+        reference_range_low: config.normalLow,
+        reference_range_high: config.normalHigh,
+        interpretation,
+        device_type: 'simulator',
+        patient_fhir_id: patientId,
+      } as Record<string, unknown>).catch(() => {
+        // Silently ignore persistence errors to not disrupt simulation
+      })
+    }
+  }, [])
 
   const tick = useCallback(() => {
     readingCountRef.current += 1
     const timeLabel = `T+${readingCountRef.current * (intervalMsRef.current / 1000)}s`
     const reading = generateReading(paramsRef.current, timeLabel)
+
+    // Persist to backend
+    persistReading(reading)
 
     setReadings((prev) => {
       const next = [...prev, reading]
@@ -896,7 +947,7 @@ export default function VitalsSimulatorPage() {
       queueMicrotask(() => setRecommendations(recs))
       return trimmed
     })
-  }, [])
+  }, [persistReading])
 
   const startSimulation = () => {
     if (isRunning) return

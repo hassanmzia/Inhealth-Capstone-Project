@@ -24,6 +24,7 @@ from .models import (
 
 class FHIRPatientSerializer(serializers.ModelSerializer):
     resourceType = serializers.SerializerMethodField()
+    id = serializers.CharField(source="fhir_id", read_only=True)
     name = serializers.SerializerMethodField()
     identifier = serializers.SerializerMethodField()
     address = serializers.SerializerMethodField()
@@ -56,20 +57,39 @@ class FHIRPatientSerializer(serializers.ModelSerializer):
 
 class FHIRObservationSerializer(serializers.ModelSerializer):
     resourceType = serializers.SerializerMethodField()
+    patient_fhir_id = serializers.CharField(write_only=True, required=False)
 
     class Meta:
         model = FHIRObservation
         fields = [
-            "resourceType", "fhir_id", "status", "code", "display",
+            "resourceType", "fhir_id", "patient", "patient_fhir_id",
+            "status", "code", "display",
             "value_quantity", "value_unit", "value_string",
             "reference_range_low", "reference_range_high",
             "effective_datetime", "issued", "components",
             "device_type", "interpretation",
             "meta_version_id", "meta_last_updated",
         ]
+        extra_kwargs = {
+            "patient": {"required": False, "read_only": True},
+        }
 
     def get_resourceType(self, obj):
         return "Observation"
+
+    def create(self, validated_data):
+        patient_fhir_id = validated_data.pop("patient_fhir_id", None)
+        if patient_fhir_id and "patient" not in validated_data:
+            try:
+                validated_data["patient"] = FHIRPatient.objects.get(
+                    fhir_id=patient_fhir_id,
+                    tenant=validated_data.get("tenant"),
+                )
+            except FHIRPatient.DoesNotExist:
+                raise serializers.ValidationError(
+                    {"patient_fhir_id": f"Patient {patient_fhir_id} not found"}
+                )
+        return super().create(validated_data)
 
 
 class FHIRConditionSerializer(serializers.ModelSerializer):

@@ -46,6 +46,7 @@ _LOINC_TO_VITAL_TYPE = {
     "39156-5": "bmi",
     "9279-1": "respiratory_rate",
     "72514-3": "pain_score",
+    "2339-0": "glucose",
 }
 
 _INTERP_TO_STATUS = {
