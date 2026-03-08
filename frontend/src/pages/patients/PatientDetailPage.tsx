@@ -39,7 +39,8 @@ import AIRecommendationPanel from '@/components/clinical/AIRecommendationPanel'
 import AgentControlPanel from '@/components/agents/AgentControlPanel'
 import { RiskScoreBadge } from '@/components/charts/RiskScoreGauge'
 import { cn } from '@/lib/utils'
-import type { PatientSummary, VitalSign, Medication, CareGap } from '@/types/clinical'
+import type { PatientSummary, VitalSign, Medication, CareGap, EcgRhythm } from '@/types/clinical'
+import { ECG_RHYTHM_LABELS } from '@/types/clinical'
 
 // ─── Generate demo vitals when API returns empty ─────────────────────────────
 function generateDemoVitals(patientId: string): VitalSign[] {
@@ -177,6 +178,17 @@ function generateArchivedVitals(patientId: string): VitalSign[] {
           unit: 'mg/dL', timestamp: ts, status: 'normal', source: 'ehr',
         })
       }
+
+      // ECG rhythm snapshot each interval
+      const ecgRhythms: EcgRhythm[] = ['normal_sinus', 'normal_sinus', 'normal_sinus', 'sinus_bradycardia', 'sinus_tachycardia']
+      const rhythm = ecgRhythms[Math.floor(Math.abs(Math.sin(phase * 0.7)) * ecgRhythms.length)] ?? 'normal_sinus'
+      const hr = Math.round(74 + Math.sin(phase * 0.2) * 10 + jitter() * 4)
+      vitals.push({
+        id: String(++id), patientId, type: 'ecg',
+        value: hr, unit: 'bpm', timestamp: ts,
+        status: rhythm === 'normal_sinus' ? 'normal' : 'warning',
+        source: 'ehr', ecgRhythm: rhythm,
+      })
     }
   }
 
@@ -568,6 +580,7 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
                   <th className="text-center p-2 font-medium text-muted-foreground">Temp (°C)</th>
                   <th className="text-center p-2 font-medium text-muted-foreground">RR (/min)</th>
                   <th className="text-center p-2 font-medium text-muted-foreground">Glucose (mg/dL)</th>
+                  <th className="text-center p-2 font-medium text-muted-foreground">ECG Rhythm</th>
                   <th className="text-center p-2 font-medium text-muted-foreground">Source</th>
                 </tr>
               </thead>
@@ -605,6 +618,9 @@ function VitalsTab({ vitals, patientId }: { vitals: VitalSign[]; patientId: stri
                         </td>
                         <td className={cn('p-2 text-center font-mono', vals['glucose']?.status === 'warning' && 'text-yellow-600 font-bold')}>
                           {vals['glucose']?.value ?? '—'}
+                        </td>
+                        <td className={cn('p-2 text-center text-[11px]', vals['ecg']?.status === 'warning' && 'text-yellow-600 font-semibold', vals['ecg']?.status === 'critical' && 'text-red-600 font-bold')}>
+                          {vals['ecg']?.ecgRhythm ? ECG_RHYTHM_LABELS[vals['ecg'].ecgRhythm] : '—'}
                         </td>
                         <td className="p-2 text-center">
                           <span className="text-[10px] px-1.5 py-0.5 rounded bg-muted text-muted-foreground">
