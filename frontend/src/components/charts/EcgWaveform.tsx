@@ -203,19 +203,19 @@ export default function EcgWaveform({
     color ??
     (status === 'critical' ? '#e11d48' : status === 'warning' ? '#d97706' : '#22c55e')
 
-  // Generate or use provided signal — only when live or when waveform data is provided
+  // Generate or use provided signal
   useEffect(() => {
     if (waveformData && waveformData.length > 0) {
       signalRef.current = waveformData
-    } else if (isLive) {
-      // Generate enough signal for looping (2x duration for smooth wrap)
+    } else if (heartRate > 0) {
+      // Generate signal for both live (looping animation) and static (single-frame) display
       signalRef.current = generateEcgSignal(heartRate, rhythm, duration * 2)
     } else {
-      // Not live and no external data — clear the signal (shows flatline)
+      // No heart rate data — show flatline
       signalRef.current = []
     }
     offsetRef.current = 0
-  }, [heartRate, rhythm, duration, waveformData, isLive])
+  }, [heartRate, rhythm, duration, waveformData])
 
   const draw = useCallback(() => {
     const canvas = canvasRef.current
@@ -233,8 +233,8 @@ export default function EcgWaveform({
 
     const signal = signalRef.current
 
-    // When not live and no waveform data, draw a flatline (monitor off)
-    if (!isLive && signal.length === 0) {
+    // When no signal data, draw a flatline (monitor off)
+    if (signal.length === 0) {
       // Draw grid
       ctx.strokeStyle = 'rgba(128, 128, 128, 0.08)'
       ctx.lineWidth = 0.5 * dpr
@@ -356,10 +356,10 @@ export default function EcgWaveform({
       />
 
       {/* Overlay: rhythm label + heart rate */}
-      {showOverlay && !isLive && (
+      {showOverlay && !isLive && signalRef.current.length === 0 && (
         <div className="absolute inset-0 flex items-center justify-center">
           <span className="text-sm font-mono text-gray-600">
-            Start simulator to display ECG
+            No ECG data available
           </span>
         </div>
       )}
