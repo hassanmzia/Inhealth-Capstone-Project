@@ -342,7 +342,7 @@ services:
     image: inhealth/django:${APP_VERSION:-latest}
     container_name: inhealth-celery-worker
     restart: unless-stopped
-    command: celery -A config.celery_app worker --loglevel=${CELERY_LOG_LEVEL:-info} --concurrency=${CELERY_WORKER_CONCURRENCY:-4} -Q default,high_priority,medical_alerts,notifications,reports
+    command: celery -A config.celery_app worker --loglevel=${CELERY_LOG_LEVEL:-info} --concurrency=${CELERY_WORKER_CONCURRENCY:-4} -Q default,high_priority,medical_alerts,notifications,reports,clinical,research
     environment:
       DJANGO_SETTINGS_MODULE: ${DJANGO_SETTINGS_MODULE:-config.settings.production}
       SECRET_KEY: ${DJANGO_SECRET_KEY:?DJANGO_SECRET_KEY is required}
