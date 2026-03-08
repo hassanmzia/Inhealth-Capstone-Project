@@ -181,7 +181,7 @@ export default function App() {
 
   return (
     <ErrorBoundary>
-      <AnimatePresence mode="popLayout">
+      <AnimatePresence mode="wait">
         <Routes location={location} key={location.pathname}>
           {/* Public routes */}
           <Route
