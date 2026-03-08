@@ -22,6 +22,7 @@ import api from '@/services/api'
 import VitalsMonitor from '@/components/clinical/VitalsMonitor'
 import VitalsChart from '@/components/charts/VitalsChart'
 import GlucoseChart from '@/components/charts/GlucoseChart'
+import EcgWaveform from '@/components/charts/EcgWaveform'
 import MedicationList from '@/components/clinical/MedicationList'
 import CareGapList from '@/components/clinical/CareGapList'
 import AIRecommendationPanel from '@/components/clinical/AIRecommendationPanel'
@@ -273,8 +274,26 @@ function OverviewTab({ patient, vitals, careGaps, recommendations, refetchRecs }
 }
 
 function VitalsTab({ vitals }: { vitals: VitalSign[] }) {
+  const latestEcg = vitals.find((v) => v.type === 'ecg')
+  const latestHr = vitals.find((v) => v.type === 'heart_rate')
+
   return (
     <div className="space-y-6">
+      {/* ECG Waveform */}
+      <div className="clinical-card overflow-hidden">
+        <h3 className="text-sm font-bold text-foreground mb-4">ECG Monitor</h3>
+        <div className="flex justify-center">
+          <EcgWaveform
+            heartRate={latestEcg?.value ?? latestHr?.value ?? 72}
+            rhythm={latestEcg?.ecgRhythm ?? 'normal_sinus'}
+            width={Math.min(720, typeof window !== 'undefined' ? window.innerWidth - 120 : 600)}
+            height={200}
+            isLive
+            showOverlay
+          />
+        </div>
+      </div>
+
       <div className="clinical-card">
         <h3 className="text-sm font-bold text-foreground mb-4">Vitals Trend (24h)</h3>
         <VitalsChart vitals={vitals} height={320} showHR showBP showSpO2 />

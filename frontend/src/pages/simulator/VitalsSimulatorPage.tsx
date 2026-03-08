@@ -3,6 +3,7 @@ import { motion } from 'framer-motion'
 import {
   Activity,
   Heart,
+  HeartPulse,
   Thermometer,
   Wind,
   Droplets,
@@ -25,6 +26,9 @@ import { cn } from '@/lib/utils'
 import { usePatients, usePatient, useConditions, useMedications } from '@/hooks/useFHIR'
 import * as fhirService from '@/services/fhir'
 import type { FHIRPatient, FHIRCondition, FHIRMedicationRequest, FHIRAllergyIntolerance } from '@/types/fhir'
+import type { EcgRhythm } from '@/types/clinical'
+import { ECG_RHYTHM_LABELS } from '@/types/clinical'
+import EcgWaveform from '@/components/charts/EcgWaveform'
 
 // ─── Patient Clinical Context ────────────────────────────────────────────────
 
@@ -199,6 +203,29 @@ const VITAL_KEY_TO_LOINC: Record<string, { code: string; display: string }> = {
   temperature: { code: '8310-5', display: 'Body temperature' },
   respRate: { code: '9279-1', display: 'Respiratory rate' },
   glucose: { code: '2339-0', display: 'Blood glucose' },
+  ecgRate: { code: '8601-7', display: 'ECG heart rate' },
+}
+
+// ─── ECG Rhythm Configuration ─────────────────────────────────────────────────
+
+const ECG_RHYTHMS: { value: EcgRhythm; label: string }[] = [
+  { value: 'normal_sinus', label: 'Normal Sinus' },
+  { value: 'sinus_bradycardia', label: 'Sinus Bradycardia' },
+  { value: 'sinus_tachycardia', label: 'Sinus Tachycardia' },
+  { value: 'atrial_fibrillation', label: 'Atrial Fibrillation' },
+  { value: 'atrial_flutter', label: 'Atrial Flutter' },
+  { value: 'ventricular_tachycardia', label: 'V-Tach' },
+  { value: 'ventricular_fibrillation', label: 'V-Fib' },
+]
+
+// Map simulation profiles to ECG rhythms
+const PROFILE_ECG_RHYTHMS: Record<string, EcgRhythm> = {
+  'Healthy Patient': 'normal_sinus',
+  'Hypertensive Crisis': 'sinus_tachycardia',
+  'Diabetic Emergency': 'sinus_tachycardia',
+  'Respiratory Distress': 'sinus_tachycardia',
+  'Sepsis Onset': 'sinus_tachycardia',
+  'Bradycardia Event': 'sinus_bradycardia',
 }
 
 // ─── Simulation Profiles ─────────────────────────────────────────────────────
@@ -827,6 +854,7 @@ export default function VitalsSimulatorPage() {
   const [intervalMs, setIntervalMs] = useState(2000)
   const [recommendations, setRecommendations] = useState<AIRecommendation[]>([])
   const [showConfig, setShowConfig] = useState(false)
+  const [ecgRhythm, setEcgRhythm] = useState<EcgRhythm>('normal_sinus')
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null)
   const readingCountRef = useRef(0)
   const [allergies, setAllergies] = useState<FHIRAllergyIntolerance[]>([])
@@ -894,6 +922,8 @@ export default function VitalsSimulatorPage() {
   intervalMsRef.current = intervalMs
   const selectedPatientIdRef = useRef(selectedPatientId)
   selectedPatientIdRef.current = selectedPatientId
+  const ecgRhythmRef = useRef(ecgRhythm)
+  ecgRhythmRef.current = ecgRhythm
 
   // Persist generated readings to the backend as FHIR Observations
   const persistReading = useCallback((reading: GeneratedReading) => {
@@ -928,6 +958,24 @@ export default function VitalsSimulatorPage() {
         // Silently ignore persistence errors to not disrupt simulation
       })
     }
+
+    // Also persist ECG observation with rhythm interpretation
+    const ecgLoinc = VITAL_KEY_TO_LOINC.ecgRate
+    const hr = reading.values.heartRate ?? 72
+    const rhythmCode = ecgRhythmRef.current
+    fhirService.createObservation({
+      status: 'final',
+      code: ecgLoinc.code,
+      display: ecgLoinc.display,
+      value_quantity: hr,
+      value_unit: 'bpm',
+      effective_datetime: now,
+      reference_range_low: 60,
+      reference_range_high: 100,
+      interpretation: rhythmCode === 'normal_sinus' ? 'NSR' : rhythmCode.toUpperCase().slice(0, 4),
+      device_type: 'simulator',
+      patient_fhir_id: patientId,
+    } as Record<string, unknown>).catch(() => {})
   }, [])
 
   const tick = useCallback(() => {
@@ -995,6 +1043,8 @@ export default function VitalsSimulatorPage() {
       }
     }
     setParams(newParams)
+    // Set ECG rhythm based on profile
+    setEcgRhythm(PROFILE_ECG_RHYTHMS[profile.name] ?? 'normal_sinus')
   }
 
   const latestReading = readings.length > 0 ? readings[readings.length - 1] : null
@@ -1211,6 +1261,38 @@ export default function VitalsSimulatorPage() {
           })}
         </motion.div>
       )}
+
+      {/* ECG Waveform Monitor */}
+      <motion.div variants={ITEM} className="clinical-card overflow-hidden">
+        <div className="flex items-center justify-between mb-3">
+          <h2 className="text-sm font-bold text-foreground flex items-center gap-2">
+            <HeartPulse className="w-4 h-4 text-green-500" />
+            ECG Monitor
+          </h2>
+          <div className="flex items-center gap-2">
+            <label className="text-xs text-muted-foreground">Rhythm:</label>
+            <select
+              value={ecgRhythm}
+              onChange={(e) => setEcgRhythm(e.target.value as EcgRhythm)}
+              className="px-2 py-1 rounded border border-border bg-card text-xs text-foreground"
+            >
+              {ECG_RHYTHMS.map((r) => (
+                <option key={r.value} value={r.value}>{r.label}</option>
+              ))}
+            </select>
+          </div>
+        </div>
+        <div className="flex justify-center">
+          <EcgWaveform
+            heartRate={latestReading?.values.heartRate ?? params.heartRate?.baseline ?? 72}
+            rhythm={ecgRhythm}
+            width={Math.min(900, typeof window !== 'undefined' ? window.innerWidth - 100 : 800)}
+            height={180}
+            isLive={isRunning || true}
+            showOverlay
+          />
+        </div>
+      </motion.div>
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Trend Charts */}
