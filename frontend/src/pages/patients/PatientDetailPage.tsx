@@ -370,7 +370,7 @@ export default function PatientDetailPage() {
           <VitalsTab vitals={vitals ?? []} patientId={patientId!} />
         )}
         {activeTab === 'medications' && (
-          <MedicationList medications={medications ?? []} />
+          <MedicationsTab medications={medications ?? []} patient={patient} />
         )}
         {activeTab === 'clinical' && (
           <ClinicalTab careGaps={careGaps ?? []} patientId={patientId!} />
@@ -646,6 +646,122 @@ function AgentsTab({ patientId, patientName, recommendations, refetchRecs }: {
     </div>
   )
 }
+
+// ─── Demo Medications ─────────────────────────────────────────────────────────
+
+function generateDemoMedications(patient: PatientSummary): Medication[] {
+  const now = new Date()
+  const conditions = patient.activeConditions?.map((c) => c.display.toLowerCase()) ?? []
+
+  const allMeds: Medication[] = []
+  let id = 0
+  const add = (m: Partial<Medication>) =>
+    allMeds.push({
+      id: `demo-med-${++id}`,
+      patientId: patient.id,
+      name: '',
+      dose: '',
+      doseUnit: 'mg',
+      frequency: 'once daily',
+      route: 'oral',
+      prescribedDate: subDays(now, 90 + Math.floor(Math.random() * 200)).toISOString(),
+      startDate: subDays(now, 90 + Math.floor(Math.random() * 200)).toISOString(),
+      status: 'active',
+      adherenceStatus: (['adherent', 'adherent', 'partial', 'adherent'] as const)[id % 4],
+      pdc: 0.75 + Math.random() * 0.2,
+      lastFillDate: subDays(now, Math.floor(Math.random() * 25)).toISOString(),
+      nextRefillDate: subDays(now, -Math.floor(Math.random() * 30)).toISOString(),
+      refillsRemaining: Math.floor(Math.random() * 6) + 1,
+      daysSupply: 90,
+      ...m,
+    } as Medication)
+
+  // Diabetes-related
+  if (conditions.some((c) => c.includes('diabet'))) {
+    add({ name: 'Metformin 500mg', genericName: 'Metformin', dose: '500', frequency: 'twice daily', indication: 'Type 2 Diabetes' })
+    add({ name: 'Empagliflozin 10mg', genericName: 'Empagliflozin', brandName: 'Jardiance', dose: '10', indication: 'Type 2 Diabetes', tierLevel: 2 })
+  }
+
+  // Hypertension-related
+  if (conditions.some((c) => c.includes('hypertens') || c.includes('blood pressure'))) {
+    add({ name: 'Lisinopril 10mg', genericName: 'Lisinopril', dose: '10', indication: 'Hypertension' })
+    add({ name: 'Amlodipine 5mg', genericName: 'Amlodipine', dose: '5', indication: 'Hypertension' })
+  }
+
+  // Heart failure
+  if (conditions.some((c) => c.includes('heart failure'))) {
+    add({ name: 'Carvedilol 25mg', genericName: 'Carvedilol', dose: '25', frequency: 'twice daily', indication: 'Heart Failure' })
+    add({ name: 'Furosemide 40mg', genericName: 'Furosemide', dose: '40', indication: 'Heart Failure' })
+  }
+
+  // CKD
+  if (conditions.some((c) => c.includes('kidney') || c.includes('ckd') || c.includes('renal'))) {
+    add({ name: 'Sodium Bicarbonate 650mg', genericName: 'Sodium Bicarbonate', dose: '650', frequency: 'three times daily', indication: 'CKD' })
+  }
+
+  // COPD / Asthma
+  if (conditions.some((c) => c.includes('copd') || c.includes('asthma') || c.includes('pulmonary'))) {
+    add({ name: 'Tiotropium 18mcg', genericName: 'Tiotropium', brandName: 'Spiriva', dose: '18', doseUnit: 'mcg', route: 'inhalation', indication: 'COPD' })
+  }
+
+  // Afib
+  if (conditions.some((c) => c.includes('fibrillation') || c.includes('afib'))) {
+    add({ name: 'Apixaban 5mg', genericName: 'Apixaban', brandName: 'Eliquis', dose: '5', frequency: 'twice daily', indication: 'Atrial Fibrillation', tierLevel: 3 })
+  }
+
+  // CAD / Cholesterol
+  if (conditions.some((c) => c.includes('coronary') || c.includes('cholesterol') || c.includes('hyperlipid'))) {
+    add({ name: 'Atorvastatin 40mg', genericName: 'Atorvastatin', dose: '40', indication: 'Hyperlipidemia' })
+    add({ name: 'Aspirin 81mg', genericName: 'Aspirin', dose: '81', indication: 'CAD prophylaxis' })
+  }
+
+  // Default if no conditions matched
+  if (allMeds.length === 0) {
+    add({ name: 'Metformin 500mg', genericName: 'Metformin', dose: '500', frequency: 'twice daily', indication: 'Type 2 Diabetes' })
+    add({ name: 'Lisinopril 10mg', genericName: 'Lisinopril', dose: '10', indication: 'Hypertension' })
+    add({ name: 'Atorvastatin 20mg', genericName: 'Atorvastatin', dose: '20', indication: 'Hyperlipidemia' })
+  }
+
+  // Add a discontinued med for realism
+  add({
+    name: 'Glipizide 5mg',
+    genericName: 'Glipizide',
+    dose: '5',
+    status: 'discontinued',
+    indication: 'Type 2 Diabetes (switched therapy)',
+    endDate: subDays(now, 45).toISOString(),
+    adherenceStatus: undefined,
+    pdc: undefined,
+    nextRefillDate: undefined,
+    refillsRemaining: undefined,
+  })
+
+  // Add one interaction example
+  if (allMeds.length >= 2) {
+    allMeds[0].interactions = [{
+      id: 'demo-int-1',
+      drug1: allMeds[0].name,
+      drug2: allMeds[1].name,
+      severity: 'moderate',
+      description: 'May increase risk of hypoglycemia when used together',
+      recommendation: 'Monitor blood glucose closely and adjust doses as needed',
+      source: 'DrugBank',
+    }]
+  }
+
+  return allMeds
+}
+
+function MedicationsTab({ medications, patient }: { medications: Medication[]; patient: PatientSummary }) {
+  const meds = useMemo(() => {
+    if (medications.length > 0) return medications
+    return generateDemoMedications(patient)
+  }, [medications, patient])
+
+  return <MedicationList medications={meds} />
+}
+
+// ─── Research Tab ─────────────────────────────────────────────────────────────
 
 interface TrialResult {
   id: string
