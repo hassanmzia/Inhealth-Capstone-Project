@@ -79,12 +79,15 @@ class ClinicalDashboardStatsView(APIView):
 
         try:
             from apps.analytics.models import RiskScore
+            # Try valid scores first; fall back to latest per patient if all expired
+            qs = RiskScore.objects.filter(
+                tenant=tenant,
+                score_type="7_day_hospitalization",
+            )
+            valid_qs = qs.filter(valid_until__gt=now)
+            use_qs = valid_qs if valid_qs.exists() else qs
             for row in (
-                RiskScore.objects.filter(
-                    tenant=tenant,
-                    valid_until__gt=now,
-                    score_type="7_day_hospitalization",
-                )
+                use_qs
                 .values("risk_level")
                 .annotate(n=Count("id"))
             ):

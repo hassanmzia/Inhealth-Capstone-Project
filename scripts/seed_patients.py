@@ -399,7 +399,7 @@ with schema_context(org.schema_name):
                     "bp_systolic":    rnd_float(130, 170)  if "HTN"  in p["conditions"] else None,
                 },
                 model_version="xgboost_v1",
-                valid_until=timezone.now() + datetime.timedelta(days=30),
+                valid_until=timezone.now() + datetime.timedelta(days=365),
             )
 
         created_count += 1
