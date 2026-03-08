@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useCallback } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useQuery } from '@tanstack/react-query'
 import { motion } from 'framer-motion'
@@ -19,6 +19,9 @@ import {
   Archive,
   ChevronDown,
   ChevronUp,
+  Search,
+  ExternalLink,
+  Loader2,
 } from 'lucide-react'
 import { format, subDays, subHours, subMinutes } from 'date-fns'
 import api from '@/services/api'
@@ -376,7 +379,7 @@ export default function PatientDetailPage() {
           <AgentsTab patientId={patientId!} patientName={`${patient.firstName} ${patient.lastName}`} recommendations={recommendations ?? []} refetchRecs={refetchRecs} />
         )}
         {activeTab === 'research' && (
-          <ResearchTabSimple />
+          <ResearchTab patient={patient} />
         )}
         {activeTab === 'sdoh' && (
           <SDOHTab />
@@ -644,14 +647,196 @@ function AgentsTab({ patientId, patientName, recommendations, refetchRecs }: {
   )
 }
 
-function ResearchTabSimple() {
+interface TrialResult {
+  id: string
+  title: string
+  abstract?: string
+  source: string
+  url?: string
+  relevanceScore?: number
+  trialStatus?: string
+  phase?: string
+}
+
+function ResearchTab({ patient }: { patient: PatientSummary }) {
+  const [query, setQuery] = useState('')
+  const [results, setResults] = useState<TrialResult[]>([])
+  const [loading, setLoading] = useState(false)
+  const [searched, setSearched] = useState(false)
+  const [expandedId, setExpandedId] = useState<string | null>(null)
+
+  const conditions = patient.activeConditions?.map((c) => c.display) ?? []
+
+  const searchTrials = useCallback(
+    async (searchQuery: string) => {
+      if (!searchQuery.trim()) return
+      setLoading(true)
+      setSearched(true)
+      try {
+        const res = await api.post('/research/search/', {
+          query: searchQuery,
+          type: 'trials',
+        })
+        setResults(res.data?.results ?? [])
+      } catch {
+        setResults([])
+      } finally {
+        setLoading(false)
+      }
+    },
+    [],
+  )
+
+  const handleConditionClick = (condition: string) => {
+    setQuery(condition)
+    searchTrials(condition)
+  }
+
+  const statusColor = (s?: string) => {
+    if (!s) return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+    const lower = s.toLowerCase()
+    if (lower.includes('recruiting')) return 'bg-green-100 text-green-700 dark:bg-green-900/30 dark:text-green-400'
+    if (lower.includes('active')) return 'bg-blue-100 text-blue-700 dark:bg-blue-900/30 dark:text-blue-400'
+    if (lower.includes('completed')) return 'bg-gray-100 text-gray-600 dark:bg-gray-800 dark:text-gray-400'
+    return 'bg-yellow-100 text-yellow-700 dark:bg-yellow-900/30 dark:text-yellow-400'
+  }
+
   return (
-    <div className="clinical-card text-center py-12">
-      <FlaskConical className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
-      <p className="text-sm font-medium text-foreground">Clinical Trial Matching</p>
-      <p className="text-xs text-muted-foreground mt-1">
-        Visit the Research page to find clinical trials for this patient
-      </p>
+    <div className="space-y-4">
+      {/* Patient conditions as quick-search chips */}
+      {conditions.length > 0 && (
+        <div className="clinical-card">
+          <p className="text-xs font-medium text-muted-foreground mb-2">
+            Match trials for active conditions:
+          </p>
+          <div className="flex flex-wrap gap-2">
+            {conditions.map((c) => (
+              <button
+                key={c}
+                onClick={() => handleConditionClick(c)}
+                className={cn(
+                  'text-xs px-3 py-1.5 rounded-full border transition-colors',
+                  query === c
+                    ? 'bg-primary text-primary-foreground border-primary'
+                    : 'bg-muted/50 text-foreground border-border hover:bg-muted',
+                )}
+              >
+                {c}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      {/* Search bar */}
+      <div className="clinical-card">
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            searchTrials(query)
+          }}
+          className="flex gap-2"
+        >
+          <div className="relative flex-1">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <input
+              type="text"
+              value={query}
+              onChange={(e) => setQuery(e.target.value)}
+              placeholder="Search clinical trials (e.g., diabetes, hypertension)..."
+              className="w-full pl-9 pr-3 py-2 text-sm rounded-lg border border-border bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
+            />
+          </div>
+          <button
+            type="submit"
+            disabled={loading || !query.trim()}
+            className="px-4 py-2 text-sm font-medium rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-50 transition-colors"
+          >
+            {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Search'}
+          </button>
+        </form>
+      </div>
+
+      {/* Results */}
+      {loading && (
+        <div className="clinical-card text-center py-8">
+          <Loader2 className="w-6 h-6 animate-spin text-primary mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">Searching ClinicalTrials.gov...</p>
+        </div>
+      )}
+
+      {!loading && searched && results.length === 0 && (
+        <div className="clinical-card text-center py-8">
+          <FlaskConical className="w-6 h-6 text-muted-foreground mx-auto mb-2" />
+          <p className="text-sm text-muted-foreground">No matching trials found. Try a different search term.</p>
+        </div>
+      )}
+
+      {!loading && results.length > 0 && (
+        <div className="space-y-2">
+          <p className="text-xs text-muted-foreground px-1">
+            {results.length} trial{results.length !== 1 ? 's' : ''} found
+          </p>
+          {results.map((trial) => (
+            <div
+              key={trial.id}
+              className="clinical-card cursor-pointer hover:ring-1 hover:ring-primary/20 transition-all"
+              onClick={() => setExpandedId(expandedId === trial.id ? null : trial.id)}
+            >
+              <div className="flex items-start justify-between gap-3">
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-medium text-foreground leading-snug">{trial.title}</p>
+                  <div className="flex items-center gap-2 mt-1.5 flex-wrap">
+                    {trial.trialStatus && (
+                      <span className={cn('text-[10px] font-semibold px-2 py-0.5 rounded-full', statusColor(trial.trialStatus))}>
+                        {trial.trialStatus}
+                      </span>
+                    )}
+                    {trial.phase && (
+                      <span className="text-[10px] font-medium px-2 py-0.5 rounded-full bg-purple-100 text-purple-700 dark:bg-purple-900/30 dark:text-purple-400">
+                        {trial.phase}
+                      </span>
+                    )}
+                    <span className="text-[10px] text-muted-foreground">{trial.source}</span>
+                    {trial.relevanceScore != null && (
+                      <span className="text-[10px] text-muted-foreground">
+                        {Math.round(trial.relevanceScore * 100)}% match
+                      </span>
+                    )}
+                  </div>
+                </div>
+                {trial.url && (
+                  <a
+                    href={trial.url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    onClick={(e) => e.stopPropagation()}
+                    className="shrink-0 p-1.5 rounded-md hover:bg-muted text-muted-foreground hover:text-foreground transition-colors"
+                  >
+                    <ExternalLink className="w-4 h-4" />
+                  </a>
+                )}
+              </div>
+              {expandedId === trial.id && trial.abstract && (
+                <p className="text-xs text-muted-foreground mt-3 pt-3 border-t border-border leading-relaxed">
+                  {trial.abstract}
+                </p>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+
+      {/* Empty state — no search yet */}
+      {!searched && conditions.length === 0 && (
+        <div className="clinical-card text-center py-10">
+          <FlaskConical className="w-8 h-8 text-muted-foreground mx-auto mb-3" />
+          <p className="text-sm font-medium text-foreground">Clinical Trial Matching</p>
+          <p className="text-xs text-muted-foreground mt-1">
+            Search for clinical trials relevant to this patient
+          </p>
+        </div>
+      )}
     </div>
   )
 }
