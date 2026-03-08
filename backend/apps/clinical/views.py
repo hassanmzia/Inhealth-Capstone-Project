@@ -1,10 +1,13 @@
 """Clinical workflow views."""
 
 import logging
+import uuid as _uuid
 
+from django.utils import timezone as tz
 from rest_framework import permissions, status
 from rest_framework.decorators import action
 from rest_framework.response import Response
+from rest_framework.views import APIView
 from rest_framework.viewsets import ModelViewSet
 
 from apps.accounts.permissions import CanAccessPHI, IsClinician
@@ -235,3 +238,79 @@ def _create_default_vital_targets(patient, tenant, set_by=None):
         )
         created.append(target)
     return created
+
+
+class VitalsIngestView(APIView):
+    """
+    POST /api/v1/clinical/vitals/
+
+    Accepts IoT simulator payloads and creates FHIR Observations.
+    Payload:
+        {
+            "patient_id": "<uuid>",
+            "device_type": "ecg_monitor",
+            "device_id": "sim-ecg_monitor-abcd1234",
+            "readings": [
+                {"vital_type": "ecg", "value": 74, "unit": "bpm",
+                 "loinc_code": "8867-4", "timestamp": "...",
+                 "ecg_rhythm": "normal_sinus"}
+            ]
+        }
+    """
+
+    permission_classes = [permissions.IsAuthenticated]
+
+    def post(self, request):
+        from apps.fhir.models import FHIRObservation, FHIRPatient
+
+        patient_id = request.data.get("patient_id")
+        readings = request.data.get("readings", [])
+        device_id = request.data.get("device_id", "")
+
+        if not patient_id or not readings:
+            return Response(
+                {"error": "patient_id and readings are required"},
+                status=status.HTTP_400_BAD_REQUEST,
+            )
+
+        tenant = getattr(request, "tenant", None) or request.user.tenant
+
+        try:
+            patient = FHIRPatient.objects.get(id=patient_id, tenant=tenant)
+        except FHIRPatient.DoesNotExist:
+            # Try by fhir_id
+            try:
+                patient = FHIRPatient.objects.get(fhir_id=patient_id, tenant=tenant)
+            except FHIRPatient.DoesNotExist:
+                return Response({"error": "Patient not found"}, status=status.HTTP_404_NOT_FOUND)
+
+        created = []
+        for r in readings:
+            loinc = r.get("loinc_code", "")
+            value = r.get("value")
+            unit = r.get("unit", "")
+            vital_type = r.get("vital_type", "")
+
+            raw = {}
+            if r.get("ecg_rhythm"):
+                raw["ecg_rhythm"] = r["ecg_rhythm"]
+
+            obs = FHIRObservation.objects.create(
+                tenant=tenant,
+                fhir_id=str(_uuid.uuid4()),
+                patient=patient,
+                code=loinc,
+                display=vital_type.replace("_", " ").title(),
+                value_quantity=float(value) if value is not None else 0,
+                value_unit=unit,
+                effective_datetime=r.get("timestamp") or tz.now(),
+                status="final",
+                device_id=device_id,
+                raw_resource=raw,
+            )
+            created.append(str(obs.fhir_id))
+
+        return Response(
+            {"created": len(created), "observation_ids": created},
+            status=status.HTTP_201_CREATED,
+        )

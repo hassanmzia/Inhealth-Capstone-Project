@@ -8,6 +8,7 @@ Supported devices:
   - smartwatch   Heart rate, SpO2, temperature, activity
   - pulse_ox     Pulse oximeter (SpO2, pulse rate)
   - bp_monitor   Blood pressure (systolic / diastolic mmHg)
+  - ecg_monitor  ECG monitor (heart rate + rhythm classification)
 
 Usage:
     python scripts/iot_simulator.py \
@@ -47,6 +48,7 @@ VITAL_RANGES = {
     "diastolic_bp": {"min": 70, "max": 90, "unit": "mmHg", "loinc": "8462-4"},
     "glucose": {"min": 70, "max": 180, "unit": "mg/dL", "loinc": "2339-0"},
     "temperature": {"min": 36.1, "max": 37.2, "unit": "Cel", "loinc": "8310-5"},
+    "ecg_heart_rate": {"min": 60, "max": 100, "unit": "bpm", "loinc": "8867-4"},
 }
 
 # Device-to-vital mapping
@@ -55,6 +57,23 @@ DEVICE_VITALS = {
     "smartwatch": ["heart_rate", "spo2", "temperature"],
     "pulse_ox": ["spo2", "heart_rate"],
     "bp_monitor": ["systolic_bp", "diastolic_bp"],
+    "ecg_monitor": ["ecg_heart_rate"],
+}
+
+# ECG rhythm classifications and their probabilities during normal / anomaly states
+ECG_RHYTHMS = {
+    "normal": [
+        ("normal_sinus", 0.85),
+        ("sinus_bradycardia", 0.07),
+        ("sinus_tachycardia", 0.08),
+    ],
+    "anomaly": [
+        ("normal_sinus", 0.20),
+        ("sinus_tachycardia", 0.25),
+        ("atrial_fibrillation", 0.30),
+        ("atrial_flutter", 0.15),
+        ("sinus_bradycardia", 0.10),
+    ],
 }
 
 # Anomaly definitions: how much to shift the value
@@ -65,6 +84,7 @@ ANOMALY_SHIFTS = {
     "diastolic_bp": {"spike": 20, "deteriorate": 1},
     "glucose": {"spike": 120, "deteriorate": 5},
     "temperature": {"spike": 2.5, "deteriorate": 0.15},
+    "ecg_heart_rate": {"spike": 50, "deteriorate": 3},
 }
 
 
@@ -154,15 +174,35 @@ class VitalSignGenerator:
             else:
                 value = round(value, 0)
 
-            readings.append({
+            reading = {
                 "vital_type": vital,
                 "value": value,
                 "unit": r["unit"],
                 "loinc_code": r["loinc"],
                 "timestamp": now,
-            })
+            }
+
+            # Attach ECG rhythm classification for ecg_monitor device
+            if self.device_type == "ecg_monitor" and vital == "ecg_heart_rate":
+                pool = ECG_RHYTHMS["anomaly"] if anomaly_this_step else ECG_RHYTHMS["normal"]
+                rhythm = _weighted_choice(pool)
+                reading["ecg_rhythm"] = rhythm
+                reading["vital_type"] = "ecg"  # map to the frontend's expected type
+
+            readings.append(reading)
 
         return readings
+
+
+def _weighted_choice(options: list[tuple[str, float]]) -> str:
+    """Pick from a list of (value, weight) tuples."""
+    r = random.random()
+    cumulative = 0.0
+    for value, weight in options:
+        cumulative += weight
+        if r < cumulative:
+            return value
+    return options[-1][0]
 
 
 def send_readings(
