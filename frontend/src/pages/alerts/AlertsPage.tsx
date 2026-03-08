@@ -160,7 +160,7 @@ export default function AlertsPage() {
 
       {/* Alert list */}
       <div className="space-y-2">
-        <AnimatePresence mode="popLayout">
+        <AnimatePresence mode="sync">
           {displayedAlerts.length === 0 ? (
             <motion.div
               key="empty"
